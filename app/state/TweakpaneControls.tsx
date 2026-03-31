@@ -92,6 +92,33 @@ export default function TweakpaneControls() {
             />
           </label>
 
+          <label style={{ display: "grid", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                fontWeight: 600,
+              }}
+            >
+              <span>Vertical Exaggeration</span>
+              <span>{moistureLayer.verticalExaggeration.toFixed(1)}x</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={8}
+              step={0.5}
+              value={moistureLayer.verticalExaggeration}
+              onChange={(event) =>
+                setMoistureLayer({
+                  verticalExaggeration: Number(event.currentTarget.value),
+                })
+              }
+              style={{ width: "100%", accentColor: "#8ad4ff" }}
+            />
+          </label>
+
           <div style={{ display: "grid", gap: 4 }}>
             <div
               style={{
@@ -107,6 +134,24 @@ export default function TweakpaneControls() {
             <div style={{ lineHeight: 1.45, opacity: 0.85 }}>
               Pressure-relative p95 by pressure level, with one light closing pass
               and small components removed.
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 4 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                opacity: 0.66,
+              }}
+            >
+              Display Mode
+            </div>
+            <div style={{ lineHeight: 1.45, opacity: 0.85 }}>
+              Frontend-only radial exaggeration with discrete pressure-level
+              color bands to make vertical structure easier to read.
             </div>
           </div>
         </div>

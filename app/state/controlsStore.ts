@@ -55,6 +55,7 @@ type ExampleParticleLayerState = {
 type MoistureStructureLayerState = {
   visible: boolean;
   opacity: number;
+  verticalExaggeration: number;
 };
 
 export const EXAMPLE_LAYER_PRESETS = {
@@ -97,6 +98,7 @@ export const useControls = create<ControlsState>()(
     moistureStructureLayer: {
       visible: true,
       opacity: 0.78,
+      verticalExaggeration: 4,
     },
     // Defaults keep the examples hidden from the UI. Use EXAMPLE_LAYER_PRESETS
     // in code when you want to turn one on for local experimentation.

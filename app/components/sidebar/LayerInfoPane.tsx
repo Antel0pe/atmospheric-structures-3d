@@ -27,21 +27,27 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
   moistureStructureLayer: {
     title: "Moisture Structures Layer",
     summary:
-      "A 3D humidity-body renderer that loads precomputed moisture meshes, colors them by vertical character, and crossfades between timestamps.",
+      "A 3D humidity-body renderer that loads precomputed moisture meshes, exaggerates their height in the client, and crossfades between timestamps.",
     detail:
-      "Humid regions are detected with pressure-relative thresholds, lightly smoothed, turned into closed 3D surfaces offline, and then rendered here as semi-transparent globe-space volumes.",
+      "Humid regions are detected with pressure-relative thresholds, lightly smoothed, turned into closed 3D surfaces offline, and then rendered here as semi-transparent globe-space volumes with discrete color bands snapped to individual pressure levels.",
     legend: [
       {
-        label: "Higher-altitude structures",
-        detail: "More magenta-toned components with lower pressure centroids.",
+        label: "Upper levels",
+        detail: "Lowest-pressure bands near the top of the rendered volume.",
         swatch:
-          "linear-gradient(135deg, rgba(214, 77, 246, 0.96), rgba(170, 68, 255, 0.84))",
+          "linear-gradient(135deg, rgba(185, 92, 255, 0.96), rgba(149, 69, 235, 0.84))",
       },
       {
-        label: "Lower-altitude structures",
-        detail: "Warmer coral-toned components with higher pressure centroids.",
+        label: "Middle levels",
+        detail: "Mid-pressure bands transition through blue and cyan hues.",
         swatch:
-          "linear-gradient(135deg, rgba(255, 123, 99, 0.96), rgba(255, 157, 117, 0.88))",
+          "linear-gradient(135deg, rgba(94, 134, 255, 0.96), rgba(66, 99, 220, 0.84))",
+      },
+      {
+        label: "Lower levels",
+        detail: "Higher-pressure bands toward the globe trend warmer.",
+        swatch:
+          "linear-gradient(135deg, rgba(45, 198, 214, 0.96), rgba(255, 138, 99, 0.84))",
       },
     ],
   },
@@ -136,7 +142,7 @@ export default function LayerInfoPane() {
     if (moistureStructureLayer.visible) {
       entries.push({
         id: "moistureStructureLayer",
-        tag: `Opacity ${Math.round(moistureStructureLayer.opacity * 100)}%`,
+        tag: `Opacity ${Math.round(moistureStructureLayer.opacity * 100)}% | Z ${moistureStructureLayer.verticalExaggeration.toFixed(1)}x`,
         ...LAYER_INFO.moistureStructureLayer,
       });
     }
@@ -172,6 +178,7 @@ export default function LayerInfoPane() {
     return entries;
   }, [
     moistureStructureLayer.opacity,
+    moistureStructureLayer.verticalExaggeration,
     moistureStructureLayer.visible,
     exampleContoursLayer.pressureLevel,
     exampleParticleLayer.pressureLevel,
