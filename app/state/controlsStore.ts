@@ -52,6 +52,11 @@ type ExampleParticleLayerState = {
   pressureLevel: ExampleParticlePressure;
 };
 
+type MoistureStructureLayerState = {
+  visible: boolean;
+  opacity: number;
+};
+
 export const EXAMPLE_LAYER_PRESETS = {
   shaderMeshVisible: {
     pressureLevel: 250 as ExampleShaderMeshPressure,
@@ -73,9 +78,13 @@ export const EXAMPLE_LAYER_PRESETS = {
 } as const;
 
 type ControlsState = {
+  moistureStructureLayer: MoistureStructureLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
   exampleParticleLayer: ExampleParticleLayerState;
+  setMoistureStructureLayer: (
+    patch: Partial<MoistureStructureLayerState>
+  ) => void;
   setExampleShaderMeshLayer: (
     patch: Partial<ExampleShaderMeshLayerState>
   ) => void;
@@ -85,6 +94,10 @@ type ControlsState = {
 
 export const useControls = create<ControlsState>()(
   subscribeWithSelector((set) => ({
+    moistureStructureLayer: {
+      visible: true,
+      opacity: 0.78,
+    },
     // Defaults keep the examples hidden from the UI. Use EXAMPLE_LAYER_PRESETS
     // in code when you want to turn one on for local experimentation.
     exampleShaderMeshLayer: {
@@ -104,6 +117,13 @@ export const useControls = create<ControlsState>()(
     exampleParticleLayer: {
       pressureLevel: "none",
     },
+    setMoistureStructureLayer: (patch) =>
+      set((state) => ({
+        moistureStructureLayer: {
+          ...state.moistureStructureLayer,
+          ...patch,
+        },
+      })),
     setExampleShaderMeshLayer: (patch) =>
       set((state) => ({
         exampleShaderMeshLayer: {

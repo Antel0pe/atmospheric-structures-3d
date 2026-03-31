@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useControls } from "@/app/state/controlsStore";
 
 type ActiveExampleId =
+  | "moistureStructureLayer"
   | "exampleShaderMeshLayer"
   | "exampleContoursLayer"
   | "exampleParticleLayer";
@@ -23,6 +24,27 @@ type LayerInfoEntry = {
 };
 
 const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
+  moistureStructureLayer: {
+    title: "Moisture Structures Layer",
+    summary:
+      "A 3D humidity-body renderer that loads precomputed moisture meshes, colors them by vertical character, and crossfades between timestamps.",
+    detail:
+      "Humid regions are detected with pressure-relative thresholds, lightly smoothed, turned into closed 3D surfaces offline, and then rendered here as semi-transparent globe-space volumes.",
+    legend: [
+      {
+        label: "Higher-altitude structures",
+        detail: "More magenta-toned components with lower pressure centroids.",
+        swatch:
+          "linear-gradient(135deg, rgba(214, 77, 246, 0.96), rgba(170, 68, 255, 0.84))",
+      },
+      {
+        label: "Lower-altitude structures",
+        detail: "Warmer coral-toned components with higher pressure centroids.",
+        swatch:
+          "linear-gradient(135deg, rgba(255, 123, 99, 0.96), rgba(255, 157, 117, 0.88))",
+      },
+    ],
+  },
   exampleShaderMeshLayer: {
     title: "Example Shader Mesh Layer",
     summary:
@@ -95,6 +117,9 @@ function sectionStyle() {
 }
 
 export default function LayerInfoPane() {
+  const moistureStructureLayer = useControls(
+    (state) => state.moistureStructureLayer
+  );
   const exampleShaderMeshLayer = useControls(
     (state) => state.exampleShaderMeshLayer
   );
@@ -107,6 +132,14 @@ export default function LayerInfoPane() {
 
   const activeEntries = useMemo(() => {
     const entries: Array<LayerInfoEntry & { tag: string }> = [];
+
+    if (moistureStructureLayer.visible) {
+      entries.push({
+        id: "moistureStructureLayer",
+        tag: `Opacity ${Math.round(moistureStructureLayer.opacity * 100)}%`,
+        ...LAYER_INFO.moistureStructureLayer,
+      });
+    }
 
     if (exampleShaderMeshLayer.pressureLevel !== "none") {
       entries.push({
@@ -138,6 +171,8 @@ export default function LayerInfoPane() {
 
     return entries;
   }, [
+    moistureStructureLayer.opacity,
+    moistureStructureLayer.visible,
     exampleContoursLayer.pressureLevel,
     exampleParticleLayer.pressureLevel,
     exampleShaderMeshLayer.pressureLevel,
@@ -175,8 +210,9 @@ export default function LayerInfoPane() {
             Example Layers
           </div>
           <div style={{ opacity: 0.78, lineHeight: 1.45 }}>
-            The example shader mesh, contour, and particle layers are scaffolded in
-            code but hidden from the UI by default.
+            The moisture structures layer is available from the sidebar, and the
+            example shader mesh, contour, and particle layers remain scaffolded in
+            code for local experimentation.
           </div>
           <div style={{ opacity: 0.62, lineHeight: 1.45, marginTop: 10 }}>
             Enable one of the presets in `app/state/controlsStore.ts` when you want

@@ -21,10 +21,13 @@ tmp/
 
 # production
 /build
+/public/moisture-structures/
 
 # misc
 .DS_Store
 *.pem
+__pycache__/
+*.py[cod]
 
 # debug
 npm-debug.log*

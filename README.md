@@ -2,7 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-Run `source scripts/project-conda-env.sh` to create the conda environment and activate it.
+Run `source scripts/project-conda-env.sh --env-name atmospheric-structures-3d`
+to create the `atmospheric-structures-3d` conda environment and activate it.
 
 First, run the development server:
 

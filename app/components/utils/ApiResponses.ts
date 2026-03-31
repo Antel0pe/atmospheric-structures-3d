@@ -1,4 +1,10 @@
-import { fetchJsonOrThrow } from "./dataFetchErrors";
+import {
+  type AvailableRange,
+  DataFetchError,
+  fetchBlobOrThrow,
+  fetchJsonOrThrow,
+  notifyDataFetchError,
+} from "./dataFetchErrors";
 
 const DATA_SOURCE_KIND = process.env.NEXT_PUBLIC_DATA_SOURCE_KIND;
 const PUBLIC_DATA_BASE_PATH = process.env.NEXT_PUBLIC_DATA_BASE_PATH?.trim() || "";
@@ -10,6 +16,10 @@ function usesPublicDataAssets() {
 function buildPublicDataUrl(...segments: string[]) {
   const prefix = PUBLIC_DATA_BASE_PATH.replace(/^\/+|\/+$/g, "");
   return `/${[prefix, ...segments].filter(Boolean).join("/")}`;
+}
+
+function buildMoistureStructuresUrl(...segments: string[]) {
+  return buildPublicDataUrl("moisture-structures", ...segments);
 }
 
 function parseDatehour(datehour: string): Date {
@@ -138,6 +148,94 @@ export type ExampleContoursFile = {
   levels: ContourLevels;
 };
 
+export type MoistureThresholdEntry = {
+  pressure_hpa: number;
+  threshold: number;
+};
+
+export type MoistureStructureManifestTimestamp = {
+  timestamp: string;
+  metadata: string;
+  positions: string;
+  indices: string;
+  component_count: number;
+  vertex_count: number;
+  index_count: number;
+};
+
+export type MoistureStructureManifest = {
+  version: number;
+  dataset: string;
+  variable: string;
+  units: string;
+  threshold_mode: {
+    kind: string;
+    quantile: number;
+    minimum_component_size: number;
+    smoothing: {
+      binary_closing_radius_cells: number;
+      gaussian_sigma: number;
+    };
+  };
+  globe: {
+    base_radius: number;
+    vertical_span: number;
+    reference_pressure_hpa: {
+      min: number;
+      max: number;
+    };
+  };
+  grid: {
+    pressure_level_count: number;
+    latitude_count: number;
+    longitude_count: number;
+    latitude_step_degrees: number;
+    longitude_step_degrees: number;
+  };
+  thresholds: MoistureThresholdEntry[];
+  timestamps: MoistureStructureManifestTimestamp[];
+};
+
+export type MoistureStructureComponentMetadata = {
+  id: number;
+  vertex_offset: number;
+  vertex_count: number;
+  index_offset: number;
+  index_count: number;
+  voxel_count: number;
+  mean_specific_humidity: number;
+  max_specific_humidity: number;
+  pressure_min_hpa: number;
+  pressure_max_hpa: number;
+  latitude_min_deg: number;
+  latitude_max_deg: number;
+  longitude_min_deg: number;
+  longitude_max_deg: number;
+  wraps_longitude_seam: boolean;
+};
+
+export type MoistureStructureMetadata = {
+  version: number;
+  timestamp: string;
+  component_count: number;
+  vertex_count: number;
+  index_count: number;
+  thresholded_voxel_count: number;
+  components: MoistureStructureComponentMetadata[];
+  positions_file: string;
+  indices_file: string;
+};
+
+export type MoistureStructureFrame = {
+  manifest: MoistureStructureManifest;
+  entry: MoistureStructureManifestTimestamp;
+  metadata: MoistureStructureMetadata;
+  positions: Float32Array;
+  indices: Uint32Array;
+};
+
+let moistureManifestPromise: Promise<MoistureStructureManifest> | null = null;
+
 export async function fetchExampleContours(
   datehour: string,
   pressure: ExampleContoursPressure
@@ -152,4 +250,145 @@ export async function fetchExampleContours(
     "Failed to load example contour data.",
     { layerLabel }
   );
+}
+
+function availableRangeFromManifest(
+  manifest: MoistureStructureManifest
+): AvailableRange | undefined {
+  const first = manifest.timestamps[0]?.timestamp;
+  const last = manifest.timestamps[manifest.timestamps.length - 1]?.timestamp;
+  if (!first || !last) return undefined;
+  return { start: first, end: last };
+}
+
+function moistureTimestampNotFoundError(
+  datehour: string,
+  manifest: MoistureStructureManifest
+) {
+  return new DataFetchError({
+    message: `No moisture structure data exists for ${datehour}.`,
+    status: 404,
+    availableRange: availableRangeFromManifest(manifest),
+  });
+}
+
+export function snapTimestampToAvailable(
+  datehour: string,
+  availableValues: string[]
+) {
+  if (availableValues.length === 0) return datehour;
+  if (availableValues.includes(datehour)) return datehour;
+
+  let targetMs = Number.NaN;
+  try {
+    targetMs = parseDatehour(datehour).getTime();
+  } catch {
+    return availableValues[0];
+  }
+
+  let bestValue = availableValues[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of availableValues) {
+    try {
+      const distance = Math.abs(parseDatehour(candidate).getTime() - targetMs);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestValue = candidate;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return bestValue;
+}
+
+export async function fetchMoistureStructureManifest(opts?: {
+  refresh?: boolean;
+  notifyOnError?: boolean;
+}) {
+  const refresh = opts?.refresh ?? false;
+  const notifyOnError = opts?.notifyOnError ?? true;
+
+  if (!refresh && moistureManifestPromise) {
+    return moistureManifestPromise;
+  }
+
+  const promise = fetchJsonOrThrow<MoistureStructureManifest>(
+    buildMoistureStructuresUrl("index.json"),
+    "Failed to load moisture structure manifest.",
+    {
+      layerLabel: "Moisture structures",
+      notifyOnError,
+    }
+  );
+
+  moistureManifestPromise = promise.catch((error) => {
+    moistureManifestPromise = null;
+    throw error;
+  });
+
+  return moistureManifestPromise;
+}
+
+export async function fetchMoistureStructureFrame(
+  datehour: string,
+  opts?: {
+    notifyOnError?: boolean;
+  }
+): Promise<MoistureStructureFrame> {
+  const notifyOnError = opts?.notifyOnError ?? true;
+  const manifest = await fetchMoistureStructureManifest({ notifyOnError });
+  const entry = manifest.timestamps.find((item) => item.timestamp === datehour);
+
+  if (!entry) {
+    const error = moistureTimestampNotFoundError(datehour, manifest);
+    if (notifyOnError) {
+      notifyDataFetchError(error, "Failed to load moisture structures.", {
+        layerLabel: "Moisture structures",
+      });
+    }
+    throw error;
+  }
+
+  const [metadata, positionsBlob, indicesBlob] = await Promise.all([
+    fetchJsonOrThrow<MoistureStructureMetadata>(
+      buildMoistureStructuresUrl(entry.metadata),
+      "Failed to load moisture structure metadata.",
+      {
+        layerLabel: "Moisture structures",
+        notifyOnError,
+      }
+    ),
+    fetchBlobOrThrow(
+      buildMoistureStructuresUrl(entry.positions),
+      "Failed to load moisture structure positions.",
+      {
+        layerLabel: "Moisture structures",
+        notifyOnError,
+      }
+    ),
+    fetchBlobOrThrow(
+      buildMoistureStructuresUrl(entry.indices),
+      "Failed to load moisture structure indices.",
+      {
+        layerLabel: "Moisture structures",
+        notifyOnError,
+      }
+    ),
+  ]);
+
+  const [positionsBuffer, indicesBuffer] = await Promise.all([
+    positionsBlob.arrayBuffer(),
+    indicesBlob.arrayBuffer(),
+  ]);
+
+  return {
+    manifest,
+    entry,
+    metadata,
+    positions: new Float32Array(positionsBuffer),
+    indices: new Uint32Array(indicesBuffer),
+  };
 }
