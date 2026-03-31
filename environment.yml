@@ -1,0 +1,25 @@
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.13
+  - ipykernel
+  - numpy
+  - scipy
+  - xarray
+  - dask
+  - h5netcdf
+  - netcdf4
+  - imageio
+  - tqdm
+  - matplotlib
+  - cartopy
+  - scikit-image
+  - metpy
+  - fastapi
+  - uvicorn
+  - proj
+  - rasterio
+  - gdal
+  - cfgrib
+  - eccodes
