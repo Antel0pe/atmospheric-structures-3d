@@ -23,7 +23,9 @@ DEFAULT_TIME_WINDOW = 7
 DEFAULT_GAUSSIAN_SIGMA = 0.6
 DEFAULT_THRESHOLD_SAMPLE_STRIDE = 1
 DEFAULT_THRESHOLD_TIME_STRIDE = 1
-CLOSING_STRUCTURE = np.ones((3, 3, 3), dtype=bool)
+DEFAULT_GEOMETRY_MODE = "marching-cubes"
+DEFAULT_CLOSING_RADIUS_CELLS = 1
+DEFAULT_SEGMENTATION_MODE = "p95-close"
 LABEL_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
 
 
@@ -39,6 +41,10 @@ class BuildConfig:
     gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA
     threshold_time_stride: int = DEFAULT_THRESHOLD_TIME_STRIDE
     threshold_sample_stride: int = DEFAULT_THRESHOLD_SAMPLE_STRIDE
+    geometry_mode: str = DEFAULT_GEOMETRY_MODE
+    closing_radius_cells: int = DEFAULT_CLOSING_RADIUS_CELLS
+    segmentation_mode: str = DEFAULT_SEGMENTATION_MODE
+    write_footprints: bool = True
     limit_timestamps: int | None = None
 
 
@@ -205,8 +211,21 @@ def build_threshold_mask(field: np.ndarray, thresholds: np.ndarray) -> np.ndarra
     return np.asarray(field >= threshold_grid, dtype=bool)
 
 
-def lightly_close_mask(mask: np.ndarray) -> np.ndarray:
-    return ndimage.binary_closing(mask, structure=CLOSING_STRUCTURE)
+def build_closing_structure(radius_cells: int) -> np.ndarray:
+    radius = max(int(radius_cells), 0)
+    if radius == 0:
+        return np.ones((1, 1, 1), dtype=bool)
+    width = radius * 2 + 1
+    return np.ones((width, width, width), dtype=bool)
+
+
+def lightly_close_mask(mask: np.ndarray, closing_radius_cells: int = DEFAULT_CLOSING_RADIUS_CELLS) -> np.ndarray:
+    if closing_radius_cells <= 0:
+        return np.asarray(mask, dtype=bool)
+    return ndimage.binary_closing(
+        mask,
+        structure=build_closing_structure(closing_radius_cells),
+    )
 
 
 def iter_wrapped_components(
@@ -288,6 +307,18 @@ def crop_mask(mask: np.ndarray, pad: int = 1) -> tuple[np.ndarray, tuple[int, in
     return cropped, tuple(int(x) for x in mins), tuple(int(x) for x in maxs)
 
 
+def build_axis_bounds(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float64)
+    if values.size == 1:
+        step = 1.0
+        return np.array([values[0] - step * 0.5, values[0] + step * 0.5], dtype=np.float64)
+
+    midpoints = (values[:-1] + values[1:]) * 0.5
+    first = values[0] - (midpoints[0] - values[0])
+    last = values[-1] + (values[-1] - midpoints[-1])
+    return np.concatenate([[first], midpoints, [last]]).astype(np.float64)
+
+
 def interpolate_pressures(pressure_levels: np.ndarray, fractional_indices: np.ndarray) -> np.ndarray:
     return np.exp(
         np.interp(
@@ -311,7 +342,41 @@ def interpolate_radius(
     )[::-1]
 
 
-def build_component_surface(
+def build_component_metadata(
+    component_mask: np.ndarray,
+    field: np.ndarray,
+    pressure_levels: np.ndarray,
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    rolled_longitudes: np.ndarray,
+    roll_start: int,
+) -> dict[str, Any]:
+    wraps_longitude_seam = bool(component_mask[..., 0].any() and component_mask[..., -1].any())
+    component_values = field[component_mask]
+    filled_coords = np.argwhere(component_mask)
+    pressure_indices = filled_coords[:, 0]
+    latitude_indices = filled_coords[:, 1]
+    longitude_indices = filled_coords[:, 2]
+
+    rolled_longitude_indices = (longitude_indices - roll_start) % longitudes.size
+    longitude_min = float(rolled_longitudes[rolled_longitude_indices].min() % 360.0)
+    longitude_max = float(rolled_longitudes[rolled_longitude_indices].max() % 360.0)
+
+    return {
+        "voxel_count": int(component_mask.sum()),
+        "mean_specific_humidity": float(np.mean(component_values)),
+        "max_specific_humidity": float(np.max(component_values)),
+        "pressure_min_hpa": float(np.min(pressure_levels[pressure_indices])),
+        "pressure_max_hpa": float(np.max(pressure_levels[pressure_indices])),
+        "latitude_min_deg": float(np.min(latitudes[latitude_indices])),
+        "latitude_max_deg": float(np.max(latitudes[latitude_indices])),
+        "longitude_min_deg": longitude_min,
+        "longitude_max_deg": longitude_max,
+        "wraps_longitude_seam": wraps_longitude_seam,
+    }
+
+
+def build_component_marching_cubes_surface(
     component_mask: np.ndarray,
     field: np.ndarray,
     pressure_levels: np.ndarray,
@@ -320,10 +385,8 @@ def build_component_surface(
     radius_lookup: np.ndarray,
     gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
-    wraps_longitude_seam = bool(component_mask[..., 0].any() and component_mask[..., -1].any())
     roll_start = choose_longitude_roll(component_mask)
     rolled_mask = np.roll(component_mask, -roll_start, axis=2)
-    rolled_field = np.roll(field, -roll_start, axis=2)
     rolled_longitudes = roll_longitudes(longitudes, roll_start)
 
     cropped_mask, mins, _ = crop_mask(rolled_mask, pad=1)
@@ -365,29 +428,366 @@ def build_component_surface(
             float(radius_values[index]),
         )
 
-    component_values = field[component_mask]
-    filled_coords = np.argwhere(component_mask)
-    pressure_indices = filled_coords[:, 0]
-    latitude_indices = filled_coords[:, 1]
-    longitude_indices = filled_coords[:, 2]
+    metadata = build_component_metadata(
+        component_mask=component_mask,
+        field=field,
+        pressure_levels=pressure_levels,
+        latitudes=latitudes,
+        longitudes=longitudes,
+        rolled_longitudes=rolled_longitudes,
+        roll_start=roll_start,
+    )
+    return positions, np.asarray(faces, dtype=np.uint32), metadata
 
-    rolled_longitude_indices = (longitude_indices - roll_start) % longitudes.size
-    longitude_min = float(rolled_longitudes[rolled_longitude_indices].min() % 360.0)
-    longitude_max = float(rolled_longitudes[rolled_longitude_indices].max() % 360.0)
 
-    metadata = {
-        "voxel_count": int(component_mask.sum()),
-        "mean_specific_humidity": float(np.mean(component_values)),
-        "max_specific_humidity": float(np.max(component_values)),
-        "pressure_min_hpa": float(np.min(pressure_levels[pressure_indices])),
-        "pressure_max_hpa": float(np.max(pressure_levels[pressure_indices])),
-        "latitude_min_deg": float(np.min(latitudes[latitude_indices])),
-        "latitude_max_deg": float(np.max(latitudes[latitude_indices])),
+def append_quad(
+    corners: list[tuple[int, int, int]],
+    vertex_lookup: dict[tuple[int, int, int], int],
+    positions: list[float],
+    faces: list[int],
+    radius_bounds: np.ndarray,
+    latitude_bounds: np.ndarray,
+    longitude_bounds: np.ndarray,
+) -> None:
+    quad_indices: list[int] = []
+
+    for key in corners:
+        vertex_index = vertex_lookup.get(key)
+        if vertex_index is None:
+            radius_index, latitude_index, longitude_index = key
+            vertex = lat_lon_to_xyz(
+                float(latitude_bounds[latitude_index]),
+                float(longitude_bounds[longitude_index]),
+                float(radius_bounds[radius_index]),
+            )
+            vertex_index = len(positions) // 3
+            positions.extend(float(value) for value in vertex)
+            vertex_lookup[key] = vertex_index
+
+        quad_indices.append(vertex_index)
+
+    faces.extend(
+        [
+            quad_indices[0],
+            quad_indices[1],
+            quad_indices[2],
+            quad_indices[0],
+            quad_indices[2],
+            quad_indices[3],
+        ]
+    )
+
+
+def build_component_voxel_surface(
+    component_mask: np.ndarray,
+    field: np.ndarray,
+    pressure_levels: np.ndarray,
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    radius_lookup: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
+    roll_start = choose_longitude_roll(component_mask)
+    rolled_mask = np.roll(component_mask, -roll_start, axis=2)
+    rolled_longitudes = roll_longitudes(longitudes, roll_start)
+
+    cropped_mask, mins, maxs = crop_mask(rolled_mask, pad=0)
+    if not bool(cropped_mask.any()):
+        return None
+
+    radius_bounds = build_axis_bounds(radius_lookup.astype(np.float64))[mins[0] : maxs[0] + 1]
+    latitude_bounds = build_axis_bounds(latitudes.astype(np.float64))[mins[1] : maxs[1] + 1]
+    longitude_bounds = build_axis_bounds(rolled_longitudes.astype(np.float64))[mins[2] : maxs[2] + 1]
+
+    vertex_lookup: dict[tuple[int, int, int], int] = {}
+    positions: list[float] = []
+    faces: list[int] = []
+
+    level_count, latitude_count, longitude_count = cropped_mask.shape
+    filled_coords = np.argwhere(cropped_mask)
+
+    for level_index, latitude_index, longitude_index in filled_coords:
+        r0 = int(level_index)
+        r1 = r0 + 1
+        a0 = int(latitude_index)
+        a1 = a0 + 1
+        o0 = int(longitude_index)
+        o1 = o0 + 1
+
+        if r0 == 0 or not cropped_mask[r0 - 1, a0, o0]:
+            append_quad(
+                [(r0, a0, o0), (r0, a1, o0), (r0, a1, o1), (r0, a0, o1)],
+                vertex_lookup,
+                positions,
+                faces,
+                radius_bounds,
+                latitude_bounds,
+                longitude_bounds,
+            )
+        if r0 == level_count - 1 or not cropped_mask[r0 + 1, a0, o0]:
+            append_quad(
+                [(r1, a0, o0), (r1, a0, o1), (r1, a1, o1), (r1, a1, o0)],
+                vertex_lookup,
+                positions,
+                faces,
+                radius_bounds,
+                latitude_bounds,
+                longitude_bounds,
+            )
+        if a0 == 0 or not cropped_mask[r0, a0 - 1, o0]:
+            append_quad(
+                [(r0, a0, o0), (r0, a0, o1), (r1, a0, o1), (r1, a0, o0)],
+                vertex_lookup,
+                positions,
+                faces,
+                radius_bounds,
+                latitude_bounds,
+                longitude_bounds,
+            )
+        if a0 == latitude_count - 1 or not cropped_mask[r0, a0 + 1, o0]:
+            append_quad(
+                [(r0, a1, o0), (r1, a1, o0), (r1, a1, o1), (r0, a1, o1)],
+                vertex_lookup,
+                positions,
+                faces,
+                radius_bounds,
+                latitude_bounds,
+                longitude_bounds,
+            )
+        if o0 == 0 or not cropped_mask[r0, a0, o0 - 1]:
+            append_quad(
+                [(r0, a0, o0), (r1, a0, o0), (r1, a1, o0), (r0, a1, o0)],
+                vertex_lookup,
+                positions,
+                faces,
+                radius_bounds,
+                latitude_bounds,
+                longitude_bounds,
+            )
+        if o0 == longitude_count - 1 or not cropped_mask[r0, a0, o0 + 1]:
+            append_quad(
+                [(r0, a0, o1), (r0, a1, o1), (r1, a1, o1), (r1, a0, o1)],
+                vertex_lookup,
+                positions,
+                faces,
+                radius_bounds,
+                latitude_bounds,
+                longitude_bounds,
+            )
+
+    if not positions or not faces:
+        return None
+
+    metadata = build_component_metadata(
+        component_mask=component_mask,
+        field=field,
+        pressure_levels=pressure_levels,
+        latitudes=latitudes,
+        longitudes=longitudes,
+        rolled_longitudes=rolled_longitudes,
+        roll_start=roll_start,
+    )
+    return (
+        np.asarray(positions, dtype=np.float32).reshape(-1, 3),
+        np.asarray(faces, dtype=np.uint32).reshape(-1, 3),
+        metadata,
+    )
+
+
+def build_component_surface(
+    component_mask: np.ndarray,
+    field: np.ndarray,
+    pressure_levels: np.ndarray,
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    radius_lookup: np.ndarray,
+    gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
+    geometry_mode: str = DEFAULT_GEOMETRY_MODE,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
+    if geometry_mode == "voxel-faces":
+        return build_component_voxel_surface(
+            component_mask=component_mask,
+            field=field,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+        )
+
+    if geometry_mode != "marching-cubes":
+        raise ValueError(f"Unsupported geometry mode: {geometry_mode}")
+
+    return build_component_marching_cubes_surface(
+        component_mask=component_mask,
+        field=field,
+        pressure_levels=pressure_levels,
+        latitudes=latitudes,
+        longitudes=longitudes,
+        radius_lookup=radius_lookup,
+        gaussian_sigma=gaussian_sigma,
+    )
+
+
+GridPoint = tuple[int, int]
+GridEdge = tuple[GridPoint, GridPoint]
+
+
+def edge_direction(edge: GridEdge) -> GridPoint:
+    (x0, y0), (x1, y1) = edge
+    return (x1 - x0, y1 - y0)
+
+
+RIGHT_TURN_PRIORITY: dict[GridPoint, tuple[GridPoint, ...]] = {
+    (1, 0): ((0, 1), (1, 0), (0, -1)),
+    (0, 1): ((-1, 0), (0, 1), (1, 0)),
+    (-1, 0): ((0, -1), (-1, 0), (0, 1)),
+    (0, -1): ((1, 0), (0, -1), (-1, 0)),
+}
+
+
+def is_collinear(prev_point: GridPoint, point: GridPoint, next_point: GridPoint) -> bool:
+    return (
+        prev_point[0] == point[0] == next_point[0]
+        or prev_point[1] == point[1] == next_point[1]
+    )
+
+
+def simplify_loop(points: list[GridPoint]) -> list[GridPoint]:
+    if len(points) < 4:
+        return points
+
+    simplified = points[:-1]
+    changed = True
+    while changed and len(simplified) >= 3:
+        changed = False
+        next_points: list[GridPoint] = []
+        for index, point in enumerate(simplified):
+            prev_point = simplified[index - 1]
+            next_point = simplified[(index + 1) % len(simplified)]
+            if is_collinear(prev_point, point, next_point):
+                changed = True
+                continue
+            next_points.append(point)
+        if next_points:
+            simplified = next_points
+
+    return simplified + [simplified[0]]
+
+
+def boundary_edges_from_footprint_mask(mask: np.ndarray) -> list[GridEdge]:
+    latitude_count, longitude_count = mask.shape
+    edges: list[GridEdge] = []
+
+    filled_coords = np.argwhere(mask)
+    for latitude_index, longitude_index in filled_coords:
+        a = int(latitude_index)
+        o = int(longitude_index)
+
+        if a == 0 or not mask[a - 1, o]:
+            edges.append(((o, a), (o + 1, a)))
+        if o == longitude_count - 1 or not mask[a, o + 1]:
+            edges.append(((o + 1, a), (o + 1, a + 1)))
+        if a == latitude_count - 1 or not mask[a + 1, o]:
+            edges.append(((o + 1, a + 1), (o, a + 1)))
+        if o == 0 or not mask[a, o - 1]:
+            edges.append(((o, a + 1), (o, a)))
+
+    return edges
+
+
+def trace_boundary_loops(edges: list[GridEdge]) -> list[list[GridPoint]]:
+    outgoing: dict[GridPoint, list[GridEdge]] = {}
+    for edge in edges:
+        outgoing.setdefault(edge[0], []).append(edge)
+
+    visited: set[GridEdge] = set()
+    loops: list[list[GridPoint]] = []
+
+    for edge in edges:
+        if edge in visited:
+            continue
+
+        current_edge = edge
+        loop = [current_edge[0], current_edge[1]]
+        visited.add(current_edge)
+
+        while loop[-1] != loop[0]:
+            current_point = loop[-1]
+            current_direction = edge_direction(current_edge)
+            candidates = [
+                candidate
+                for candidate in outgoing.get(current_point, [])
+                if candidate not in visited and candidate[1] != current_edge[0]
+            ]
+            if not candidates:
+                break
+
+            priority = RIGHT_TURN_PRIORITY.get(current_direction, ())
+            next_edge = candidates[0]
+            for direction in priority:
+                directed = next(
+                    (candidate for candidate in candidates if edge_direction(candidate) == direction),
+                    None,
+                )
+                if directed is not None:
+                    next_edge = directed
+                    break
+
+            current_edge = next_edge
+            visited.add(current_edge)
+            loop.append(current_edge[1])
+
+        if len(loop) >= 4 and loop[0] == loop[-1]:
+            loops.append(simplify_loop(loop))
+
+    return loops
+
+
+def build_component_footprint(
+    component_mask: np.ndarray,
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+) -> dict[str, Any]:
+    roll_start = choose_longitude_roll(component_mask)
+    rolled_mask = np.roll(component_mask, -roll_start, axis=2)
+    rolled_longitudes = roll_longitudes(longitudes, roll_start)
+    footprint_mask = rolled_mask.any(axis=0)
+
+    latitude_bounds = build_axis_bounds(latitudes.astype(np.float64))
+    longitude_bounds = build_axis_bounds(rolled_longitudes.astype(np.float64))
+    loops = trace_boundary_loops(boundary_edges_from_footprint_mask(footprint_mask))
+
+    rings: list[list[list[float]]] = []
+    for loop in loops:
+        ring: list[list[float]] = []
+        for longitude_index, latitude_index in loop[:-1]:
+            ring.append(
+                [
+                    float(longitude_bounds[longitude_index]),
+                    float(latitude_bounds[latitude_index]),
+                ]
+            )
+        if len(ring) >= 3:
+            rings.append(ring)
+
+    filled_coords = np.argwhere(footprint_mask)
+    if filled_coords.size == 0:
+        latitude_min = latitude_max = float(latitudes[0])
+        longitude_min = longitude_max = float(rolled_longitudes[0] % 360.0)
+    else:
+        latitude_min = float(np.min(latitudes[filled_coords[:, 0]]))
+        latitude_max = float(np.max(latitudes[filled_coords[:, 0]]))
+        longitude_values = rolled_longitudes[filled_coords[:, 1]]
+        longitude_min = float(np.min(longitude_values) % 360.0)
+        longitude_max = float(np.max(longitude_values) % 360.0)
+
+    return {
+        "occupied_cell_count": int(footprint_mask.sum()),
+        "latitude_min_deg": latitude_min,
+        "latitude_max_deg": latitude_max,
         "longitude_min_deg": longitude_min,
         "longitude_max_deg": longitude_max,
-        "wraps_longitude_seam": wraps_longitude_seam,
+        "rings": rings,
     }
-    return positions, np.asarray(faces, dtype=np.uint32), metadata
 
 
 def build_timestamp_payload(
@@ -399,13 +799,17 @@ def build_timestamp_payload(
     radius_lookup: np.ndarray,
     min_component_size: int = DEFAULT_MIN_COMPONENT_SIZE,
     gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
+    closing_radius_cells: int = DEFAULT_CLOSING_RADIUS_CELLS,
+    geometry_mode: str = DEFAULT_GEOMETRY_MODE,
+    write_footprints: bool = True,
 ) -> dict[str, Any]:
     raw_mask = build_threshold_mask(field, thresholds)
-    closed_mask = lightly_close_mask(raw_mask)
+    closed_mask = lightly_close_mask(raw_mask, closing_radius_cells=closing_radius_cells)
 
     position_chunks: list[np.ndarray] = []
     index_chunks: list[np.ndarray] = []
     components: list[dict[str, Any]] = []
+    footprints: list[dict[str, Any]] = []
     vertex_offset = 0
     index_offset = 0
 
@@ -425,6 +829,7 @@ def build_timestamp_payload(
             longitudes=longitudes,
             radius_lookup=radius_lookup,
             gaussian_sigma=gaussian_sigma,
+            geometry_mode=geometry_mode,
         )
         if surface is None:
             continue
@@ -445,6 +850,17 @@ def build_timestamp_payload(
                 **metadata,
             }
         )
+        if write_footprints:
+            footprints.append(
+                {
+                    "id": component_id,
+                    **build_component_footprint(
+                        component_mask=component_mask,
+                        latitudes=latitudes,
+                        longitudes=longitudes,
+                    ),
+                }
+            )
 
         vertex_offset += positions.shape[0]
         index_offset += flat_indices.size
@@ -468,6 +884,7 @@ def build_timestamp_payload(
         "vertex_count": int(positions.size // 3),
         "index_count": int(indices.size),
         "voxel_count": int(closed_mask.sum()),
+        "footprints": footprints,
     }
 
 
@@ -488,6 +905,21 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
 
 
+def clear_output_dir(output_dir: Path, preserve_child_names: set[str] | None = None) -> None:
+    preserve = preserve_child_names or set()
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return
+
+    for child in output_dir.iterdir():
+        if child.name in preserve:
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
 def write_timestamp_assets(
     output_dir: Path,
     timestamp: str,
@@ -500,9 +932,19 @@ def write_timestamp_assets(
     positions_path = frame_dir / "positions.bin"
     indices_path = frame_dir / "indices.bin"
     metadata_path = frame_dir / "metadata.json"
+    footprints_path = frame_dir / "footprints.json"
 
     payload["positions"].astype("<f4").tofile(positions_path)
     payload["indices"].astype("<u4").tofile(indices_path)
+    if payload.get("footprints"):
+        write_json(
+            footprints_path,
+            {
+                "version": OUTPUT_VERSION,
+                "timestamp": timestamp,
+                "components": payload["footprints"],
+            },
+        )
 
     metadata = {
         "version": OUTPUT_VERSION,
@@ -517,7 +959,7 @@ def write_timestamp_assets(
     }
     write_json(metadata_path, metadata)
 
-    return {
+    entry = {
         "timestamp": timestamp,
         "metadata": str(metadata_path.relative_to(output_dir)).replace("\\", "/"),
         "positions": str(positions_path.relative_to(output_dir)).replace("\\", "/"),
@@ -526,6 +968,11 @@ def write_timestamp_assets(
         "vertex_count": payload["vertex_count"],
         "index_count": payload["index_count"],
     }
+    if payload.get("footprints"):
+        entry["footprints"] = str(footprints_path.relative_to(output_dir)).replace(
+            "\\", "/"
+        )
+    return entry
 
 
 def build_assets(config: BuildConfig) -> dict[str, Any]:
@@ -556,9 +1003,8 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             vertical_span=config.vertical_span,
         )
 
-        if config.output_dir.exists():
-            shutil.rmtree(config.output_dir)
-        config.output_dir.mkdir(parents=True, exist_ok=True)
+        preserve_children = {"variants"} if config.segmentation_mode == "p95-close" else set()
+        clear_output_dir(config.output_dir, preserve_child_names=preserve_children)
 
         entries: list[dict[str, Any]] = []
         time_count = specific_humidity.sizes["valid_time"]
@@ -582,6 +1028,9 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                     radius_lookup=radius_lookup,
                     min_component_size=config.min_component_size,
                     gaussian_sigma=config.gaussian_sigma,
+                    closing_radius_cells=config.closing_radius_cells,
+                    geometry_mode=config.geometry_mode,
+                    write_footprints=config.write_footprints,
                 )
                 entry = write_timestamp_assets(config.output_dir, timestamp, payload)
                 entries.append(entry)
@@ -598,16 +1047,18 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             "dataset": config.dataset_path.name,
             "variable": DATASET_VARIABLE,
             "units": str(specific_humidity.attrs.get("units", "")),
+            "segmentation_mode": config.segmentation_mode,
             "threshold_mode": {
                 "kind": "pressure-relative-quantile",
                 "quantile": config.threshold_quantile,
                 "minimum_component_size": config.min_component_size,
                 "threshold_seed": "midpoint_time_slice",
                 "smoothing": {
-                    "binary_closing_radius_cells": 1,
+                    "binary_closing_radius_cells": config.closing_radius_cells,
                     "gaussian_sigma": config.gaussian_sigma,
                 },
             },
+            "geometry_mode": config.geometry_mode,
             "globe": {
                 "base_radius": config.base_radius,
                 "vertical_span": config.vertical_span,

@@ -64,6 +64,30 @@ def parse_args() -> argparse.Namespace:
         help="Gaussian smoothing sigma applied before marching cubes.",
     )
     parser.add_argument(
+        "--geometry-mode",
+        choices=("marching-cubes", "voxel-faces"),
+        default="marching-cubes",
+        help="Mesh generation strategy for each connected moisture component.",
+    )
+    parser.add_argument(
+        "--closing-radius-cells",
+        type=int,
+        default=1,
+        help="Radius in grid cells for the binary closing pass. Use 0 to disable it.",
+    )
+    parser.add_argument(
+        "--segmentation-mode",
+        type=str,
+        default="p95-close",
+        help="Label written into the manifest to identify the segmentation variant.",
+    )
+    parser.add_argument(
+        "--write-footprints",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Whether to emit per-component footprint assets alongside the mesh payloads.",
+    )
+    parser.add_argument(
         "--limit-timestamps",
         type=int,
         default=None,
@@ -83,6 +107,10 @@ def main() -> None:
         base_radius=args.base_radius,
         vertical_span=args.vertical_span,
         gaussian_sigma=args.gaussian_sigma,
+        geometry_mode=args.geometry_mode,
+        closing_radius_cells=args.closing_radius_cells,
+        segmentation_mode=args.segmentation_mode,
+        write_footprints=args.write_footprints,
         limit_timestamps=args.limit_timestamps,
     )
     manifest = build_assets(config)

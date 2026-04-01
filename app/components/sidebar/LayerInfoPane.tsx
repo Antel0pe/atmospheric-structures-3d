@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import { useControls } from "@/app/state/controlsStore";
+import {
+  MOISTURE_COMPONENT_SORT_OPTIONS,
+  MOISTURE_STRUCTURE_PRESET_OPTIONS,
+  MOISTURE_VISUAL_PRESET_OPTIONS,
+  getMoistureStructurePresetState,
+  getMoistureVisualPresetState,
+  useControls,
+  type MoistureStructureLayerState,
+} from "@/app/state/controlsStore";
+import type {
+  MoistureStructureComponentMetadata,
+} from "../utils/ApiResponses";
 
 type ActiveExampleId =
   | "moistureStructureLayer"
@@ -27,25 +38,25 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
   moistureStructureLayer: {
     title: "Moisture Structures Layer",
     summary:
-      "A 3D humidity-body renderer that loads precomputed moisture meshes, exaggerates their height in the client, and crossfades between timestamps.",
+      "A 3D humidity-body renderer that loads precomputed moisture meshes, exaggerates their height in the client, applies a camera-following cutaway, and now adds structure-focused presets for component reading, picking, wall suppression, and macro footprints.",
     detail:
-      "Humid regions are detected with pressure-relative thresholds, lightly smoothed, turned into closed 3D surfaces offline, and then rendered here as semi-transparent globe-space volumes with discrete color bands snapped to individual pressure levels.",
+      "Humid regions are detected with pressure-relative thresholds, meshed offline, and rendered here as globe-space moisture bodies. The review harness now lets you compare pressure bands versus component-aware colors, focus individual components, suppress side-wall clutter, and project selected footprints back onto the globe.",
     legend: [
       {
-        label: "Upper levels",
-        detail: "Lowest-pressure bands near the top of the rendered volume.",
+        label: "Pressure Bands",
+        detail: "Discrete per-level coloring for seeing vertical structure and stacked altitude slices.",
         swatch:
           "linear-gradient(135deg, rgba(185, 92, 255, 0.96), rgba(149, 69, 235, 0.84))",
       },
       {
-        label: "Middle levels",
-        detail: "Mid-pressure bands transition through blue and cyan hues.",
+        label: "Component Colors",
+        detail: "Stable per-component hues for reading continuity and large-scale shape.",
         swatch:
           "linear-gradient(135deg, rgba(94, 134, 255, 0.96), rgba(66, 99, 220, 0.84))",
       },
       {
-        label: "Lower levels",
-        detail: "Higher-pressure bands toward the globe trend warmer.",
+        label: "Footprint Overlay",
+        detail: "Projected outlines of selected or dominant components for macro context.",
         swatch:
           "linear-gradient(135deg, rgba(45, 198, 214, 0.96), rgba(255, 138, 99, 0.84))",
       },
@@ -122,9 +133,171 @@ function sectionStyle() {
   } as const;
 }
 
+type MoistureVisualOverrideKey = keyof ReturnType<typeof getMoistureVisualPresetState>;
+type MoistureStructureOverrideKey = keyof ReturnType<
+  typeof getMoistureStructurePresetState
+>;
+
+const COMPONENT_PALETTE = [
+  "#ff8a63",
+  "#ffd166",
+  "#8ac926",
+  "#2dc6d6",
+  "#5e86ff",
+  "#b95cff",
+  "#f72585",
+  "#06d6a0",
+  "#4895ef",
+  "#f4a261",
+  "#90be6d",
+  "#c77dff",
+] as const;
+
+const MOISTURE_VISUAL_OVERRIDE_LABELS: Record<MoistureVisualOverrideKey, string> = {
+  solidShellEnabled: "Shell",
+  lightingEnabled: "Light",
+  interiorBackfaceEnabled: "Interior",
+  rimEnabled: "Rim",
+  distanceFadeEnabled: "Distance",
+  frontOpacity: "Front",
+  backfaceOpacity: "Back",
+  ambientIntensity: "Ambient",
+  keyLightIntensity: "Key",
+  headLightIntensity: "Head",
+  rimStrength: "Rim",
+  distanceFadeStrength: "Fade",
+};
+
+const MOISTURE_STRUCTURE_OVERRIDE_LABELS: Record<
+  MoistureStructureOverrideKey,
+  string
+> = {
+  focusMode: "Focus",
+  pickMode: "Pick",
+  nonSelectedOpacity: "Dim",
+  colorMode: "Color",
+  verticalWallFadeEnabled: "Walls",
+  verticalWallFadeStrength: "Walls",
+  segmentationMode: "Seg",
+  footprintOverlayEnabled: "Footprint",
+};
+
+function moisturePresetLabel(value: MoistureStructureLayerState["visualPreset"]) {
+  return (
+    MOISTURE_VISUAL_PRESET_OPTIONS.find((option) => option.value === value)?.label ??
+    value
+  );
+}
+
+function moistureStructurePresetLabel(
+  value: MoistureStructureLayerState["structurePreset"]
+) {
+  return (
+    MOISTURE_STRUCTURE_PRESET_OPTIONS.find((option) => option.value === value)
+      ?.label ?? value
+  );
+}
+
+function moistureOverrideSummary(state: MoistureStructureLayerState) {
+  const presetState = getMoistureVisualPresetState(state.visualPreset);
+  const overrideKeys = (Object.keys(presetState) as MoistureVisualOverrideKey[]).filter(
+    (key) => state[key] !== presetState[key]
+  );
+  if (overrideKeys.length === 0) return "Preset";
+  const labels = overrideKeys
+    .slice(0, 3)
+    .map((key) => MOISTURE_VISUAL_OVERRIDE_LABELS[key]);
+  const suffix = overrideKeys.length > 3 ? ` +${overrideKeys.length - 3}` : "";
+  return `${labels.join(" / ")}${suffix}`;
+}
+
+function moistureStructureOverrideSummary(state: MoistureStructureLayerState) {
+  const presetState = getMoistureStructurePresetState(state.structurePreset);
+  const overrideKeys = (
+    Object.keys(presetState) as MoistureStructureOverrideKey[]
+  ).filter((key) => state[key] !== presetState[key]);
+  if (overrideKeys.length === 0) return "Preset";
+  const labels = overrideKeys
+    .slice(0, 3)
+    .map((key) => MOISTURE_STRUCTURE_OVERRIDE_LABELS[key]);
+  const suffix = overrideKeys.length > 3 ? ` +${overrideKeys.length - 3}` : "";
+  return `${labels.join(" / ")}${suffix}`;
+}
+
+function componentColorForId(id: number) {
+  return COMPONENT_PALETTE[id % COMPONENT_PALETTE.length];
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`;
+}
+
+function componentPressureSpan(component: MoistureStructureComponentMetadata) {
+  return component.pressure_max_hpa - component.pressure_min_hpa;
+}
+
+function sortComponents(
+  components: MoistureStructureComponentMetadata[],
+  sort: MoistureStructureLayerState["componentSort"]
+) {
+  return components.slice().sort((left, right) => {
+    if (sort === "pressureSpan") {
+      return componentPressureSpan(right) - componentPressureSpan(left);
+    }
+    if (sort === "peakHumidity") {
+      return right.max_specific_humidity - left.max_specific_humidity;
+    }
+    return right.voxel_count - left.voxel_count;
+  });
+}
+
+function splitRingForMap(ring: Array<[number, number]>) {
+  if (ring.length === 0) return [];
+
+  const segments: Array<Array<[number, number]>> = [];
+  let current: Array<[number, number]> = [];
+
+  for (let index = 0; index < ring.length; index += 1) {
+    const [longitude, latitude] = ring[index];
+    const normalizedLongitude = ((longitude % 360) + 360) % 360;
+    const point: [number, number] = [normalizedLongitude, latitude];
+
+    if (current.length > 0) {
+      const previousLongitude = current[current.length - 1][0];
+      if (Math.abs(normalizedLongitude - previousLongitude) > 180) {
+        segments.push(current);
+        current = [];
+      }
+    }
+
+    current.push(point);
+  }
+
+  if (current.length > 1) {
+    segments.push(current);
+  }
+
+  return segments;
+}
+
+function ringPath(segment: Array<[number, number]>) {
+  if (segment.length < 2) return "";
+  return segment
+    .map(([longitude, latitude], index) => {
+      const x = longitude;
+      const y = 90 - latitude;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
 export default function LayerInfoPane() {
   const moistureStructureLayer = useControls(
     (state) => state.moistureStructureLayer
+  );
+  const moistureStructureFrame = useControls((state) => state.moistureStructureFrame);
+  const setMoistureStructureLayer = useControls(
+    (state) => state.setMoistureStructureLayer
   );
   const exampleShaderMeshLayer = useControls(
     (state) => state.exampleShaderMeshLayer
@@ -136,13 +309,55 @@ export default function LayerInfoPane() {
     (state) => state.exampleParticleLayer
   );
 
+  const sortedMoistureComponents = useMemo(() => {
+    if (!moistureStructureFrame) return [];
+    return sortComponents(
+      moistureStructureFrame.components,
+      moistureStructureLayer.componentSort
+    );
+  }, [moistureStructureFrame, moistureStructureLayer.componentSort]);
+
+  const selectedMoistureComponent = useMemo(() => {
+    if (!moistureStructureFrame || moistureStructureLayer.selectedComponentId === null) {
+      return null;
+    }
+    return (
+      moistureStructureFrame.components.find(
+        (component) => component.id === moistureStructureLayer.selectedComponentId
+      ) ?? null
+    );
+  }, [moistureStructureFrame, moistureStructureLayer.selectedComponentId]);
+
+  const selectedMoistureFootprint = useMemo(() => {
+    if (!moistureStructureFrame || moistureStructureLayer.selectedComponentId === null) {
+      return null;
+    }
+    return (
+      moistureStructureFrame.footprints.find(
+        (footprint) => footprint.id === moistureStructureLayer.selectedComponentId
+      ) ?? null
+    );
+  }, [moistureStructureFrame, moistureStructureLayer.selectedComponentId]);
+
   const activeEntries = useMemo(() => {
     const entries: Array<LayerInfoEntry & { tag: string }> = [];
 
     if (moistureStructureLayer.visible) {
       entries.push({
         id: "moistureStructureLayer",
-        tag: `Opacity ${Math.round(moistureStructureLayer.opacity * 100)}% | Z ${moistureStructureLayer.verticalExaggeration.toFixed(1)}x`,
+        tag: `${moisturePresetLabel(
+          moistureStructureLayer.visualPreset
+        )} / ${moistureStructurePresetLabel(
+          moistureStructureLayer.structurePreset
+        )} | ${moistureOverrideSummary(
+          moistureStructureLayer
+        )} + ${moistureStructureOverrideSummary(
+          moistureStructureLayer
+        )} | ${moistureStructureLayer.segmentationMode} | Clip ${
+          moistureStructureLayer.cameraCutawayEnabled
+            ? moistureStructureLayer.cameraCutawayRadius.toFixed(0)
+            : "Off"
+        }`,
         ...LAYER_INFO.moistureStructureLayer,
       });
     }
@@ -177,9 +392,7 @@ export default function LayerInfoPane() {
 
     return entries;
   }, [
-    moistureStructureLayer.opacity,
-    moistureStructureLayer.verticalExaggeration,
-    moistureStructureLayer.visible,
+    moistureStructureLayer,
     exampleContoursLayer.pressureLevel,
     exampleParticleLayer.pressureLevel,
     exampleShaderMeshLayer.pressureLevel,
@@ -289,6 +502,220 @@ export default function LayerInfoPane() {
                 </div>
               ))}
             </div>
+            {entry.id === "moistureStructureLayer" && moistureStructureFrame ? (
+              <div
+                style={{
+                  display: "grid",
+                  gap: 10,
+                  marginTop: 14,
+                  paddingTop: 12,
+                  borderTop: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      opacity: 0.7,
+                    }}
+                  >
+                    Components
+                  </div>
+                  <div style={{ opacity: 0.62 }}>
+                    {
+                      MOISTURE_COMPONENT_SORT_OPTIONS.find(
+                        (option) =>
+                          option.value === moistureStructureLayer.componentSort
+                      )?.label
+                    }
+                  </div>
+                </div>
+                <div style={{ opacity: 0.72, lineHeight: 1.45 }}>
+                  {moistureStructureFrame.timestamp} ·{" "}
+                  {moistureStructureFrame.components.length} components ·{" "}
+                  {moistureStructureFrame.segmentationMode}
+                </div>
+
+                {selectedMoistureComponent ? (
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 8,
+                      padding: 10,
+                      borderRadius: 12,
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        Component {selectedMoistureComponent.id}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMoistureStructureLayer({ selectedComponentId: null })
+                        }
+                        style={{
+                          borderRadius: 999,
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          background: "rgba(255,255,255,0.06)",
+                          color: "#e9eef7",
+                          padding: "4px 8px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div style={{ opacity: 0.72, lineHeight: 1.4 }}>
+                      {formatPercent(
+                        selectedMoistureComponent.voxel_count /
+                          Math.max(moistureStructureFrame.thresholdedVoxelCount, 1)
+                      )}{" "}
+                      of thresholded voxels ·{" "}
+                      {selectedMoistureComponent.pressure_min_hpa.toFixed(0)}-
+                      {selectedMoistureComponent.pressure_max_hpa.toFixed(0)} hPa ·
+                      peak {selectedMoistureComponent.max_specific_humidity.toExponential(2)}
+                    </div>
+                    <div style={{ opacity: 0.64, lineHeight: 1.4 }}>
+                      Lat {selectedMoistureComponent.latitude_min_deg.toFixed(1)} to{" "}
+                      {selectedMoistureComponent.latitude_max_deg.toFixed(1)} · Lon{" "}
+                      {selectedMoistureComponent.longitude_min_deg.toFixed(1)} to{" "}
+                      {selectedMoistureComponent.longitude_max_deg.toFixed(1)} ·{" "}
+                      {selectedMoistureComponent.wraps_longitude_seam
+                        ? "Wraps seam"
+                        : "No seam wrap"}
+                    </div>
+                    {selectedMoistureFootprint ? (
+                      <svg
+                        viewBox="0 0 360 180"
+                        style={{
+                          width: "100%",
+                          height: 110,
+                          borderRadius: 10,
+                          background: "rgba(7, 12, 20, 0.8)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                        }}
+                      >
+                        <rect
+                          x="0"
+                          y="0"
+                          width="360"
+                          height="180"
+                          fill="rgba(12, 18, 28, 0.9)"
+                        />
+                        {selectedMoistureFootprint.rings.flatMap((ring, ringIndex) =>
+                          splitRingForMap(ring).map((segment, segmentIndex) => (
+                            <path
+                              key={`${ringIndex}-${segmentIndex}`}
+                              d={ringPath(segment)}
+                              fill="none"
+                              stroke={componentColorForId(selectedMoistureFootprint.id)}
+                              strokeWidth="2.5"
+                              strokeLinejoin="round"
+                              strokeLinecap="round"
+                            />
+                          ))
+                        )}
+                      </svg>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div style={{ display: "grid", gap: 8 }}>
+                  {sortedMoistureComponents.map((component, index) => {
+                    const selected =
+                      component.id === moistureStructureLayer.selectedComponentId;
+                    return (
+                      <button
+                        key={component.id}
+                        type="button"
+                        onClick={() =>
+                          setMoistureStructureLayer({
+                            selectedComponentId:
+                              selected && moistureStructureLayer.focusMode === "none"
+                                ? null
+                                : component.id,
+                          })
+                        }
+                        style={{
+                          display: "grid",
+                          gap: 6,
+                          textAlign: "left",
+                          padding: 10,
+                          borderRadius: 12,
+                          border: selected
+                            ? "1px solid rgba(152, 200, 255, 0.45)"
+                            : "1px solid rgba(255,255,255,0.08)",
+                          background: selected
+                            ? "rgba(91, 152, 255, 0.14)"
+                            : "rgba(255,255,255,0.04)",
+                          color: "#e9eef7",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              aria-hidden
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: 999,
+                                background: componentColorForId(component.id),
+                                boxShadow: "0 0 0 1px rgba(255,255,255,0.18)",
+                              }}
+                            />
+                            <span style={{ fontWeight: 700 }}>
+                              #{index + 1} · Component {component.id}
+                            </span>
+                          </div>
+                          <span style={{ opacity: 0.7 }}>
+                            {formatPercent(
+                              component.voxel_count /
+                                Math.max(
+                                  moistureStructureFrame.thresholdedVoxelCount,
+                                  1
+                                )
+                            )}
+                          </span>
+                        </div>
+                        <div style={{ opacity: 0.75, lineHeight: 1.35 }}>
+                          {component.voxel_count.toLocaleString()} voxels ·{" "}
+                          {component.pressure_min_hpa.toFixed(0)}-
+                          {component.pressure_max_hpa.toFixed(0)} hPa
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </section>
         ))
       )}

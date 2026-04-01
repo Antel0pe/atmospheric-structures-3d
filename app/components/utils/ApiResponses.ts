@@ -18,8 +18,26 @@ function buildPublicDataUrl(...segments: string[]) {
   return `/${[prefix, ...segments].filter(Boolean).join("/")}`;
 }
 
-function buildMoistureStructuresUrl(...segments: string[]) {
-  return buildPublicDataUrl("moisture-structures", ...segments);
+export type MoistureSegmentationMode = "p95-close" | "p95-open" | "p97-close";
+
+function moistureStructuresBaseSegments(
+  segmentationMode: MoistureSegmentationMode
+) {
+  if (segmentationMode === "p95-close") {
+    return ["moisture-structures"];
+  }
+
+  return ["moisture-structures", "variants", segmentationMode];
+}
+
+function buildMoistureStructuresUrl(
+  segmentationMode: MoistureSegmentationMode,
+  ...segments: string[]
+) {
+  return buildPublicDataUrl(
+    ...moistureStructuresBaseSegments(segmentationMode),
+    ...segments
+  );
 }
 
 function parseDatehour(datehour: string): Date {
@@ -158,6 +176,7 @@ export type MoistureStructureManifestTimestamp = {
   metadata: string;
   positions: string;
   indices: string;
+  footprints?: string;
   component_count: number;
   vertex_count: number;
   index_count: number;
@@ -168,6 +187,8 @@ export type MoistureStructureManifest = {
   dataset: string;
   variable: string;
   units: string;
+  geometry_mode?: string;
+  segmentation_mode?: MoistureSegmentationMode;
   threshold_mode: {
     kind: string;
     quantile: number;
@@ -226,15 +247,35 @@ export type MoistureStructureMetadata = {
   indices_file: string;
 };
 
+export type MoistureComponentFootprint = {
+  id: number;
+  rings: Array<Array<[number, number]>>;
+  occupied_cell_count: number;
+  latitude_min_deg: number;
+  latitude_max_deg: number;
+  longitude_min_deg: number;
+  longitude_max_deg: number;
+};
+
+export type MoistureFootprintFile = {
+  version: number;
+  timestamp: string;
+  components: MoistureComponentFootprint[];
+};
+
 export type MoistureStructureFrame = {
   manifest: MoistureStructureManifest;
   entry: MoistureStructureManifestTimestamp;
   metadata: MoistureStructureMetadata;
   positions: Float32Array;
   indices: Uint32Array;
+  footprints: MoistureComponentFootprint[];
 };
 
-let moistureManifestPromise: Promise<MoistureStructureManifest> | null = null;
+const moistureManifestPromises = new Map<
+  MoistureSegmentationMode,
+  Promise<MoistureStructureManifest>
+>();
 
 export async function fetchExampleContours(
   datehour: string,
@@ -305,18 +346,23 @@ export function snapTimestampToAvailable(
 }
 
 export async function fetchMoistureStructureManifest(opts?: {
+  segmentationMode?: MoistureSegmentationMode;
   refresh?: boolean;
   notifyOnError?: boolean;
 }) {
+  const segmentationMode = opts?.segmentationMode ?? "p95-close";
   const refresh = opts?.refresh ?? false;
   const notifyOnError = opts?.notifyOnError ?? true;
 
-  if (!refresh && moistureManifestPromise) {
-    return moistureManifestPromise;
+  if (!refresh) {
+    const existingPromise = moistureManifestPromises.get(segmentationMode);
+    if (existingPromise) {
+      return existingPromise;
+    }
   }
 
   const promise = fetchJsonOrThrow<MoistureStructureManifest>(
-    buildMoistureStructuresUrl("index.json"),
+    buildMoistureStructuresUrl(segmentationMode, "index.json"),
     "Failed to load moisture structure manifest.",
     {
       layerLabel: "Moisture structures",
@@ -324,22 +370,30 @@ export async function fetchMoistureStructureManifest(opts?: {
     }
   );
 
-  moistureManifestPromise = promise.catch((error) => {
-    moistureManifestPromise = null;
-    throw error;
-  });
+  moistureManifestPromises.set(
+    segmentationMode,
+    promise.catch((error) => {
+      moistureManifestPromises.delete(segmentationMode);
+      throw error;
+    })
+  );
 
-  return moistureManifestPromise;
+  return moistureManifestPromises.get(segmentationMode)!;
 }
 
 export async function fetchMoistureStructureFrame(
   datehour: string,
   opts?: {
+    segmentationMode?: MoistureSegmentationMode;
     notifyOnError?: boolean;
   }
 ): Promise<MoistureStructureFrame> {
+  const segmentationMode = opts?.segmentationMode ?? "p95-close";
   const notifyOnError = opts?.notifyOnError ?? true;
-  const manifest = await fetchMoistureStructureManifest({ notifyOnError });
+  const manifest = await fetchMoistureStructureManifest({
+    segmentationMode,
+    notifyOnError,
+  });
   const entry = manifest.timestamps.find((item) => item.timestamp === datehour);
 
   if (!entry) {
@@ -352,9 +406,9 @@ export async function fetchMoistureStructureFrame(
     throw error;
   }
 
-  const [metadata, positionsBlob, indicesBlob] = await Promise.all([
+  const [metadata, positionsBlob, indicesBlob, footprintFile] = await Promise.all([
     fetchJsonOrThrow<MoistureStructureMetadata>(
-      buildMoistureStructuresUrl(entry.metadata),
+      buildMoistureStructuresUrl(segmentationMode, entry.metadata),
       "Failed to load moisture structure metadata.",
       {
         layerLabel: "Moisture structures",
@@ -362,7 +416,7 @@ export async function fetchMoistureStructureFrame(
       }
     ),
     fetchBlobOrThrow(
-      buildMoistureStructuresUrl(entry.positions),
+      buildMoistureStructuresUrl(segmentationMode, entry.positions),
       "Failed to load moisture structure positions.",
       {
         layerLabel: "Moisture structures",
@@ -370,13 +424,23 @@ export async function fetchMoistureStructureFrame(
       }
     ),
     fetchBlobOrThrow(
-      buildMoistureStructuresUrl(entry.indices),
+      buildMoistureStructuresUrl(segmentationMode, entry.indices),
       "Failed to load moisture structure indices.",
       {
         layerLabel: "Moisture structures",
         notifyOnError,
       }
     ),
+    entry.footprints
+      ? fetchJsonOrThrow<MoistureFootprintFile>(
+          buildMoistureStructuresUrl(segmentationMode, entry.footprints),
+          "Failed to load moisture footprint data.",
+          {
+            layerLabel: "Moisture structures",
+            notifyOnError,
+          }
+        )
+      : Promise.resolve(null),
   ]);
 
   const [positionsBuffer, indicesBuffer] = await Promise.all([
@@ -390,5 +454,6 @@ export async function fetchMoistureStructureFrame(
     metadata,
     positions: new Float32Array(positionsBuffer),
     indices: new Uint32Array(indicesBuffer),
+    footprints: footprintFile?.components ?? [],
   };
 }
