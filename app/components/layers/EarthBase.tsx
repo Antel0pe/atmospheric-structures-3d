@@ -15,6 +15,9 @@ export type EarthEngine = {
     cameraRef: RefObject<THREE.PerspectiveCamera | null>;
     controlsRef: RefObject<OrbitControls | null>;
     globeRef: RefObject<ThreeGlobe | null>;
+    ambientLightRef: RefObject<THREE.AmbientLight | null>;
+    moistureKeyLightRef: RefObject<THREE.DirectionalLight | null>;
+    moistureHeadLightRef: RefObject<THREE.DirectionalLight | null>;
 
     timestamp: string;
 
@@ -83,6 +86,9 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
     const sceneRef = useRef<THREE.Scene | null>(null);
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
     const controlsRef = useRef<OrbitControls | null>(null);
+    const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
+    const moistureKeyLightRef = useRef<THREE.DirectionalLight | null>(null);
+    const moistureHeadLightRef = useRef<THREE.DirectionalLight | null>(null);
     const sunRef = useRef<THREE.DirectionalLight | null>(null);
     const roRef = useRef<ResizeObserver | null>(null);
     const [engineReady, setEngineReady] = useState(false);
@@ -250,7 +256,23 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
         lookAtLatLon(30, -135, camera, controls, globe, 100);
         _setZoom01(radiusToZoom01(camera.position.length()));
 
-        scene.add(new THREE.AmbientLight(0xffffff, 2));
+        const ambient = new THREE.AmbientLight(0xffffff, 2);
+        scene.add(ambient);
+
+        const moistureLightTarget = new THREE.Object3D();
+        moistureLightTarget.position.set(0, 0, 0);
+        scene.add(moistureLightTarget);
+
+        const moistureKeyLight = new THREE.DirectionalLight(0xf5f9ff, 0);
+        moistureKeyLight.position.set(220, -160, 260);
+        moistureKeyLight.target = moistureLightTarget;
+        scene.add(moistureKeyLight);
+
+        const moistureHeadLight = new THREE.DirectionalLight(0xcfe4ff, 0);
+        moistureHeadLight.position.copy(camera.position);
+        moistureHeadLight.target = moistureLightTarget;
+        scene.add(moistureHeadLight);
+
         const sun = null;
         // const sun = new THREE.DirectionalLight(0xffffff, 0.9);
         // sun.position.set(1.5, 1.0, 2.0).multiplyScalar(1000);
@@ -538,6 +560,9 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
         sceneRef.current = scene;
         cameraRef.current = camera;
         controlsRef.current = controls;
+        ambientLightRef.current = ambient;
+        moistureKeyLightRef.current = moistureKeyLight;
+        moistureHeadLightRef.current = moistureHeadLight;
         sunRef.current = sun;
         roRef.current = ro;
 
@@ -549,6 +574,9 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
             if (rafId != null) cancelAnimationFrame(rafId);
             ro.disconnect();
             controls.dispose();
+            ambientLightRef.current = null;
+            moistureKeyLightRef.current = null;
+            moistureHeadLightRef.current = null;
 
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
@@ -572,6 +600,7 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
                 zoomCommitTimerRef.current = null;
             }
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -583,8 +612,6 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
         if (!renderer || !scene || !camera || !controls) return;
 
         let running = true;
-
-        let lastT = performance.now();
 
         function runFramePassSafely(pass: FramePass, tick: FrameTick) {
             if (!renderer) return;
@@ -624,10 +651,14 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
             if (!running) return;
 
             const now = performance.now();
-            // const dt = Math.min(0.05, (now - lastT) / 1000);
-            // const dt = (now - lastT) / 1000;
+            // NOTE: This loop intentionally uses a fixed simulation timestep for now.
+            // FrameTick.dt is documented as seconds, and ExampleParticleLayer consumes
+            // it as the particle advection/decay timestep. If you are investigating
+            // particle motion, DO NOT silently switch this back to elapsed wall-clock
+            // time without verifying the visual and numerical impact. Re-check whether
+            // using actual elapsed seconds here changes particle advection behavior in
+            // a desirable way before replacing this with `(now - lastT) / 1000`.
             const dt = 15;
-            lastT = now;
 
             // stash viewport/scissor once
             const prevViewport = new THREE.Vector4();
@@ -657,6 +688,7 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
         requestAnimationFrame(loop);
         return () => { running = false; };
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [engineReady]);
 
     const earthValue = useMemo(() => ({
@@ -667,6 +699,9 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
         cameraRef,
         controlsRef,
         globeRef,
+        ambientLightRef,
+        moistureKeyLightRef,
+        moistureHeadLightRef,
         timestamp,
         registerLayer,
         unregisterLayer,

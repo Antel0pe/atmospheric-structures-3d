@@ -11,6 +11,14 @@ const EarthBase = dynamic(() => import("./layers/EarthBase"), {
   loading: () => <div style={{ width: "100%", height: "100%" }} />,
 });
 
+const MoistureStructureLayer = dynamic(
+  () => import("./layers/MoistureStructureLayer"),
+  {
+    ssr: false,
+    loading: () => <div style={{ width: "100%", height: "100%" }} />,
+  }
+);
+
 const ExampleShaderMeshLayer = dynamic(
   () => import("./layers/ExampleShaderMeshLayer"),
   {
@@ -41,7 +49,7 @@ const TimeSlider = dynamic(() => import("./TimeSlider"), {
 });
 
 export default function HomeClient() {
-  const [datehour, setDatehour] = useState(() => "2021-11-12T03:00");
+  const [datehour, setDatehour] = useState(() => "2021-11-08T12:00");
   const [allReady, setAllReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [layerInfoOpen, setLayerInfoOpen] = useState(true);
@@ -72,6 +80,7 @@ export default function HomeClient() {
             if (timestamp === datehour) setAllReady(ready);
           }}
         >
+          <MoistureStructureLayer />
           <ExampleShaderMeshLayer />
           <ExampleContoursLayer />
           <ExampleParticleLayer heightTex={null} />
