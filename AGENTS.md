@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # Python Environment
 
 Use the conda environment named `atmospheric-structures-3d` for Python work in this repo.
+
+# Privacy
+
+Never include the user's full local filesystem path in any public or shareable artifact. This includes committed files, documentation, commit messages, pull requests, issues, comments, generated reports, screenshots, and any other text that may leave the local machine. Use repo-relative paths, `~`, or sanitized placeholders instead.

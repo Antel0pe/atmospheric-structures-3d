@@ -651,8 +651,13 @@ export default function EarthBase({ timestamp, onAllReadyChange, children }: Pro
             if (!running) return;
 
             const now = performance.now();
-            // const dt = Math.min(0.05, (now - lastT) / 1000);
-            // const dt = (now - lastT) / 1000;
+            // NOTE: This loop intentionally uses a fixed simulation timestep for now.
+            // FrameTick.dt is documented as seconds, and ExampleParticleLayer consumes
+            // it as the particle advection/decay timestep. If you are investigating
+            // particle motion, DO NOT silently switch this back to elapsed wall-clock
+            // time without verifying the visual and numerical impact. Re-check whether
+            // using actual elapsed seconds here changes particle advection behavior in
+            // a desirable way before replacing this with `(now - lastT) / 1000`.
             const dt = 15;
 
             // stash viewport/scissor once
