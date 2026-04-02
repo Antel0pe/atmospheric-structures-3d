@@ -1,9 +1,9 @@
 import path from "node:path";
 
-const DEFAULT_DATA_DIR = "public";
+import { getAppConfig } from "../../lib/appConfig";
 
 export function getDataRootPath() {
-  const configured = process.env.DATA_DIR?.trim() || DEFAULT_DATA_DIR;
+  const configured = getAppConfig().dataDir;
 
   if (path.isAbsolute(configured)) return configured;
   return path.join(process.cwd(), configured);

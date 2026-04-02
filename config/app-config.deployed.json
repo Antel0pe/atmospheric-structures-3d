@@ -1,0 +1,7 @@
+{
+  "dataDir": "public",
+  "sliderDateRange": {
+    "startDate": "2021-11-01T00:00",
+    "endDate": "2021-11-30T23:00"
+  }
+}
