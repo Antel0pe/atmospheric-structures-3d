@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { getAppConfig } from "../lib/appConfig";
 import SidebarPane from "./sidebar/SidebarPane";
 import LayerInfoPane from "./sidebar/LayerInfoPane";
 import DataNoticeOverlay from "./DataNoticeOverlay";
@@ -49,7 +50,9 @@ const TimeSlider = dynamic(() => import("./TimeSlider"), {
 });
 
 export default function HomeClient() {
-  const [datehour, setDatehour] = useState(() => "2021-11-08T12:00");
+  const [datehour, setDatehour] = useState(
+    () => getAppConfig().sliderDateRange.startDate
+  );
   const [allReady, setAllReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [layerInfoOpen, setLayerInfoOpen] = useState(true);

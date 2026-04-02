@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getSliderDateRangeFromEnv } from "../lib/sliderDateRange";
+import { getAppConfig } from "../lib/appConfig";
 
 // -----------------------------
 // Constants
@@ -88,7 +88,7 @@ export default function TimeSlider({
   onChange,
   allReady,
 }: TimeSliderProps) {
-  const { startDate, endDate } = getSliderDateRangeFromEnv();
+  const { startDate, endDate } = getAppConfig().sliderDateRange;
   const start = useMemo(() => parseDateTimeUTC(startDate), [startDate]);
   const end = useMemo(() => parseDateTimeUTC(endDate), [endDate]);
   const clampedValue = useMemo(() => clampValueToRange(value, start, end), [value, start, end]);

@@ -1,7 +1,9 @@
 import path from "node:path";
 
+import { getAppConfig } from "../../lib/appConfig";
+
 export function getFilesystemDataRootPath() {
-  const configured = process.env.DATA_DIR?.trim();
+  const configured = getAppConfig().dataDir;
 
   if (!configured || !path.isAbsolute(configured)) {
     return null;

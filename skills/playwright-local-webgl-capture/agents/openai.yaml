@@ -1,0 +1,4 @@
+interface:
+  display_name: "Local WebGL Capture"
+  short_description: "Reliable headless local WebGL capture"
+  default_prompt: "Use $playwright-local-webgl-capture to open my local app, wait for the WebGL scene to settle, capture a screenshot, and return the browser logs."

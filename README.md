@@ -15,6 +15,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## App Config
+
+App configuration is selected by `NEXT_PUBLIC_APP_MODE`.
+
+- `dev` uses `config/app-config.dev.json`
+- `deployed` uses `config/app-config.deployed.json`
+
+If `NEXT_PUBLIC_APP_MODE` is unset, the app defaults to `deployed`.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
