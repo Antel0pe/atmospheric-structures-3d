@@ -349,7 +349,8 @@ export default function TimeSlider({
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               onClick={() => nudgeByStep(-1)}
-              aria-label={`Step backward ${stepHours} hours`}
+              aria-label="Step backward time"
+              data-testid="time-step-backward"
               title={`Step backward ${stepHours} hours`}
               style={chromeButtonStyle}
             >
@@ -377,7 +378,8 @@ export default function TimeSlider({
 
             <button
               onClick={() => nudgeByStep(1)}
-              aria-label={`Step forward ${stepHours} hours`}
+              aria-label="Step forward time"
+              data-testid="time-step-forward"
               title={`Step forward ${stepHours} hours`}
               style={chromeButtonStyle}
             >
@@ -415,7 +417,8 @@ export default function TimeSlider({
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 onClick={() => nudgeByStep(-1)}
-                aria-label={`Step backward ${stepHours} hours`}
+                aria-label="Step backward time"
+                data-testid="time-step-backward"
                 title={`Step backward ${stepHours} hours`}
                 style={chromeButtonStyle}
               >
@@ -443,7 +446,8 @@ export default function TimeSlider({
 
               <button
                 onClick={() => nudgeByStep(1)}
-                aria-label={`Step forward ${stepHours} hours`}
+                aria-label="Step forward time"
+                data-testid="time-step-forward"
                 title={`Step forward ${stepHours} hours`}
                 style={chromeButtonStyle}
               >

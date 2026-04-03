@@ -25,6 +25,10 @@ export function getAppMode(): AppMode {
   return APP_MODE;
 }
 
+export function isDevMode(): boolean {
+  return APP_MODE === "dev";
+}
+
 export function getAppConfig(): AppConfig {
   return APP_CONFIG_BY_MODE[APP_MODE];
 }

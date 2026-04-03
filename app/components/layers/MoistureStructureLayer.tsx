@@ -1118,17 +1118,36 @@ export default function MoistureStructureLayer() {
     void (async () => {
       try {
         const style = styleRef.current;
+        const prev = currentRef.current;
+        // Crossfading from an empty scene only delays the first visible render.
+        const skipInitialFade = !prev;
         const frame = await fetchMoistureStructureFrame(timestamp, {
           segmentationMode,
         });
         if (isCancelled()) return;
 
-        const next = buildSlice(frame, style, 0.0);
+        const next = buildSlice(frame, style, skipInitialFade ? style.opacity : 0.0);
         root.add(next.group);
+        if (skipInitialFade) {
+          currentRef.current = next;
+          currentFrameRef.current = frame;
+          transitionRef.current = null;
+          transitionFrameRef.current = null;
+          fadeMixRef.current = null;
+          applyVisibleOpacity(style.opacity);
+          applyCameraDrivenState(
+            cameraPositionRef.current,
+            cameraDirectionRef.current,
+            style
+          );
+          updateFootprints(root, frame, style);
+          publishMoistureFrameState(frame, style.segmentationMode);
+          signalReady(timestamp);
+          return;
+        }
+
         transitionRef.current = next;
         transitionFrameRef.current = frame;
-
-        const prev = currentRef.current;
         fadeMixRef.current = 0;
         applyVisibleOpacity(style.opacity);
         applyCameraDrivenState(
@@ -1166,10 +1185,9 @@ export default function MoistureStructureLayer() {
             );
             updateFootprints(root, frame, styleRef.current);
             publishMoistureFrameState(frame, styleRef.current.segmentationMode);
+            signalReady(timestamp);
           }
         );
-
-        signalReady(timestamp);
       } catch (error) {
         if (isCancelled()) return;
         console.error("Failed to load moisture structures", error);

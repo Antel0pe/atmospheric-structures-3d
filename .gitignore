@@ -2,6 +2,7 @@
 
 data/
 tmp/
+/saved-views/
 # dependencies
 /node_modules
 /.pnp

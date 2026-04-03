@@ -6,6 +6,9 @@ import { chromium } from "playwright";
 const cwd = process.cwd();
 const home = process.env.HOME ?? "";
 
+const nowMs = () => Number(process.hrtime.bigint()) / 1e6;
+const round = (value) => Math.round(value * 10) / 10;
+
 function sanitize(value) {
   if (!value) return value;
   let next = String(value);
@@ -25,6 +28,7 @@ function parseArgs(argv) {
     serverTimeoutMs: 120_000,
     settleMs: 45_000,
     screenshotTimeoutMs: 120_000,
+    skipScreenshot: false,
     canvasSelector: "canvas",
     readySelector: '[aria-label="Play"], [aria-label="Pause"]',
     readyTitles: ["Play", "Pause"],
@@ -32,6 +36,9 @@ function parseArgs(argv) {
     checkOnly: false,
     devCommand: "",
     trackUrlSubstring: "earth-day.jpg",
+    automation: true,
+    sceneOnly: false,
+    swiftshader: true,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -64,6 +71,9 @@ function parseArgs(argv) {
       case "--screenshot-timeout-ms":
         options.screenshotTimeoutMs = Number(argv[++i]);
         break;
+      case "--skip-screenshot":
+        options.skipScreenshot = true;
+        break;
       case "--canvas-selector":
         options.canvasSelector = argv[++i];
         break;
@@ -88,6 +98,18 @@ function parseArgs(argv) {
       case "--track-url-substring":
         options.trackUrlSubstring = argv[++i];
         break;
+      case "--no-automation":
+        options.automation = false;
+        break;
+      case "--scene-only":
+        options.sceneOnly = true;
+        break;
+      case "--swiftshader":
+        options.swiftshader = true;
+        break;
+      case "--native-gpu":
+        options.swiftshader = false;
+        break;
       default:
         throw new Error(`Unknown argument: ${arg}`);
     }
@@ -102,6 +124,12 @@ function parseViewport(viewport) {
     throw new Error(`Invalid viewport '${viewport}'. Expected <width>x<height>.`);
   }
   return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+function withAutomationQuery(urlString) {
+  const url = new URL(urlString);
+  url.searchParams.set("automation", "1");
+  return url.toString();
 }
 
 function deriveArtifactPath(kind, urlString) {
@@ -145,14 +173,119 @@ async function waitForServer(urlString, timeoutMs, intervalMs = 1_000) {
 function defaultDevCommandForUrl(urlString) {
   const url = new URL(urlString);
   const port = url.port || (url.protocol === "https:" ? "443" : "80");
-  if (port === "3000") return "bun dev";
-  return `bun dev -- --port ${port}`;
+  if (port === "3000") return "bun dev --hostname localhost --port 3000";
+  return `bun dev --hostname localhost --port ${port}`;
+}
+
+async function collectPerfTiming(page) {
+  return page.evaluate(() => {
+    const navigation = performance.getEntriesByType("navigation")[0];
+    const trackedResources = performance
+      .getEntriesByType("resource")
+      .filter((entry) =>
+        [
+          "earth-day.jpg",
+          "metadata.json",
+          "positions.bin",
+          "indices.bin",
+          "footprints.json",
+        ].some((token) => entry.name.includes(token))
+      )
+      .map((entry) => ({
+        name: entry.name,
+        initiatorType: entry.initiatorType,
+        startTime: entry.startTime,
+        duration: entry.duration,
+        transferSize: entry.transferSize,
+        encodedBodySize: entry.encodedBodySize,
+        decodedBodySize: entry.decodedBodySize,
+      }));
+
+    return {
+      navigation: navigation
+        ? {
+            domContentLoadedEventEnd: navigation.domContentLoadedEventEnd,
+            loadEventEnd: navigation.loadEventEnd,
+            responseEnd: navigation.responseEnd,
+          }
+        : null,
+      trackedResources,
+    };
+  });
+}
+
+async function collectDomInfo(page, options) {
+  return page.evaluate(
+    ({ canvasSelector, readySelector }) => {
+      const canvas = document.querySelector(canvasSelector);
+      const rect = canvas?.getBoundingClientRect();
+      const readyNode = readySelector ? document.querySelector(readySelector) : null;
+      return {
+        href: location.href,
+        title: document.title,
+        canvas: rect ? { width: rect.width, height: rect.height } : null,
+        readyTitle: readyNode?.getAttribute("title") || null,
+        textSample: document.body?.innerText?.slice(0, 500) || "",
+      };
+    },
+    {
+      canvasSelector: options.canvasSelector,
+      readySelector: options.skipReady ? "" : options.readySelector,
+    }
+  );
+}
+
+async function captureSceneDataUrl(page, screenshotPath) {
+  const dataUrl = await page.evaluate(
+    () => window.__ATMOS_AUTOMATION__?.capturePngDataUrl() ?? null
+  );
+  if (!dataUrl) {
+    throw new Error("Automation capture returned an empty PNG data URL.");
+  }
+
+  const base64 = dataUrl.split(",")[1] || "";
+  await fs.writeFile(screenshotPath, Buffer.from(base64, "base64"));
+}
+
+function buildTimingSummary(marks) {
+  const summary = {};
+  if (marks.started && marks.browserLaunched) {
+    summary.launchBrowserMs = round(marks.browserLaunched - marks.started);
+  }
+  if (marks.browserLaunched && marks.pageCreated) {
+    summary.createPageMs = round(marks.pageCreated - marks.browserLaunched);
+  }
+  if (marks.pageCreated && marks.domContentLoaded) {
+    summary.gotoDomContentLoadedMs = round(marks.domContentLoaded - marks.pageCreated);
+  }
+  if (marks.domContentLoaded && marks.readyForCapture) {
+    summary.waitForReadyToCaptureMs = round(
+      marks.readyForCapture - marks.domContentLoaded
+    );
+  }
+  if (marks.renderOnceDone && marks.captureDone) {
+    summary.screenshotMs = round(marks.captureDone - marks.renderOnceDone);
+  } else if (marks.readyForCapture && marks.captureDone) {
+    summary.screenshotMs = round(marks.captureDone - marks.readyForCapture);
+  }
+  if (marks.started && marks.captureDone) {
+    summary.captureCompleteMs = round(marks.captureDone - marks.started);
+  }
+  if (marks.captureDone && marks.summaryDone) {
+    summary.postCaptureMetadataMs = round(marks.summaryDone - marks.captureDone);
+  }
+  if (marks.started && marks.summaryDone) {
+    summary.totalMs = round(marks.summaryDone - marks.started);
+  }
+  return summary;
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  const targetUrl = options.automation ? withAutomationQuery(options.url) : options.url;
   const viewport = parseViewport(options.viewport);
-  const screenshotPath = options.screenshot || deriveArtifactPath("screenshot", options.url);
+  const screenshotPath =
+    options.screenshot || deriveArtifactPath("screenshot", options.url);
   const logPath = options.log || deriveArtifactPath("log", options.url);
   const runtimeRoot = path.join(cwd, "tmp", "playwright-runtime");
   const browserTempRoot = path.join(runtimeRoot, "tmp");
@@ -160,6 +293,7 @@ async function main() {
   const xdgCacheHome = path.join(runtimeRoot, "xdg-cache");
   const xdgDataHome = path.join(runtimeRoot, "xdg-data");
   const serverLogPath = options.serverLog || path.join(runtimeRoot, "bun-dev.log");
+  const marks = { started: nowMs() };
   const logs = [];
   const push = (kind, message) => {
     const line = `[${new Date().toISOString()}] ${kind}: ${sanitize(message)}`;
@@ -196,6 +330,11 @@ async function main() {
   let context;
   let page;
   let devServer;
+  let perfTiming = null;
+  let domInfo = null;
+  let automationInfo = null;
+  let startedServer = false;
+  let captureMode = options.sceneOnly ? "scene-data-url" : "page-screenshot";
 
   await fs.writeFile(logPath, "", "utf8");
 
@@ -207,9 +346,14 @@ async function main() {
   try {
     await appendLog("browser-path", chromium.executablePath());
     await appendLog("runtime-root", runtimeRoot);
+    await appendLog("target-url", targetUrl);
+    await appendLog("automation", options.automation ? "enabled" : "disabled");
 
-    const serverInitiallyUp = await isServerUp(options.url);
-    await appendLog("server-check", serverInitiallyUp ? `${options.url} reachable` : `${options.url} unreachable`);
+    const serverInitiallyUp = await isServerUp(targetUrl);
+    await appendLog(
+      "server-check",
+      serverInitiallyUp ? `${targetUrl} reachable` : `${targetUrl} unreachable`
+    );
 
     if (options.checkOnly) {
       console.log(
@@ -217,7 +361,7 @@ async function main() {
           {
             ok: true,
             mode: "check-only",
-            url: options.url,
+            url: sanitize(targetUrl),
             reachable: serverInitiallyUp,
             browserPath: sanitize(chromium.executablePath()),
             runtimeRoot: sanitize(runtimeRoot),
@@ -232,7 +376,10 @@ async function main() {
 
     if (!serverInitiallyUp) {
       const devCommand = options.devCommand || defaultDevCommandForUrl(options.url);
-      await appendLog("server", `starting '${devCommand}' because ${options.url} is not reachable`);
+      await appendLog(
+        "server",
+        `starting '${devCommand}' because ${targetUrl} is not reachable`
+      );
       const serverLogHandle = await fs.open(serverLogPath, "a");
       devServer = spawn("bash", ["-lc", devCommand], {
         cwd,
@@ -242,38 +389,40 @@ async function main() {
       });
       devServer.unref();
       await serverLogHandle.close();
-      const ready = await waitForServer(options.url, options.serverTimeoutMs);
+      startedServer = true;
+      const ready = await waitForServer(targetUrl, options.serverTimeoutMs);
       if (!ready) {
-        throw new Error(`Server command did not make ${options.url} reachable within ${options.serverTimeoutMs}ms. See ${sanitize(serverLogPath)}`);
+        throw new Error(
+          `Server command did not make ${targetUrl} reachable within ${options.serverTimeoutMs}ms. See ${sanitize(serverLogPath)}`
+        );
       }
-      await appendLog("server", `server command is serving ${options.url}`);
+      await appendLog("server", `server command is serving ${targetUrl}`);
     } else {
-      await appendLog("server", `${options.url} already reachable`);
+      await appendLog("server", `${targetUrl} already reachable`);
+    }
+
+    const launchArgs = ["--enable-webgl", "--ignore-gpu-blocklist"];
+    if (options.swiftshader) {
+      launchArgs.push("--use-gl=angle", "--use-angle=swiftshader");
+      await appendLog("browser-flags", "swiftshader enabled");
     }
 
     browser = await chromium.launch({
       headless: true,
       env: launchEnv,
-      args: [
-        "--use-gl=angle",
-        "--use-angle=swiftshader",
-        "--enable-webgl",
-        "--ignore-gpu-blocklist",
-      ],
+      args: launchArgs,
     });
+    marks.browserLaunched = nowMs();
 
     context = await browser.newContext({
       viewport,
       deviceScaleFactor: 1,
     });
     page = await context.newPage();
+    marks.pageCreated = nowMs();
 
     page.on("console", (msg) => {
-      void fs.appendFile(
-        logPath,
-        `${push(`console.${msg.type()}`, msg.text())}\n`,
-        "utf8"
-      );
+      void fs.appendFile(logPath, `${push(`console.${msg.type()}`, msg.text())}\n`, "utf8");
     });
     page.on("pageerror", (err) => {
       void fs.appendFile(logPath, `${push("pageerror", err.stack || err.message)}\n`, "utf8");
@@ -282,10 +431,7 @@ async function main() {
       const failure = req.failure();
       void fs.appendFile(
         logPath,
-        `${push(
-          "requestfailed",
-          `${req.method()} ${req.url()} ${failure ? failure.errorText : "unknown"}`
-        )}\n`,
+        `${push("requestfailed", `${req.method()} ${req.url()} ${failure ? failure.errorText : "unknown"}`)}\n`,
         "utf8"
       );
     });
@@ -308,10 +454,11 @@ async function main() {
       });
     }
 
-    await page.goto(options.url, {
+    await page.goto(targetUrl, {
       waitUntil: "domcontentloaded",
       timeout: options.timeoutMs,
     });
+    marks.domContentLoaded = nowMs();
     await appendLog("nav", `loaded ${page.url()}`);
     await appendLog("title", await page.title());
 
@@ -331,58 +478,97 @@ async function main() {
     );
     await appendLog("canvas", "visible and sized");
 
-    if (!options.skipReady && options.readySelector) {
-      await page.waitForSelector(options.readySelector, {
-        state: "visible",
-        timeout: options.timeoutMs,
-      });
+    if (options.automation) {
       await page.waitForFunction(
-        ({ selector, titles }) => {
-          const node = document.querySelector(selector);
-          if (!(node instanceof HTMLElement)) return false;
-          const title = node.getAttribute("title") || "";
-          return titles.length === 0 ? true : titles.includes(title);
-        },
-        { selector: options.readySelector, titles: options.readyTitles },
+        () => Boolean(window.__ATMOS_AUTOMATION__?.enabled),
+        undefined,
         { timeout: options.timeoutMs }
       );
-      await appendLog("ready", "readiness control indicates scene ready");
+      await appendLog("automation", "__ATMOS_AUTOMATION__ detected");
+
+      await page.waitForFunction(
+        () => Boolean(window.__ATMOS_AUTOMATION__?.paused),
+        undefined,
+        { timeout: options.timeoutMs }
+      );
+      marks.automationPaused = nowMs();
+      marks.readyForCapture = marks.automationPaused;
+      automationInfo = {
+        enabled: true,
+        paused: true,
+        hasCapturePngDataUrl: true,
+      };
+      await appendLog("automation", JSON.stringify(automationInfo));
+
+      if (!options.skipScreenshot) {
+        if (options.sceneOnly) {
+          await captureSceneDataUrl(page, screenshotPath);
+          marks.captureDone = nowMs();
+          await appendLog("capture", `scene data URL -> ${screenshotPath}`);
+        } else {
+          await page.screenshot({
+            path: screenshotPath,
+            type: "png",
+            timeout: options.screenshotTimeoutMs,
+          });
+          marks.captureDone = nowMs();
+          await appendLog("capture", `page screenshot -> ${screenshotPath}`);
+        }
+      }
+    } else {
+      if (!options.skipReady && options.readySelector) {
+        await page.waitForSelector(options.readySelector, {
+          state: "visible",
+          timeout: options.timeoutMs,
+        });
+        await page.waitForFunction(
+          ({ selector, titles }) => {
+            const node = document.querySelector(selector);
+            if (!(node instanceof HTMLElement)) return false;
+            const title = node.getAttribute("title") || "";
+            return titles.length === 0 ? true : titles.includes(title);
+          },
+          { selector: options.readySelector, titles: options.readyTitles },
+          { timeout: options.timeoutMs }
+        );
+        await appendLog("ready", "readiness control indicates scene ready");
+      }
+
+      await appendLog("settle", `${options.settleMs}ms`);
+      await page.waitForTimeout(options.settleMs);
+      marks.readyForCapture = nowMs();
+
+      if (!options.skipScreenshot) {
+        await page.locator(options.canvasSelector).first().screenshot({
+          path: screenshotPath,
+          timeout: options.screenshotTimeoutMs,
+        });
+        marks.captureDone = nowMs();
+        await appendLog("capture", `canvas screenshot -> ${screenshotPath}`);
+      }
     }
 
-    await appendLog("settle", `${options.settleMs}ms`);
-    await page.waitForTimeout(options.settleMs);
-
-    const domInfo = await page.evaluate(({ canvasSelector, readySelector }) => {
-      const canvas = document.querySelector(canvasSelector);
-      const rect = canvas?.getBoundingClientRect();
-      const readyNode = readySelector ? document.querySelector(readySelector) : null;
-      return {
-        href: location.href,
-        title: document.title,
-        canvas: rect ? { width: rect.width, height: rect.height } : null,
-        readyTitle: readyNode?.getAttribute("title") || null,
-        textSample: document.body?.innerText?.slice(0, 500) || "",
-      };
-    }, {
-      canvasSelector: options.canvasSelector,
-      readySelector: options.skipReady ? "" : options.readySelector,
-    });
+    perfTiming = await collectPerfTiming(page);
+    domInfo = await collectDomInfo(page, options);
+    marks.summaryDone = nowMs();
+    await appendLog("perf", JSON.stringify(perfTiming));
     await appendLog("dom", JSON.stringify(domInfo));
-
-    await page.locator(options.canvasSelector).first().screenshot({
-      path: screenshotPath,
-      timeout: options.screenshotTimeoutMs,
-    });
-    await appendLog("screenshot", screenshotPath);
 
     console.log(
       JSON.stringify(
         {
           ok: true,
-          url: options.url,
+          url: sanitize(targetUrl),
           browserPath: sanitize(chromium.executablePath()),
-          screenshotPath: sanitize(screenshotPath),
+          screenshotPath: options.skipScreenshot ? null : sanitize(screenshotPath),
           logPath: sanitize(logPath),
+          serverLogPath: sanitize(serverLogPath),
+          startedServer,
+          captureMode,
+          timingsMs: buildTimingSummary(marks),
+          automationInfo,
+          perfTiming,
+          domInfo,
           logs,
         },
         null,
@@ -390,34 +576,66 @@ async function main() {
       )
     );
   } catch (error) {
+    if (!marks.summaryDone) {
+      marks.summaryDone = nowMs();
+    }
     await appendLog("fatal", error.stack || error.message);
-    if (page) {
+
+    if (page && !options.skipScreenshot) {
       try {
-        const canvasLocator = page.locator(options.canvasSelector).first();
-        if ((await canvasLocator.count()) > 0) {
-          await canvasLocator.screenshot({
+        if (options.automation) {
+          try {
+            await page.evaluate(() => {
+              window.__ATMOS_AUTOMATION__?.freeze();
+              window.__ATMOS_AUTOMATION__?.renderOnce();
+              return 1;
+            });
+          } catch {
+            // ignore automation capture prep failures in the failure path
+          }
+          await page.screenshot({
             path: screenshotPath,
+            type: "png",
             timeout: options.screenshotTimeoutMs,
           });
         } else {
-          await page.locator("body").screenshot({
-            path: screenshotPath,
-            timeout: options.screenshotTimeoutMs,
-          });
+          const canvasLocator = page.locator(options.canvasSelector).first();
+          if ((await canvasLocator.count()) > 0) {
+            await canvasLocator.screenshot({
+              path: screenshotPath,
+              timeout: options.screenshotTimeoutMs,
+            });
+          } else {
+            await page.locator("body").screenshot({
+              path: screenshotPath,
+              timeout: options.screenshotTimeoutMs,
+            });
+          }
         }
         await appendLog("failure-screenshot", screenshotPath);
       } catch (screenshotError) {
-        await appendLog("failure-screenshot-error", screenshotError.stack || screenshotError.message);
+        await appendLog(
+          "failure-screenshot-error",
+          screenshotError.stack || screenshotError.message
+        );
       }
     }
+
     console.log(
       JSON.stringify(
         {
           ok: false,
-          url: options.url,
+          url: sanitize(targetUrl),
           browserPath: sanitize(chromium.executablePath()),
-          screenshotPath: sanitize(screenshotPath),
+          screenshotPath: options.skipScreenshot ? null : sanitize(screenshotPath),
           logPath: sanitize(logPath),
+          serverLogPath: sanitize(serverLogPath),
+          startedServer,
+          captureMode,
+          timingsMs: buildTimingSummary(marks),
+          automationInfo,
+          perfTiming,
+          domInfo,
           logs,
           error: sanitize(error.stack || error.message),
         },
