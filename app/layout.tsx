@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { isDevMode } from "./lib/appConfig";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,13 +24,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const devMode = isDevMode();
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable}`}
       >
         {children}
-        <Analytics />
+        {devMode ? null : <Analytics />}
       </body>
     </html>
   );

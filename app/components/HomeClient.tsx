@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
-import { getAppConfig } from "../lib/appConfig";
+import { useEffect, useState } from "react";
 import SidebarPane from "./sidebar/SidebarPane";
 import LayerInfoPane from "./sidebar/LayerInfoPane";
 import DataNoticeOverlay from "./DataNoticeOverlay";
+import { useViewerStore } from "../state/viewerStore";
 
 const EarthBase = dynamic(() => import("./layers/EarthBase"), {
   ssr: false,
@@ -50,14 +50,34 @@ const TimeSlider = dynamic(() => import("./TimeSlider"), {
 });
 
 export default function HomeClient() {
-  const [datehour, setDatehour] = useState(
-    () => getAppConfig().sliderDateRange.startDate
-  );
   const [allReady, setAllReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [layerInfoOpen, setLayerInfoOpen] = useState(true);
+  const datehour = useViewerStore((state) => state.timestamp);
+  const setTimestamp = useViewerStore((state) => state.setTimestamp);
+  const applySavedViewRequest = useViewerStore(
+    (state) => state.applySavedViewRequest
+  );
   const sidebarWidth = "max(15vw, 320px)";
   const layerInfoWidth = sidebarWidth;
+
+  useEffect(() => {
+    if (!applySavedViewRequest) return;
+    if (applySavedViewRequest.phase !== "initial") return;
+    if (applySavedViewRequest.savedView.timestamp === datehour) return;
+
+    setTimestamp(applySavedViewRequest.savedView.timestamp);
+  }, [applySavedViewRequest, datehour, setTimestamp]);
+
+  useEffect(() => {
+    if (!allReady || !applySavedViewRequest) return;
+    if (applySavedViewRequest.phase !== "initial") return;
+    if (applySavedViewRequest.savedView.timestamp !== datehour) return;
+
+    useViewerStore
+      .getState()
+      .promoteApplySavedViewReady(applySavedViewRequest.requestId);
+  }, [allReady, applySavedViewRequest, datehour]);
 
   return (
     <div
@@ -109,11 +129,9 @@ export default function HomeClient() {
           }}
         >
           <TimeSlider
+            key={applySavedViewRequest ? `saved-view-${applySavedViewRequest.requestId}` : "time-slider"}
             value={datehour}
-            onChange={(next) => {
-              setAllReady(false);
-              setDatehour(next);
-            }}
+            onChange={setTimestamp}
             allReady={allReady}
           />
         </div>

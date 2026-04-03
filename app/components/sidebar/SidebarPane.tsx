@@ -1,6 +1,14 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import TweakpaneControls from "@/app/state/TweakpaneControls";
 import ControlsHelp from "./ControlsHelp";
 import ExplainerCard from "./ExplainerCard";
+
+const DevViewerPane = dynamic(() => import("./DevViewerPane"), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function SidebarPane() {
   return (
@@ -30,6 +38,7 @@ export default function SidebarPane() {
       >
         <ExplainerCard />
         <ControlsHelp />
+        <DevViewerPane />
         <TweakpaneControls />
       </div>
     </aside>

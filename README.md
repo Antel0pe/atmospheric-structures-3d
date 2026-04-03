@@ -15,6 +15,29 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Fast Playwright Capture
+
+Use the repo-local capture workflow when you want a deterministic screenshot of the fully loaded WebGL app:
+
+```bash
+bun run capture:webgl
+```
+
+Default behavior:
+
+- Targets `http://localhost:3000/?automation=1`
+- Starts `bun dev --hostname localhost --port 3000` automatically if the app is down
+- Waits for the repo's automation renderer to pause after the globe texture and layers are ready
+- Captures a full browser screenshot to `tmp/playwright-localhost-3000.png`
+- Writes logs to `tmp/playwright-localhost-3000.log`
+- Prints JSON timings so you can see launch, ready, and screenshot cost separately
+
+For a scene-only export without the browser chrome:
+
+```bash
+bun run capture:webgl -- --scene-only
+```
+
 ## App Config
 
 App configuration is selected by `NEXT_PUBLIC_APP_MODE`.
