@@ -94,10 +94,27 @@ export const MOISTURE_SEGMENTATION_MODE_OPTIONS: ReadonlyArray<{
   value: MoistureSegmentationMode;
   label: string;
 }> = [
-  { value: "p95-close", label: "p95 + Closing" },
-  { value: "p95-open", label: "p95 No Closing" },
-  { value: "p97-close", label: "p97 + Closing" },
+  { value: "p95-close", label: "Bridge Pruned Baseline" },
+  { value: "p95-smooth-open1", label: "Smoothed Support" },
+  { value: "p95-local-anomaly", label: "Local Anomaly" },
 ] as const;
+
+export const BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close" as const;
+export const LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close-open1" as const;
+
+export const MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "shellFirst", label: "Shell First" },
+  { value: "bridgePruned", label: "Bridge Pruned" },
+  { value: "bridgePrunedShellFirst", label: "Bridge Pruned + Shell First" },
+  {
+    value: "bridgePrunedShellFirstMatte",
+    label: "Bridge Pruned + Shell First Matte",
+  },
+] as const;
+
+export type MoistureLegibilityExperiment =
+  (typeof MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS)[number]["value"];
 
 type ExampleShaderMeshLayerState = {
   pressureLevel: ExampleShaderMeshPressure;
@@ -149,7 +166,10 @@ export type MoistureStructureLayerState = {
   verticalWallFadeStrength: number;
   segmentationMode: MoistureSegmentationMode;
   footprintOverlayEnabled: boolean;
+  legibilityExperiment: MoistureLegibilityExperiment;
 };
+
+export type ResolvedMoistureStructureLayerState = MoistureStructureLayerState;
 
 export type MoistureVisualPresetState = Pick<
   MoistureStructureLayerState,
@@ -369,6 +389,71 @@ export function getMoistureStructurePresetState(
   return MOISTURE_STRUCTURE_PRESET_STATE[preset];
 }
 
+export function moistureLegibilityExperimentLabel(
+  experiment: MoistureLegibilityExperiment
+) {
+  return (
+    MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS.find(
+      (option) => option.value === experiment
+    )?.label ?? experiment
+  );
+}
+
+export function moistureSegmentationModeLabel(
+  segmentationMode: MoistureSegmentationMode
+) {
+  if (segmentationMode === LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE) {
+    return "Bridge Pruned (Legacy Variant)";
+  }
+  if (segmentationMode === "p95-open") {
+    return "Legacy p95 Open";
+  }
+  if (segmentationMode === "p97-close") {
+    return "Legacy p97 Close";
+  }
+
+  return (
+    MOISTURE_SEGMENTATION_MODE_OPTIONS.find(
+      (option) => option.value === segmentationMode
+    )?.label ?? segmentationMode
+  );
+}
+
+export function resolveMoistureStructureLayerState(
+  state: MoistureStructureLayerState
+): ResolvedMoistureStructureLayerState {
+  const resolved: ResolvedMoistureStructureLayerState = { ...state };
+
+  switch (state.legibilityExperiment) {
+    case "shellFirst":
+    case "bridgePrunedShellFirst":
+    case "bridgePrunedShellFirstMatte":
+      resolved.solidShellEnabled = true;
+      resolved.distanceFadeEnabled = false;
+      resolved.interiorBackfaceEnabled = false;
+      resolved.frontOpacity = Math.max(state.frontOpacity, 1.5);
+      resolved.backfaceOpacity = 0;
+      if (
+        state.legibilityExperiment === "bridgePrunedShellFirst" ||
+        state.legibilityExperiment === "bridgePrunedShellFirstMatte"
+      ) {
+        resolved.segmentationMode = state.segmentationMode;
+      }
+      if (state.legibilityExperiment === "bridgePrunedShellFirstMatte") {
+        resolved.ambientIntensity = Math.max(state.ambientIntensity, 0.92);
+        resolved.keyLightIntensity = Math.min(state.keyLightIntensity, 0.72);
+        resolved.headLightIntensity = Math.min(state.headLightIntensity, 0.42);
+      }
+      return resolved;
+    case "bridgePruned":
+      resolved.segmentationMode = state.segmentationMode;
+      return resolved;
+    case "none":
+    default:
+      return resolved;
+  }
+}
+
 export const EXAMPLE_LAYER_PRESETS = {
   shaderMeshVisible: {
     pressureLevel: 250 as ExampleShaderMeshPressure,
@@ -402,6 +487,10 @@ type ControlsState = {
   resetMoistureVisualPreset: () => void;
   setMoistureStructurePreset: (preset: MoistureStructurePreset) => void;
   resetMoistureStructurePreset: () => void;
+  setMoistureLegibilityExperiment: (
+    experiment: MoistureLegibilityExperiment
+  ) => void;
+  resetMoistureLegibilityExperiment: () => void;
   setMoistureStructureFrame: (frame: MoistureSidebarFrameState) => void;
   setExampleShaderMeshLayer: (
     patch: Partial<ExampleShaderMeshLayerState>
@@ -424,6 +513,7 @@ export const useControls = create<ControlsState>()(
       ...getMoistureStructurePresetState("componentRead"),
       selectedComponentId: null,
       componentSort: "size",
+      legibilityExperiment: "bridgePruned",
     },
     moistureStructureFrame: null,
     // Defaults keep the examples hidden from the UI. Use EXAMPLE_LAYER_PRESETS
@@ -482,6 +572,20 @@ export const useControls = create<ControlsState>()(
           ...getMoistureStructurePresetState(
             state.moistureStructureLayer.structurePreset
           ),
+        },
+      })),
+    setMoistureLegibilityExperiment: (legibilityExperiment) =>
+      set((state) => ({
+        moistureStructureLayer: {
+          ...state.moistureStructureLayer,
+          legibilityExperiment,
+        },
+      })),
+    resetMoistureLegibilityExperiment: () =>
+      set((state) => ({
+        moistureStructureLayer: {
+          ...state.moistureStructureLayer,
+          legibilityExperiment: "bridgePruned",
         },
       })),
     setMoistureStructureFrame: (frame) =>

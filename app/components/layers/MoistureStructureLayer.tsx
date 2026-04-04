@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useEarthLayer } from "./EarthBase";
-import { useControls } from "../../state/controlsStore";
+import {
+  resolveMoistureStructureLayerState,
+  useControls,
+  type ResolvedMoistureStructureLayerState,
+} from "../../state/controlsStore";
 import {
   fetchMoistureStructureFrame,
   type MoistureSegmentationMode,
@@ -9,15 +13,12 @@ import {
   type MoistureStructureFrame,
 } from "../utils/ApiResponses";
 
-type MoistureLayerStyle = ReturnType<
-  typeof useControls.getState
->["moistureStructureLayer"];
+type MoistureLayerStyle = ResolvedMoistureStructureLayerState;
 
 type MoistureShaderUniforms = {
   cutawayCenter: { value: THREE.Vector3 };
   cutawayRadius: { value: number };
   cutawayEnabled: { value: number };
-  cameraPosition: { value: THREE.Vector3 };
   rimEnabled: { value: number };
   rimStrength: { value: number };
   distanceFadeEnabled: { value: number };
@@ -29,6 +30,7 @@ type MoistureShaderUniforms = {
   verticalWallFadeEnabled: { value: number };
   verticalWallFadeStrength: { value: number };
   wallFadePassScale: { value: number };
+  backPass: { value: number };
 };
 
 type MoistureComponentVisual = {
@@ -224,7 +226,6 @@ function attachMoistureShader(material: THREE.MeshPhongMaterial) {
     cutawayCenter: { value: new THREE.Vector3() },
     cutawayRadius: { value: 0 },
     cutawayEnabled: { value: 0 },
-    cameraPosition: { value: new THREE.Vector3() },
     rimEnabled: { value: 0 },
     rimStrength: { value: 0 },
     distanceFadeEnabled: { value: 0 },
@@ -236,6 +237,7 @@ function attachMoistureShader(material: THREE.MeshPhongMaterial) {
     verticalWallFadeEnabled: { value: 0 },
     verticalWallFadeStrength: { value: 0 },
     wallFadePassScale: { value: 1 },
+    backPass: { value: 0 },
   };
 
   material.userData.moistureShaderUniforms = uniforms;
@@ -243,7 +245,6 @@ function attachMoistureShader(material: THREE.MeshPhongMaterial) {
     shader.uniforms.uCameraCutawayCenter = uniforms.cutawayCenter;
     shader.uniforms.uCameraCutawayRadius = uniforms.cutawayRadius;
     shader.uniforms.uCameraCutawayEnabled = uniforms.cutawayEnabled;
-    shader.uniforms.uMoistureCameraPosition = uniforms.cameraPosition;
     shader.uniforms.uMoistureRimEnabled = uniforms.rimEnabled;
     shader.uniforms.uMoistureRimStrength = uniforms.rimStrength;
     shader.uniforms.uMoistureDistanceFadeEnabled = uniforms.distanceFadeEnabled;
@@ -257,6 +258,7 @@ function attachMoistureShader(material: THREE.MeshPhongMaterial) {
     shader.uniforms.uMoistureVerticalWallFadeStrength =
       uniforms.verticalWallFadeStrength;
     shader.uniforms.uMoistureWallFadePassScale = uniforms.wallFadePassScale;
+    shader.uniforms.uMoistureBackPass = uniforms.backPass;
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -294,7 +296,6 @@ vWorldPosition = moistureWorldPosition.xyz;`
 uniform vec3 uCameraCutawayCenter;
 uniform float uCameraCutawayRadius;
 uniform float uCameraCutawayEnabled;
-uniform vec3 uMoistureCameraPosition;
 uniform float uMoistureRimEnabled;
 uniform float uMoistureRimStrength;
 uniform float uMoistureDistanceFadeEnabled;
@@ -306,6 +307,7 @@ uniform float uMoistureIsSelected;
 uniform float uMoistureVerticalWallFadeEnabled;
 uniform float uMoistureVerticalWallFadeStrength;
 uniform float uMoistureWallFadePassScale;
+uniform float uMoistureBackPass;
 varying vec3 vWorldPosition;
 varying vec3 vMoistureWorldNormal;
 varying float vPressureMix;`
@@ -338,10 +340,10 @@ if ( uMoistureColorMode > 0.5 ) {
         `#include <envmap_fragment>
 vec3 moistureViewDir = normalize( vViewPosition );
 vec3 moistureViewNormal = normalize( normal );
+vec3 radialUp = normalize( vWorldPosition );
+float wallness = 1.0 - abs( dot( normalize( vMoistureWorldNormal ), radialUp ) );
 float moistureWallFade = 0.0;
 if ( uMoistureVerticalWallFadeEnabled > 0.5 ) {
-  vec3 radialUp = normalize( vWorldPosition );
-  float wallness = 1.0 - abs( dot( normalize( vMoistureWorldNormal ), radialUp ) );
   moistureWallFade = smoothstep( 0.35, 0.9, wallness ) * uMoistureVerticalWallFadeStrength * uMoistureWallFadePassScale;
   diffuseColor.a *= 1.0 - 0.75 * moistureWallFade;
 }
@@ -360,7 +362,7 @@ if ( uMoistureDistanceFadeEnabled > 0.5 ) {
 outgoingLight *= 1.0 - moistureWallFade * 0.22;`
       );
   };
-  material.customProgramCacheKey = () => "moisture-structure-legibility-v1";
+  material.customProgramCacheKey = () => "moisture-structure-legibility-v2";
 }
 
 function setMoistureShaderUniforms(
@@ -371,6 +373,7 @@ function setMoistureShaderUniforms(
     componentColor: THREE.Color;
     isSelected: boolean;
     wallFadePassScale: number;
+    backPass: boolean;
   }
 ) {
   const uniforms = material.userData.moistureShaderUniforms as
@@ -381,7 +384,6 @@ function setMoistureShaderUniforms(
   uniforms.cutawayCenter.value.copy(cameraPosition);
   uniforms.cutawayRadius.value = style.cameraCutawayRadius;
   uniforms.cutawayEnabled.value = style.cameraCutawayEnabled ? 1 : 0;
-  uniforms.cameraPosition.value.copy(cameraPosition);
   uniforms.rimEnabled.value = style.rimEnabled ? 1 : 0;
   uniforms.rimStrength.value = style.rimStrength;
   uniforms.distanceFadeEnabled.value = style.distanceFadeEnabled ? 1 : 0;
@@ -393,6 +395,7 @@ function setMoistureShaderUniforms(
   uniforms.verticalWallFadeEnabled.value = style.verticalWallFadeEnabled ? 1 : 0;
   uniforms.verticalWallFadeStrength.value = style.verticalWallFadeStrength;
   uniforms.wallFadePassScale.value = options.wallFadePassScale;
+  uniforms.backPass.value = options.backPass ? 1 : 0;
 }
 
 function buildComponentGeometry(
@@ -583,6 +586,8 @@ function applySliceRenderStyle(
   const showBackfaces =
     !style.solidShellEnabled || style.interiorBackfaceEnabled;
   const backDarkened = style.solidShellEnabled && style.interiorBackfaceEnabled;
+  const matteShellFirst =
+    style.legibilityExperiment === "bridgePrunedShellFirstMatte";
 
   for (const component of slice.components) {
     const isSelected =
@@ -596,10 +601,17 @@ function applySliceRenderStyle(
           : style.focusMode === "showSelectedOnly"
             ? 0
             : 1;
-    const frontWeight = boostedFrontOpacityWeight(
+    let frontWeight = boostedFrontOpacityWeight(
       component.opacityWeight,
       style.solidShellEnabled
     );
+    if (
+      style.legibilityExperiment === "shellFirst" ||
+      style.legibilityExperiment === "bridgePrunedShellFirst" ||
+      style.legibilityExperiment === "bridgePrunedShellFirstMatte"
+    ) {
+      frontWeight = Math.max(frontWeight, 0.96);
+    }
     const frontAlpha = THREE.MathUtils.clamp(
       slice.baseOpacity *
         frontWeight *
@@ -632,6 +644,10 @@ function applySliceRenderStyle(
     component.frontMaterial.emissiveIntensity = frontEmissiveIntensity;
     component.frontMaterial.specular.copy(FRONT_SPECULAR);
     component.frontMaterial.shininess = frontShininess;
+    if (matteShellFirst) {
+      component.frontMaterial.specular.multiplyScalar(0.18);
+      component.frontMaterial.shininess = 12;
+    }
 
     updateTransparentMode(component.backMaterial, true);
     component.backMaterial.opacity = backAlpha;
@@ -642,6 +658,10 @@ function applySliceRenderStyle(
     component.backMaterial.emissiveIntensity = backDarkened ? 0.08 : frontEmissiveIntensity;
     component.backMaterial.specular.copy(backDarkened ? BACK_SPECULAR : FRONT_SPECULAR);
     component.backMaterial.shininess = backDarkened ? 18 : frontShininess;
+    if (matteShellFirst) {
+      component.backMaterial.specular.multiplyScalar(0.12);
+      component.backMaterial.shininess = backDarkened ? 8 : 10;
+    }
   }
 }
 
@@ -655,16 +675,28 @@ function applySliceCameraState(
     const isSelected =
       style.selectedComponentId !== null &&
       component.componentId === style.selectedComponentId;
-    setMoistureShaderUniforms(component.frontMaterial, cameraPosition, style, {
-      componentColor: component.componentColor,
-      isSelected,
-      wallFadePassScale: 1,
-    });
-    setMoistureShaderUniforms(component.backMaterial, cameraPosition, style, {
-      componentColor: component.componentColor,
-      isSelected,
-      wallFadePassScale: style.interiorBackfaceEnabled ? 0.5 : 0,
-    });
+    setMoistureShaderUniforms(
+      component.frontMaterial,
+      cameraPosition,
+      style,
+      {
+        componentColor: component.componentColor,
+        isSelected,
+        wallFadePassScale: 1,
+        backPass: false,
+      }
+    );
+    setMoistureShaderUniforms(
+      component.backMaterial,
+      cameraPosition,
+      style,
+      {
+        componentColor: component.componentColor,
+        isSelected,
+        wallFadePassScale: style.interiorBackfaceEnabled ? 0.5 : 0,
+        backPass: true,
+      }
+    );
   }
 }
 
@@ -807,7 +839,8 @@ function publishMoistureFrameState(
 }
 
 export default function MoistureStructureLayer() {
-  const moistureLayer = useControls((state) => state.moistureStructureLayer);
+  const rawMoistureLayer = useControls((state) => state.moistureStructureLayer);
+  const moistureLayer = resolveMoistureStructureLayerState(rawMoistureLayer);
   const visible = moistureLayer.visible;
   const segmentationMode = moistureLayer.segmentationMode;
 
@@ -939,7 +972,9 @@ export default function MoistureStructureLayer() {
     if (!engineReady || !sceneRef.current) return;
 
     const root = new THREE.Group();
-    const state = useControls.getState().moistureStructureLayer;
+    const state = resolveMoistureStructureLayerState(
+      useControls.getState().moistureStructureLayer
+    );
     const ambientLight = ambientLightRef.current;
     const keyLight = moistureKeyLightRef.current;
     const headLight = moistureHeadLightRef.current;
@@ -954,7 +989,11 @@ export default function MoistureStructureLayer() {
     if (cameraRef.current) {
       cameraRef.current.getWorldPosition(cameraPositionRef.current);
       cameraRef.current.getWorldDirection(cameraDirectionRef.current);
-      applyCameraDrivenState(cameraPositionRef.current, cameraDirectionRef.current, state);
+      applyCameraDrivenState(
+        cameraPositionRef.current,
+        cameraDirectionRef.current,
+        state
+      );
     } else {
       applyMoistureLighting(
         state,
@@ -981,7 +1020,8 @@ export default function MoistureStructureLayer() {
 
     const unsubscribe = useControls.subscribe(
       (state) => state.moistureStructureLayer,
-      (next) => {
+      (nextRaw) => {
+        const next = resolveMoistureStructureLayerState(nextRaw);
         const prev = styleRef.current;
         styleRef.current = next;
         root.visible = next.visible;
@@ -998,7 +1038,8 @@ export default function MoistureStructureLayer() {
         if (
           next.footprintOverlayEnabled !== prev.footprintOverlayEnabled ||
           next.selectedComponentId !== prev.selectedComponentId ||
-          next.structurePreset !== prev.structurePreset
+          next.structurePreset !== prev.structurePreset ||
+          next.legibilityExperiment !== prev.legibilityExperiment
         ) {
           updateFootprints(root, currentFrameRef.current, next);
         }

@@ -7,6 +7,9 @@ import {
   MOISTURE_VISUAL_PRESET_OPTIONS,
   getMoistureStructurePresetState,
   getMoistureVisualPresetState,
+  moistureLegibilityExperimentLabel,
+  moistureSegmentationModeLabel,
+  resolveMoistureStructureLayerState,
   useControls,
   type MoistureStructureLayerState,
 } from "@/app/state/controlsStore";
@@ -292,8 +295,12 @@ function ringPath(segment: Array<[number, number]>) {
 }
 
 export default function LayerInfoPane() {
-  const moistureStructureLayer = useControls(
+  const moistureStructureLayerState = useControls(
     (state) => state.moistureStructureLayer
+  );
+  const moistureStructureLayer = useMemo(
+    () => resolveMoistureStructureLayerState(moistureStructureLayerState),
+    [moistureStructureLayerState]
   );
   const moistureStructureFrame = useControls((state) => state.moistureStructureFrame);
   const setMoistureStructureLayer = useControls(
@@ -339,7 +346,7 @@ export default function LayerInfoPane() {
     );
   }, [moistureStructureFrame, moistureStructureLayer.selectedComponentId]);
 
-  const activeEntries = useMemo(() => {
+  const activeEntries = (() => {
     const entries: Array<LayerInfoEntry & { tag: string }> = [];
 
     if (moistureStructureLayer.visible) {
@@ -349,11 +356,15 @@ export default function LayerInfoPane() {
           moistureStructureLayer.visualPreset
         )} / ${moistureStructurePresetLabel(
           moistureStructureLayer.structurePreset
+        )} | ${moistureLegibilityExperimentLabel(
+          moistureStructureLayer.legibilityExperiment
         )} | ${moistureOverrideSummary(
-          moistureStructureLayer
+          moistureStructureLayerState
         )} + ${moistureStructureOverrideSummary(
-          moistureStructureLayer
-        )} | ${moistureStructureLayer.segmentationMode} | Clip ${
+          moistureStructureLayerState
+        )} | ${moistureSegmentationModeLabel(
+          moistureStructureLayer.segmentationMode
+        )} | Clip ${
           moistureStructureLayer.cameraCutawayEnabled
             ? moistureStructureLayer.cameraCutawayRadius.toFixed(0)
             : "Off"
@@ -391,12 +402,7 @@ export default function LayerInfoPane() {
     }
 
     return entries;
-  }, [
-    moistureStructureLayer,
-    exampleContoursLayer.pressureLevel,
-    exampleParticleLayer.pressureLevel,
-    exampleShaderMeshLayer.pressureLevel,
-  ]);
+  })();
 
   return (
     <aside
@@ -543,7 +549,9 @@ export default function LayerInfoPane() {
                 <div style={{ opacity: 0.72, lineHeight: 1.45 }}>
                   {moistureStructureFrame.timestamp} ·{" "}
                   {moistureStructureFrame.components.length} components ·{" "}
-                  {moistureStructureFrame.segmentationMode}
+                  {moistureSegmentationModeLabel(
+                    moistureStructureFrame.segmentationMode
+                  )}
                 </div>
 
                 {selectedMoistureComponent ? (

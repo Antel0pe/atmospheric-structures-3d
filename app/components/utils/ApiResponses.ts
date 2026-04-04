@@ -18,7 +18,13 @@ function buildPublicDataUrl(...segments: string[]) {
   return `/${[prefix, ...segments].filter(Boolean).join("/")}`;
 }
 
-export type MoistureSegmentationMode = "p95-close" | "p95-open" | "p97-close";
+export type MoistureSegmentationMode =
+  | "p95-close"
+  | "p95-smooth-open1"
+  | "p95-local-anomaly"
+  | "p95-open"
+  | "p97-close"
+  | "p95-close-open1";
 
 function moistureStructuresBaseSegments(
   segmentationMode: MoistureSegmentationMode
@@ -195,6 +201,7 @@ export type MoistureStructureManifest = {
     minimum_component_size: number;
     smoothing: {
       binary_closing_radius_cells: number;
+      binary_opening_radius_cells?: number;
       gaussian_sigma: number;
     };
   };

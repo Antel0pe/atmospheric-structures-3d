@@ -25,7 +25,22 @@ DEFAULT_THRESHOLD_SAMPLE_STRIDE = 1
 DEFAULT_THRESHOLD_TIME_STRIDE = 1
 DEFAULT_GEOMETRY_MODE = "marching-cubes"
 DEFAULT_CLOSING_RADIUS_CELLS = 1
+DEFAULT_OPENING_RADIUS_CELLS = 1
 DEFAULT_SEGMENTATION_MODE = "p95-close"
+LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close-open1"
+SMOOTH_SUPPORT_SIGMA = 1.0
+LOCAL_ANOMALY_BACKGROUND_SIGMA = 8.0
+P97_CLOSE_QUANTILE = 0.97
+LOCAL_ANOMALY_RAW_QUANTILE = 0.90
+LOCAL_ANOMALY_ANOMALY_QUANTILE = 0.95
+SUPPORTED_SEGMENTATION_MODES = (
+    "p95-close",
+    LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE,
+    "p95-smooth-open1",
+    "p95-local-anomaly",
+    "p95-open",
+    "p97-close",
+)
 LABEL_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
 
 
@@ -43,9 +58,22 @@ class BuildConfig:
     threshold_sample_stride: int = DEFAULT_THRESHOLD_SAMPLE_STRIDE
     geometry_mode: str = DEFAULT_GEOMETRY_MODE
     closing_radius_cells: int = DEFAULT_CLOSING_RADIUS_CELLS
+    opening_radius_cells: int = DEFAULT_OPENING_RADIUS_CELLS
     segmentation_mode: str = DEFAULT_SEGMENTATION_MODE
     write_footprints: bool = True
     limit_timestamps: int | None = None
+
+
+@dataclass(frozen=True)
+class SegmentationContext:
+    segmentation_mode: str
+    primary_thresholds: np.ndarray
+    threshold_tables: dict[str, np.ndarray]
+    closing_radius_cells: int
+    opening_radius_cells: int
+    threshold_quantile: float
+    threshold_kind: str
+    recipe_metadata: dict[str, Any]
 
 
 def timestamp_to_iso_minute(value: np.datetime64) -> str:
@@ -88,14 +116,24 @@ def build_radius_lookup(
 def compute_per_level_thresholds_from_array(
     values: np.ndarray,
     quantile: float = DEFAULT_THRESHOLD_QUANTILE,
+    value_mask: np.ndarray | None = None,
 ) -> np.ndarray:
     if values.ndim < 2:
         raise ValueError("Expected values with shape (time, level, ...).")
+    if value_mask is not None and value_mask.shape != values.shape:
+        raise ValueError("Expected value_mask to match values.")
 
     thresholds = []
     for level_index in range(values.shape[1]):
         level_values = np.asarray(values[:, level_index, ...], dtype=np.float32).ravel()
-        finite_values = level_values[np.isfinite(level_values)]
+        finite_mask = np.isfinite(level_values)
+        if value_mask is not None:
+            level_mask = np.asarray(
+                value_mask[:, level_index, ...],
+                dtype=bool,
+            ).ravel()
+            finite_mask &= level_mask
+        finite_values = level_values[finite_mask]
         if finite_values.size == 0:
             thresholds.append(np.nan)
             continue
@@ -133,6 +171,31 @@ def compute_pressure_thresholds_from_variable(
         dtype=np.float32,
     )
     return compute_per_level_thresholds_from_array(sampled, quantile=quantile)
+
+
+def load_threshold_seed_sample(variable: netCDF4.Variable) -> np.ndarray:
+    midpoint_index = variable.shape[0] // 2
+    return np.asarray(
+        variable[midpoint_index : midpoint_index + 1, :, :, :],
+        dtype=np.float32,
+    )
+
+
+def lat_lon_gaussian_filter(values: np.ndarray, sigma: float) -> np.ndarray:
+    if sigma <= 0:
+        return np.asarray(values, dtype=np.float32)
+
+    sigma_axes = [0.0] * values.ndim
+    sigma_axes[-2] = sigma
+    sigma_axes[-1] = sigma
+    return np.asarray(
+        ndimage.gaussian_filter(
+            np.asarray(values, dtype=np.float32),
+            sigma=sigma_axes,
+            mode="nearest",
+        ),
+        dtype=np.float32,
+    )
 
 
 def compute_pressure_thresholds_histogram(
@@ -228,6 +291,29 @@ def lightly_close_mask(mask: np.ndarray, closing_radius_cells: int = DEFAULT_CLO
     )
 
 
+def lightly_open_mask(
+    mask: np.ndarray,
+    opening_radius_cells: int = DEFAULT_OPENING_RADIUS_CELLS,
+) -> np.ndarray:
+    if opening_radius_cells <= 0:
+        return np.asarray(mask, dtype=bool)
+    return ndimage.binary_opening(
+        mask,
+        structure=build_closing_structure(opening_radius_cells),
+    )
+
+
+def apply_binary_postprocess(
+    mask: np.ndarray,
+    closing_radius_cells: int,
+    opening_radius_cells: int,
+) -> np.ndarray:
+    return lightly_open_mask(
+        lightly_close_mask(mask, closing_radius_cells=closing_radius_cells),
+        opening_radius_cells=opening_radius_cells,
+    )
+
+
 def iter_wrapped_components(
     mask: np.ndarray,
     min_component_size: int = 0,
@@ -270,6 +356,214 @@ def iter_wrapped_components(
 
     components.sort(key=lambda item: item[0], reverse=True)
     return [component for _, component in components]
+
+
+def prepare_segmentation_context(
+    threshold_seed_sample: np.ndarray,
+    config: BuildConfig,
+) -> SegmentationContext:
+    mode = config.segmentation_mode
+    if mode not in SUPPORTED_SEGMENTATION_MODES:
+        raise ValueError(f"Unsupported segmentation mode: {mode}")
+
+    if mode in {"p95-close", LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE}:
+        raw_q95 = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=DEFAULT_THRESHOLD_QUANTILE,
+        )
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=raw_q95,
+            threshold_tables={"raw_q95": raw_q95},
+            closing_radius_cells=DEFAULT_CLOSING_RADIUS_CELLS,
+            opening_radius_cells=DEFAULT_OPENING_RADIUS_CELLS,
+            threshold_quantile=DEFAULT_THRESHOLD_QUANTILE,
+            threshold_kind="pressure-relative-quantile",
+            recipe_metadata={
+                "recipe": "bridge-pruned-baseline",
+                "thresholds": {"raw_q95": DEFAULT_THRESHOLD_QUANTILE},
+                "preprocessing": {},
+                "postprocess": {
+                    "binary_closing_radius_cells": DEFAULT_CLOSING_RADIUS_CELLS,
+                    "binary_opening_radius_cells": DEFAULT_OPENING_RADIUS_CELLS,
+                },
+            },
+        )
+
+    if mode == "p95-smooth-open1":
+        smoothed_sample = lat_lon_gaussian_filter(
+            threshold_seed_sample,
+            sigma=SMOOTH_SUPPORT_SIGMA,
+        )
+        smoothed_q95 = compute_per_level_thresholds_from_array(
+            smoothed_sample,
+            quantile=DEFAULT_THRESHOLD_QUANTILE,
+        )
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=smoothed_q95,
+            threshold_tables={"smoothed_q95": smoothed_q95},
+            closing_radius_cells=DEFAULT_CLOSING_RADIUS_CELLS,
+            opening_radius_cells=DEFAULT_OPENING_RADIUS_CELLS,
+            threshold_quantile=DEFAULT_THRESHOLD_QUANTILE,
+            threshold_kind="lat-lon-smoothed-quantile",
+            recipe_metadata={
+                "recipe": "smoothed-support",
+                "thresholds": {"smoothed_q95": DEFAULT_THRESHOLD_QUANTILE},
+                "preprocessing": {"lat_lon_gaussian_sigma": SMOOTH_SUPPORT_SIGMA},
+                "postprocess": {
+                    "binary_closing_radius_cells": DEFAULT_CLOSING_RADIUS_CELLS,
+                    "binary_opening_radius_cells": DEFAULT_OPENING_RADIUS_CELLS,
+                },
+            },
+        )
+
+    if mode == "p95-local-anomaly":
+        background_sample = lat_lon_gaussian_filter(
+            threshold_seed_sample,
+            sigma=LOCAL_ANOMALY_BACKGROUND_SIGMA,
+        )
+        anomaly_sample = threshold_seed_sample - background_sample
+        raw_q90 = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=LOCAL_ANOMALY_RAW_QUANTILE,
+        )
+        anomaly_q95 = compute_per_level_thresholds_from_array(
+            anomaly_sample,
+            quantile=LOCAL_ANOMALY_ANOMALY_QUANTILE,
+        )
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=anomaly_q95,
+            threshold_tables={
+                "raw_q90": raw_q90,
+                "anomaly_q95": anomaly_q95,
+            },
+            closing_radius_cells=DEFAULT_CLOSING_RADIUS_CELLS,
+            opening_radius_cells=DEFAULT_OPENING_RADIUS_CELLS,
+            threshold_quantile=LOCAL_ANOMALY_ANOMALY_QUANTILE,
+            threshold_kind="local-anomaly-quantile",
+            recipe_metadata={
+                "recipe": "local-anomaly",
+                "thresholds": {
+                    "raw_q90": LOCAL_ANOMALY_RAW_QUANTILE,
+                    "anomaly_q95": LOCAL_ANOMALY_ANOMALY_QUANTILE,
+                },
+                "preprocessing": {
+                    "background_lat_lon_gaussian_sigma": LOCAL_ANOMALY_BACKGROUND_SIGMA,
+                },
+                "postprocess": {
+                    "binary_closing_radius_cells": DEFAULT_CLOSING_RADIUS_CELLS,
+                    "binary_opening_radius_cells": DEFAULT_OPENING_RADIUS_CELLS,
+                },
+            },
+        )
+
+    if mode == "p95-open":
+        raw_q95 = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=DEFAULT_THRESHOLD_QUANTILE,
+        )
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=raw_q95,
+            threshold_tables={"raw_q95": raw_q95},
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+            threshold_quantile=DEFAULT_THRESHOLD_QUANTILE,
+            threshold_kind="pressure-relative-quantile",
+            recipe_metadata={
+                "recipe": "legacy-p95-open",
+                "thresholds": {"raw_q95": DEFAULT_THRESHOLD_QUANTILE},
+                "preprocessing": {},
+                "postprocess": {
+                    "binary_closing_radius_cells": 0,
+                    "binary_opening_radius_cells": 0,
+                },
+            },
+        )
+
+    if mode == "p97-close":
+        raw_q97 = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=P97_CLOSE_QUANTILE,
+        )
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=raw_q97,
+            threshold_tables={"raw_q97": raw_q97},
+            closing_radius_cells=DEFAULT_CLOSING_RADIUS_CELLS,
+            opening_radius_cells=0,
+            threshold_quantile=P97_CLOSE_QUANTILE,
+            threshold_kind="pressure-relative-quantile",
+            recipe_metadata={
+                "recipe": "legacy-p97-close",
+                "thresholds": {"raw_q97": P97_CLOSE_QUANTILE},
+                "preprocessing": {},
+                "postprocess": {
+                    "binary_closing_radius_cells": DEFAULT_CLOSING_RADIUS_CELLS,
+                    "binary_opening_radius_cells": 0,
+                },
+            },
+        )
+
+    raise ValueError(f"Unsupported segmentation mode: {mode}")
+
+
+def build_segmentation_mask(
+    field: np.ndarray,
+    context: SegmentationContext,
+) -> np.ndarray:
+    field = np.asarray(field, dtype=np.float32)
+    mode = context.segmentation_mode
+
+    if mode in {"p95-close", LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE}:
+        return apply_binary_postprocess(
+            build_threshold_mask(field, context.threshold_tables["raw_q95"]),
+            closing_radius_cells=context.closing_radius_cells,
+            opening_radius_cells=context.opening_radius_cells,
+        )
+
+    if mode == "p95-smooth-open1":
+        smoothed = lat_lon_gaussian_filter(field, sigma=SMOOTH_SUPPORT_SIGMA)
+        return apply_binary_postprocess(
+            build_threshold_mask(smoothed, context.threshold_tables["smoothed_q95"]),
+            closing_radius_cells=context.closing_radius_cells,
+            opening_radius_cells=context.opening_radius_cells,
+        )
+
+    if mode == "p95-local-anomaly":
+        background = lat_lon_gaussian_filter(
+            field,
+            sigma=LOCAL_ANOMALY_BACKGROUND_SIGMA,
+        )
+        anomaly = field - background
+        raw_support = build_threshold_mask(field, context.threshold_tables["raw_q90"])
+        anomaly_support = build_threshold_mask(
+            anomaly,
+            context.threshold_tables["anomaly_q95"],
+        )
+        return apply_binary_postprocess(
+            raw_support & anomaly_support,
+            closing_radius_cells=context.closing_radius_cells,
+            opening_radius_cells=context.opening_radius_cells,
+        )
+
+    if mode == "p95-open":
+        return apply_binary_postprocess(
+            build_threshold_mask(field, context.threshold_tables["raw_q95"]),
+            closing_radius_cells=context.closing_radius_cells,
+            opening_radius_cells=context.opening_radius_cells,
+        )
+
+    if mode == "p97-close":
+        return apply_binary_postprocess(
+            build_threshold_mask(field, context.threshold_tables["raw_q97"]),
+            closing_radius_cells=context.closing_radius_cells,
+            opening_radius_cells=context.opening_radius_cells,
+        )
+
+    raise ValueError(f"Unsupported segmentation mode: {mode}")
 
 
 def choose_longitude_roll(component_mask: np.ndarray) -> int:
@@ -800,11 +1094,19 @@ def build_timestamp_payload(
     min_component_size: int = DEFAULT_MIN_COMPONENT_SIZE,
     gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
     closing_radius_cells: int = DEFAULT_CLOSING_RADIUS_CELLS,
+    opening_radius_cells: int = DEFAULT_OPENING_RADIUS_CELLS,
     geometry_mode: str = DEFAULT_GEOMETRY_MODE,
     write_footprints: bool = True,
+    processed_mask: np.ndarray | None = None,
 ) -> dict[str, Any]:
-    raw_mask = build_threshold_mask(field, thresholds)
-    closed_mask = lightly_close_mask(raw_mask, closing_radius_cells=closing_radius_cells)
+    if processed_mask is None:
+        processed_mask = apply_binary_postprocess(
+            build_threshold_mask(field, thresholds),
+            closing_radius_cells=closing_radius_cells,
+            opening_radius_cells=opening_radius_cells,
+        )
+    else:
+        processed_mask = np.asarray(processed_mask, dtype=bool)
 
     position_chunks: list[np.ndarray] = []
     index_chunks: list[np.ndarray] = []
@@ -814,7 +1116,7 @@ def build_timestamp_payload(
     index_offset = 0
 
     wrapped_components = iter_wrapped_components(
-        closed_mask,
+        processed_mask,
         min_component_size=min_component_size,
     )
 
@@ -883,7 +1185,7 @@ def build_timestamp_payload(
         "component_count": len(components),
         "vertex_count": int(positions.size // 3),
         "index_count": int(indices.size),
-        "voxel_count": int(closed_mask.sum()),
+        "voxel_count": int(processed_mask.sum()),
         "footprints": footprints,
     }
 
@@ -989,14 +1291,17 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             for value in np.asarray(dataset.coords["valid_time"].values)
         ]
 
-        print("Computing moisture thresholds...", flush=True)
-        thresholds = compute_pressure_thresholds_from_variable(
-            specific_humidity_var,
-            quantile=config.threshold_quantile,
-            time_stride=config.threshold_time_stride,
-            sample_stride=config.threshold_sample_stride,
+        print(
+            f"Preparing segmentation recipe {config.segmentation_mode}...",
+            flush=True,
         )
-        print("Thresholds ready.", flush=True)
+        threshold_seed_sample = load_threshold_seed_sample(specific_humidity_var)
+        segmentation_context = prepare_segmentation_context(
+            threshold_seed_sample,
+            config,
+        )
+        thresholds = segmentation_context.primary_thresholds
+        print("Segmentation recipe ready.", flush=True)
         radius_lookup = build_radius_lookup(
             pressure_levels_hpa=pressure_levels,
             base_radius=config.base_radius,
@@ -1019,6 +1324,10 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 absolute_index = start + local_index
                 timestamp = timestamps[absolute_index]
                 print(f"Building {timestamp}...", flush=True)
+                processed_mask = build_segmentation_mask(
+                    window[local_index],
+                    segmentation_context,
+                )
                 payload = build_timestamp_payload(
                     field=window[local_index],
                     thresholds=thresholds,
@@ -1029,8 +1338,10 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                     min_component_size=config.min_component_size,
                     gaussian_sigma=config.gaussian_sigma,
                     closing_radius_cells=config.closing_radius_cells,
+                    opening_radius_cells=config.opening_radius_cells,
                     geometry_mode=config.geometry_mode,
                     write_footprints=config.write_footprints,
+                    processed_mask=processed_mask,
                 )
                 entry = write_timestamp_assets(config.output_dir, timestamp, payload)
                 entries.append(entry)
@@ -1049,14 +1360,16 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             "units": str(specific_humidity.attrs.get("units", "")),
             "segmentation_mode": config.segmentation_mode,
             "threshold_mode": {
-                "kind": "pressure-relative-quantile",
-                "quantile": config.threshold_quantile,
+                "kind": segmentation_context.threshold_kind,
+                "quantile": segmentation_context.threshold_quantile,
                 "minimum_component_size": config.min_component_size,
                 "threshold_seed": "midpoint_time_slice",
                 "smoothing": {
-                    "binary_closing_radius_cells": config.closing_radius_cells,
+                    "binary_closing_radius_cells": segmentation_context.closing_radius_cells,
+                    "binary_opening_radius_cells": segmentation_context.opening_radius_cells,
                     "gaussian_sigma": config.gaussian_sigma,
                 },
+                "recipe": segmentation_context.recipe_metadata,
             },
             "geometry_mode": config.geometry_mode,
             "globe": {
