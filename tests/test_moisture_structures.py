@@ -8,16 +8,94 @@ import numpy as np
 import json
 
 from scripts.moisture_structures import (
+    BuildConfig,
+    SegmentationContext,
+    prepare_segmentation_context,
     build_radius_lookup,
+    build_segmentation_mask,
     build_threshold_mask,
     build_timestamp_payload,
     compute_per_level_thresholds_from_array,
     iter_wrapped_components,
+    DEFAULT_OPENING_RADIUS_CELLS,
     write_timestamp_assets,
 )
 
 
+def make_segmentation_context(
+    segmentation_mode: str,
+    *,
+    primary_thresholds: np.ndarray,
+    threshold_tables: dict[str, np.ndarray],
+    closing_radius_cells: int = 1,
+    opening_radius_cells: int = 1,
+) -> SegmentationContext:
+    return SegmentationContext(
+        segmentation_mode=segmentation_mode,
+        primary_thresholds=np.asarray(primary_thresholds, dtype=np.float32),
+        threshold_tables={
+            key: np.asarray(value, dtype=np.float32)
+            for key, value in threshold_tables.items()
+        },
+        closing_radius_cells=closing_radius_cells,
+        opening_radius_cells=opening_radius_cells,
+        threshold_quantile=0.95,
+        threshold_kind="test",
+        recipe_metadata={},
+    )
+
+
 class MoistureStructuresTests(unittest.TestCase):
+    def test_prepare_segmentation_context_uses_configured_quantile_for_p95_close(self) -> None:
+        threshold_seed_sample = np.array(
+            [
+                [
+                    [[0.1, 0.2], [0.3, 0.4]],
+                    [[0.5, 0.6], [0.7, 0.8]],
+                ]
+            ],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            threshold_quantile=0.75,
+            segmentation_mode="p95-close",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+        expected = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=0.75,
+        )
+
+        np.testing.assert_allclose(context.primary_thresholds, expected)
+        self.assertEqual(context.threshold_quantile, 0.75)
+        self.assertEqual(context.recipe_metadata["thresholds"]["raw_q95"], 0.75)
+
+    def test_prepare_segmentation_context_uses_configured_radii_for_p95_close(self) -> None:
+        threshold_seed_sample = np.ones((1, 1, 2, 2), dtype=np.float32)
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            closing_radius_cells=0,
+            opening_radius_cells=2,
+            segmentation_mode="p95-close",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.closing_radius_cells, 0)
+        self.assertEqual(context.opening_radius_cells, 2)
+        self.assertEqual(
+            context.recipe_metadata["postprocess"]["binary_closing_radius_cells"],
+            0,
+        )
+        self.assertEqual(
+            context.recipe_metadata["postprocess"]["binary_opening_radius_cells"],
+            2,
+        )
+
     def test_wraparound_components_merge_across_longitude_seam(self) -> None:
         mask = np.zeros((2, 2, 8), dtype=bool)
         mask[0, 0, 0] = True
@@ -72,6 +150,7 @@ class MoistureStructuresTests(unittest.TestCase):
                 radius_lookup=radius_lookup,
                 min_component_size=1,
                 gaussian_sigma=0.4,
+                opening_radius_cells=0,
                 geometry_mode=geometry_mode,
             )
 
@@ -113,6 +192,7 @@ class MoistureStructuresTests(unittest.TestCase):
             radius_lookup=radius_lookup,
             min_component_size=1,
             closing_radius_cells=0,
+            opening_radius_cells=0,
             geometry_mode="voxel-faces",
         )
         closed = build_timestamp_payload(
@@ -124,11 +204,124 @@ class MoistureStructuresTests(unittest.TestCase):
             radius_lookup=radius_lookup,
             min_component_size=1,
             closing_radius_cells=1,
+            opening_radius_cells=0,
             geometry_mode="voxel-faces",
         )
 
         self.assertEqual(opened["component_count"], 2)
         self.assertEqual(closed["component_count"], 1)
+
+    def test_opening_radius_breaks_thin_bridge(self) -> None:
+        pressure_levels = np.array([1000.0, 850.0, 700.0], dtype=np.float32)
+        latitudes = np.array([3.0, 2.0, 1.0, 0.0, -1.0], dtype=np.float32)
+        longitudes = np.arange(8.0, dtype=np.float32)
+        radius_lookup = build_radius_lookup(pressure_levels)
+
+        field = np.zeros((3, 5, 8), dtype=np.float32)
+        field[:, 1:4, 0:3] = 0.9
+        field[:, 1:4, 5:8] = 0.9
+        field[:, 2:3, 3:5] = 0.9
+        thresholds = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+
+        connected = build_timestamp_payload(
+            field=field,
+            thresholds=thresholds,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+            min_component_size=1,
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+            geometry_mode="voxel-faces",
+        )
+        pruned = build_timestamp_payload(
+            field=field,
+            thresholds=thresholds,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+            min_component_size=1,
+            closing_radius_cells=0,
+            opening_radius_cells=1,
+            geometry_mode="voxel-faces",
+        )
+
+        self.assertEqual(connected["component_count"], 1)
+        self.assertEqual(pruned["component_count"], 2)
+        self.assertLess(pruned["voxel_count"], connected["voxel_count"])
+
+    def test_default_opening_radius_uses_bridge_pruned_processing(self) -> None:
+        pressure_levels = np.array([1000.0, 850.0, 700.0], dtype=np.float32)
+        latitudes = np.array([3.0, 2.0, 1.0, 0.0, -1.0], dtype=np.float32)
+        longitudes = np.arange(8.0, dtype=np.float32)
+        radius_lookup = build_radius_lookup(pressure_levels)
+
+        field = np.zeros((3, 5, 8), dtype=np.float32)
+        field[:, 1:4, 0:3] = 0.9
+        field[:, 1:4, 5:8] = 0.9
+        field[:, 2:3, 3:5] = 0.9
+        thresholds = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+
+        default_payload = build_timestamp_payload(
+            field=field,
+            thresholds=thresholds,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+            min_component_size=1,
+            closing_radius_cells=0,
+            geometry_mode="voxel-faces",
+        )
+
+        self.assertEqual(DEFAULT_OPENING_RADIUS_CELLS, 1)
+        self.assertEqual(default_payload["component_count"], 2)
+
+    def test_smoothed_support_merges_a_tiny_gap_without_capturing_a_far_blob(self) -> None:
+        field = np.zeros((3, 7, 10), dtype=np.float32)
+        field[:, 2:5, 0:3] = 1.0
+        field[:, 2:5, 4:7] = 1.0
+        field[:, 0:2, 8:10] = 1.0
+
+        context = make_segmentation_context(
+            "p95-smooth-open1",
+            primary_thresholds=np.array([0.45, 0.45, 0.45], dtype=np.float32),
+            threshold_tables={
+                "smoothed_q95": np.array([0.45, 0.45, 0.45], dtype=np.float32),
+            },
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+        )
+
+        mask = build_segmentation_mask(field, context)
+        components = iter_wrapped_components(mask, min_component_size=1)
+
+        self.assertEqual(len(components), 2)
+        self.assertTrue(mask[:, 2:5, 3].any())
+        self.assertTrue(mask[:, 0:2, 8:10].any())
+
+    def test_local_anomaly_suppresses_broad_background_humidity(self) -> None:
+        field = np.full((3, 7, 10), 0.82, dtype=np.float32)
+        field[:, 2:5, 4:7] = 0.96
+
+        context = make_segmentation_context(
+            "p95-local-anomaly",
+            primary_thresholds=np.array([0.03, 0.03, 0.03], dtype=np.float32),
+            threshold_tables={
+                "raw_q90": np.array([0.80, 0.80, 0.80], dtype=np.float32),
+                "anomaly_q95": np.array([0.03, 0.03, 0.03], dtype=np.float32),
+            },
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+        )
+
+        mask = build_segmentation_mask(field, context)
+
+        self.assertTrue(mask[:, 2:5, 4:7].any())
+        self.assertFalse(mask[:, 0:2, 0:3].any())
+        self.assertLess(int(mask.sum()), int(np.prod(field.shape)))
 
     def test_timestamp_assets_write_footprints_when_present(self) -> None:
         pressure_levels = np.array([1000.0, 700.0], dtype=np.float32)
@@ -148,6 +341,7 @@ class MoistureStructuresTests(unittest.TestCase):
             radius_lookup=radius_lookup,
             min_component_size=1,
             closing_radius_cells=0,
+            opening_radius_cells=0,
             geometry_mode="voxel-faces",
             write_footprints=True,
         )

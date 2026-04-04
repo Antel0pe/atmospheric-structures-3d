@@ -22,6 +22,12 @@ import {
   VIEWER_TIME_CONTROLS,
 } from "../../lib/viewerAutomation";
 import type { EarthViewState } from "../../lib/viewerTypes";
+import {
+  resolveMoistureStructureLayerState,
+  useControls,
+  type MoistureLegibilityExperiment,
+} from "../../state/controlsStore";
+import type { MoistureSegmentationMode } from "../utils/ApiResponses";
 import { useViewerStore } from "../../state/viewerStore";
 import { lookAtLatLon } from "../utils/EarthUtils";
 import {
@@ -636,11 +642,17 @@ export default function EarthBase({
 
     function getViewerSnapshot() {
       const state = useViewerStore.getState();
+      const moistureLayer = useControls.getState().moistureStructureLayer;
+      const resolvedMoistureLayer = resolveMoistureStructureLayerState(
+        moistureLayer
+      );
       return {
         ready: getReadyState(),
         paused: automationPausedRef.current,
         timestamp: state.timestamp,
         zoom01: state.zoom01,
+        moistureLegibilityExperiment: moistureLayer.legibilityExperiment,
+        moistureSegmentationMode: resolvedMoistureLayer.segmentationMode,
         earthView: state.earthView,
         savedViews: state.savedViews,
       };
@@ -690,6 +702,37 @@ export default function EarthBase({
 
     async function waitForReady(timeoutMs = 90_000) {
       await waitForCondition(getReadyState, timeoutMs, "the viewer to become ready");
+      return getViewerSnapshot();
+    }
+
+    async function waitForMoistureState(timeoutMs = 90_000) {
+      const moistureLayer = useControls.getState().moistureStructureLayer;
+      const resolved = resolveMoistureStructureLayerState(moistureLayer);
+      const expectedTimestamp = useViewerStore.getState().timestamp;
+
+      await waitForCondition(
+        () => {
+          const frame = useControls.getState().moistureStructureFrame;
+          return (
+            !resolved.visible ||
+            (frame !== null &&
+              frame.timestamp === expectedTimestamp &&
+              frame.segmentationMode === resolved.segmentationMode)
+          );
+        },
+        timeoutMs,
+        `moisture state for ${resolved.segmentationMode} to settle`
+      );
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            render();
+            resolve();
+          })
+        );
+      });
+
       return getViewerSnapshot();
     }
 
@@ -902,6 +945,39 @@ export default function EarthBase({
 
         applyEarthViewState(input.earthView);
         return getViewerSnapshot();
+      },
+      async setMoistureLegibilityExperiment(
+        experiment: MoistureLegibilityExperiment,
+        timeoutMs = 90_000
+      ) {
+        if (useControls.getState().moistureStructureLayer.legibilityExperiment === experiment) {
+          return waitForMoistureState(timeoutMs);
+        }
+
+        useControls.getState().setMoistureLegibilityExperiment(experiment);
+        return waitForMoistureState(timeoutMs);
+      },
+      async resetMoistureLegibilityExperiment(timeoutMs = 90_000) {
+        if (
+          useControls.getState().moistureStructureLayer.legibilityExperiment ===
+          "bridgePruned"
+        ) {
+          return waitForMoistureState(timeoutMs);
+        }
+
+        useControls.getState().resetMoistureLegibilityExperiment();
+        return waitForMoistureState(timeoutMs);
+      },
+      async setMoistureSegmentationMode(
+        segmentationMode: MoistureSegmentationMode,
+        timeoutMs = 90_000
+      ) {
+        if (useControls.getState().moistureStructureLayer.segmentationMode === segmentationMode) {
+          return waitForMoistureState(timeoutMs);
+        }
+
+        useControls.getState().setMoistureStructureLayer({ segmentationMode });
+        return waitForMoistureState(timeoutMs);
       },
       async listSavedViews() {
         return loadSavedViews();

@@ -5,12 +5,14 @@ import {
   MOISTURE_COLOR_MODE_OPTIONS,
   MOISTURE_COMPONENT_SORT_OPTIONS,
   MOISTURE_FOCUS_MODE_OPTIONS,
+  MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS,
   MOISTURE_SEGMENTATION_MODE_OPTIONS,
   MOISTURE_STRUCTURE_PRESET_OPTIONS,
   MOISTURE_VISUAL_PRESET_OPTIONS,
   type MoistureColorMode,
   type MoistureComponentSort,
   type MoistureFocusMode,
+  type MoistureLegibilityExperiment,
   type MoistureStructurePreset,
   type MoistureVisualPreset,
   useControls,
@@ -172,6 +174,12 @@ export default function TweakpaneControls() {
   const resetMoistureStructurePreset = useControls(
     (state) => state.resetMoistureStructurePreset
   );
+  const setMoistureLegibilityExperiment = useControls(
+    (state) => state.setMoistureLegibilityExperiment
+  );
+  const resetMoistureLegibilityExperiment = useControls(
+    (state) => state.resetMoistureLegibilityExperiment
+  );
 
   const backfaceControlsEnabled =
     !moistureLayer.solidShellEnabled || moistureLayer.interiorBackfaceEnabled;
@@ -257,6 +265,56 @@ export default function TweakpaneControls() {
               setMoistureLayer({ cameraCutawayRadius: value })
             }
           />
+
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              marginTop: 2,
+              paddingTop: 12,
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            <div style={infoTitleStyle()}>Legibility Experiments</div>
+
+            <label style={{ display: "grid", gap: 8 }}>
+              <div style={sliderLabelStyle()}>
+                <span>Experiment</span>
+                <span style={{ opacity: 0.68 }}>Comparison mode</span>
+              </div>
+              <select
+                value={moistureLayer.legibilityExperiment}
+                onChange={(event) =>
+                  setMoistureLegibilityExperiment(
+                    event.currentTarget.value as MoistureLegibilityExperiment
+                  )
+                }
+                style={selectStyle()}
+              >
+                {MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => resetMoistureLegibilityExperiment()}
+              style={actionButtonStyle()}
+            >
+              Reset To Default
+            </button>
+
+            <div style={{ lineHeight: 1.45, opacity: 0.78 }}>
+              `Bridge Pruned` is the default comparison state. Segmentation now
+              controls the data variant directly, so `None` and `Bridge Pruned`
+              use the same selected dataset, `Bridge Pruned + Shell First`
+              matches `Shell First`, and the matte variant only softens the
+              lighting response.
+            </div>
+          </div>
 
           <div
             style={{
@@ -631,6 +689,15 @@ export default function TweakpaneControls() {
               Combine the depth harness with component-aware colors, picking,
               focus modes, wall suppression, and macro footprints to test what
               makes structure easiest to read.
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 4 }}>
+            <div style={infoTitleStyle()}>Legibility Mode</div>
+            <div style={{ lineHeight: 1.45, opacity: 0.85 }}>
+              Use the named legibility experiments for apples-to-apples
+              screenshot comparisons. Segmentation now changes the moisture
+              recipe; legibility only changes how that recipe is rendered.
             </div>
           </div>
         </div>

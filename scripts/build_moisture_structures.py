@@ -8,7 +8,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.moisture_structures import BuildConfig, build_assets
+from scripts.moisture_structures import (
+    BuildConfig,
+    SUPPORTED_SEGMENTATION_MODES,
+    build_assets,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -76,9 +80,16 @@ def parse_args() -> argparse.Namespace:
         help="Radius in grid cells for the binary closing pass. Use 0 to disable it.",
     )
     parser.add_argument(
+        "--opening-radius-cells",
+        type=int,
+        default=1,
+        help="Radius in grid cells for the binary opening pass after closing. Use 0 to disable it.",
+    )
+    parser.add_argument(
         "--segmentation-mode",
         type=str,
         default="p95-close",
+        choices=SUPPORTED_SEGMENTATION_MODES,
         help="Label written into the manifest to identify the segmentation variant.",
     )
     parser.add_argument(
@@ -109,6 +120,7 @@ def main() -> None:
         gaussian_sigma=args.gaussian_sigma,
         geometry_mode=args.geometry_mode,
         closing_radius_cells=args.closing_radius_cells,
+        opening_radius_cells=args.opening_radius_cells,
         segmentation_mode=args.segmentation_mode,
         write_footprints=args.write_footprints,
         limit_timestamps=args.limit_timestamps,

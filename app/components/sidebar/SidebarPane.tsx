@@ -1,11 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import TweakpaneControls from "@/app/state/TweakpaneControls";
 import ControlsHelp from "./ControlsHelp";
 import ExplainerCard from "./ExplainerCard";
 
 const DevViewerPane = dynamic(() => import("./DevViewerPane"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const TweakpaneControls = dynamic(() => import("@/app/state/TweakpaneControls"), {
   ssr: false,
   loading: () => null,
 });

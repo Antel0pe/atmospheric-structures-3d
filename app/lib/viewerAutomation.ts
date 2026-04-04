@@ -3,6 +3,8 @@ import type {
   SavedViewRecord,
   ViewerNavigationCommand,
 } from "./viewerTypes";
+import type { MoistureLegibilityExperiment } from "../state/controlsStore";
+import type { MoistureSegmentationMode } from "../components/utils/ApiResponses";
 
 export const VIEWER_NAVIGATION_CONTROLS = [
   {
@@ -140,6 +142,8 @@ export type ViewerAutomationSnapshot = {
   paused: boolean;
   timestamp: string;
   zoom01: number;
+  moistureLegibilityExperiment: MoistureLegibilityExperiment;
+  moistureSegmentationMode: MoistureSegmentationMode;
   earthView: EarthViewState | null;
   savedViews: SavedViewRecord[];
 };
@@ -188,6 +192,17 @@ export type ViewerAutomationApi = {
   ) => Promise<ViewerAutomationSnapshot>;
   applyViewState: (
     input: ViewerAutomationViewInput,
+    timeoutMs?: number
+  ) => Promise<ViewerAutomationSnapshot>;
+  setMoistureLegibilityExperiment: (
+    experiment: MoistureLegibilityExperiment,
+    timeoutMs?: number
+  ) => Promise<ViewerAutomationSnapshot>;
+  resetMoistureLegibilityExperiment: (
+    timeoutMs?: number
+  ) => Promise<ViewerAutomationSnapshot>;
+  setMoistureSegmentationMode: (
+    segmentationMode: MoistureSegmentationMode,
     timeoutMs?: number
   ) => Promise<ViewerAutomationSnapshot>;
   listSavedViews: () => Promise<SavedViewRecord[]>;
