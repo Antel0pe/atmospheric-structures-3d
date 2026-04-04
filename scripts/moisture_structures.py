@@ -369,23 +369,23 @@ def prepare_segmentation_context(
     if mode in {"p95-close", LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE}:
         raw_q95 = compute_per_level_thresholds_from_array(
             threshold_seed_sample,
-            quantile=DEFAULT_THRESHOLD_QUANTILE,
+            quantile=config.threshold_quantile,
         )
         return SegmentationContext(
             segmentation_mode=mode,
             primary_thresholds=raw_q95,
             threshold_tables={"raw_q95": raw_q95},
-            closing_radius_cells=DEFAULT_CLOSING_RADIUS_CELLS,
-            opening_radius_cells=DEFAULT_OPENING_RADIUS_CELLS,
-            threshold_quantile=DEFAULT_THRESHOLD_QUANTILE,
+            closing_radius_cells=config.closing_radius_cells,
+            opening_radius_cells=config.opening_radius_cells,
+            threshold_quantile=config.threshold_quantile,
             threshold_kind="pressure-relative-quantile",
             recipe_metadata={
                 "recipe": "bridge-pruned-baseline",
-                "thresholds": {"raw_q95": DEFAULT_THRESHOLD_QUANTILE},
+                "thresholds": {"raw_q95": config.threshold_quantile},
                 "preprocessing": {},
                 "postprocess": {
-                    "binary_closing_radius_cells": DEFAULT_CLOSING_RADIUS_CELLS,
-                    "binary_opening_radius_cells": DEFAULT_OPENING_RADIUS_CELLS,
+                    "binary_closing_radius_cells": config.closing_radius_cells,
+                    "binary_opening_radius_cells": config.opening_radius_cells,
                 },
             },
         )

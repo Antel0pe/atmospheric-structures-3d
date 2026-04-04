@@ -8,7 +8,9 @@ import numpy as np
 import json
 
 from scripts.moisture_structures import (
+    BuildConfig,
     SegmentationContext,
+    prepare_segmentation_context,
     build_radius_lookup,
     build_segmentation_mask,
     build_threshold_mask,
@@ -44,6 +46,56 @@ def make_segmentation_context(
 
 
 class MoistureStructuresTests(unittest.TestCase):
+    def test_prepare_segmentation_context_uses_configured_quantile_for_p95_close(self) -> None:
+        threshold_seed_sample = np.array(
+            [
+                [
+                    [[0.1, 0.2], [0.3, 0.4]],
+                    [[0.5, 0.6], [0.7, 0.8]],
+                ]
+            ],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            threshold_quantile=0.75,
+            segmentation_mode="p95-close",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+        expected = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=0.75,
+        )
+
+        np.testing.assert_allclose(context.primary_thresholds, expected)
+        self.assertEqual(context.threshold_quantile, 0.75)
+        self.assertEqual(context.recipe_metadata["thresholds"]["raw_q95"], 0.75)
+
+    def test_prepare_segmentation_context_uses_configured_radii_for_p95_close(self) -> None:
+        threshold_seed_sample = np.ones((1, 1, 2, 2), dtype=np.float32)
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            closing_radius_cells=0,
+            opening_radius_cells=2,
+            segmentation_mode="p95-close",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.closing_radius_cells, 0)
+        self.assertEqual(context.opening_radius_cells, 2)
+        self.assertEqual(
+            context.recipe_metadata["postprocess"]["binary_closing_radius_cells"],
+            0,
+        )
+        self.assertEqual(
+            context.recipe_metadata["postprocess"]["binary_opening_radius_cells"],
+            2,
+        )
+
     def test_wraparound_components_merge_across_longitude_seam(self) -> None:
         mask = np.zeros((2, 2, 8), dtype=bool)
         mask[0, 0, 0] = True
