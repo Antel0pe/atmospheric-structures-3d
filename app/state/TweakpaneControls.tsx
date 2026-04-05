@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import {
+  DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
+  MOISTURE_BUCKET_COUNT,
   MOISTURE_COLOR_MODE_OPTIONS,
   MOISTURE_COMPONENT_SORT_OPTIONS,
   MOISTURE_FOCUS_MODE_OPTIONS,
@@ -78,6 +80,20 @@ function actionButtonStyle() {
     background: "rgba(82, 146, 255, 0.16)",
     color: "#e9eef7",
     padding: "10px 12px",
+    fontWeight: 700,
+    cursor: "pointer",
+  } as const;
+}
+
+function bucketButtonStyle(active: boolean, color: string) {
+  return {
+    borderRadius: 999,
+    border: active
+      ? `1px solid ${color}`
+      : "1px solid rgba(255,255,255,0.1)",
+    background: active ? `${color}26` : "rgba(255,255,255,0.04)",
+    color: "#e9eef7",
+    padding: "8px 10px",
     fontWeight: 700,
     cursor: "pointer",
   } as const;
@@ -183,6 +199,9 @@ export default function TweakpaneControls() {
 
   const backfaceControlsEnabled =
     !moistureLayer.solidShellEnabled || moistureLayer.interiorBackfaceEnabled;
+  const bucketControlsVisible =
+    moistureLayer.segmentationMode === "buckets" ||
+    moistureLayer.segmentationMode === "buckets-global";
 
   return (
     <section style={sectionStyle()}>
@@ -644,6 +663,85 @@ export default function TweakpaneControls() {
                 ))}
               </select>
             </label>
+
+            {bucketControlsVisible ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={sliderLabelStyle()}>
+                  <span>Visible Buckets</span>
+                  <span style={{ opacity: 0.68 }}>
+                    {moistureLayer.visibleBucketIndices.length}/{MOISTURE_BUCKET_COUNT}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMoistureLayer({
+                        visibleBucketIndices: DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
+                      })
+                    }
+                    style={actionButtonStyle()}
+                  >
+                    Show All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMoistureLayer({ visibleBucketIndices: [] })}
+                    style={{
+                      ...actionButtonStyle(),
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    Hide All
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                    gap: 8,
+                  }}
+                >
+                  {Array.from({ length: MOISTURE_BUCKET_COUNT }, (_, bucketIndex) => {
+                    const active = moistureLayer.visibleBucketIndices.includes(bucketIndex);
+                    const color =
+                      [
+                        "#ff8a63",
+                        "#ffd166",
+                        "#8ac926",
+                        "#2dc6d6",
+                        "#5e86ff",
+                        "#b95cff",
+                        "#f72585",
+                        "#06d6a0",
+                        "#4895ef",
+                        "#f4a261",
+                      ][bucketIndex] ?? "#7de0ff";
+                    return (
+                      <button
+                        key={bucketIndex}
+                        type="button"
+                        onClick={() =>
+                          setMoistureLayer({
+                            visibleBucketIndices: active
+                              ? moistureLayer.visibleBucketIndices.filter(
+                                  (value) => value !== bucketIndex
+                                )
+                              : [...moistureLayer.visibleBucketIndices, bucketIndex].sort(
+                                  (left, right) => left - right
+                                ),
+                          })
+                        }
+                        style={bucketButtonStyle(active, color)}
+                      >
+                        {bucketIndex + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <SliderField
               label="Wall Fade Strength"

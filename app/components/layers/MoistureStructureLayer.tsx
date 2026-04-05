@@ -40,6 +40,7 @@ type MoistureComponentVisual = {
   backMaterial: THREE.MeshPhongMaterial;
   opacityWeight: number;
   componentId: number;
+  bucketIndex: number | null;
   componentColor: THREE.Color;
 };
 
@@ -74,6 +75,7 @@ const MOISTURE_EMISSIVE = new THREE.Color("#151b28");
 const INTERIOR_TINT = new THREE.Color("#42577f");
 const FRONT_TINT = new THREE.Color("#ffffff");
 const DEFAULT_AMBIENT_INTENSITY = 2;
+const MOISTURE_GLOBE_CLEARANCE = 10;
 const FRONT_RENDER_ORDER = 64;
 const BACK_RENDER_ORDER = 65;
 const FOOTPRINT_RENDER_ORDER = 68;
@@ -202,6 +204,9 @@ function levelIndexForRadius(radius: number, bandScale: LevelBandScale) {
 }
 
 function buildComponentOpacityWeights(frame: MoistureStructureFrame) {
+  if (frame.metadata.components.length === 0) {
+    return [];
+  }
   const maxVoxelCount = Math.max(
     ...frame.metadata.components.map((component) => component.voxel_count),
     1
@@ -431,7 +436,8 @@ function buildComponentGeometry(
       localColors[i + 2] = levelColor.b;
 
       const radialOffset = Math.max(radius - baseRadius, 0);
-      const exaggeratedRadius = baseRadius + radialOffset * verticalExaggeration;
+      const exaggeratedRadius =
+        baseRadius + MOISTURE_GLOBE_CLEARANCE + radialOffset * verticalExaggeration;
       const scale = exaggeratedRadius / radius;
 
       localPositions[i] *= scale;
@@ -452,6 +458,12 @@ function buildComponentGeometry(
       localColors[i] = levelColor.r;
       localColors[i + 1] = levelColor.g;
       localColors[i + 2] = levelColor.b;
+
+      const elevatedRadius = radius + MOISTURE_GLOBE_CLEARANCE;
+      const scale = elevatedRadius / radius;
+      localPositions[i] *= scale;
+      localPositions[i + 1] *= scale;
+      localPositions[i + 2] *= scale;
     }
   }
 
@@ -520,7 +532,9 @@ function buildSlice(
     );
     const frontMaterial = createMoistureMaterial(THREE.FrontSide, flatShading);
     const backMaterial = createMoistureMaterial(THREE.BackSide, flatShading);
-    const componentColor = componentColorForId(component.id);
+    const componentColor = componentColorForId(
+      component.bucket_index ?? component.id
+    );
 
     const frontMesh = new THREE.Mesh(geometry, frontMaterial);
     frontMesh.name = `moisture-component-${component.id}-front`;
@@ -544,6 +558,7 @@ function buildSlice(
       backMaterial,
       opacityWeight: opacityWeights[index] ?? 1,
       componentId: component.id,
+      bucketIndex: component.bucket_index ?? null,
       componentColor,
     });
     materials.push(frontMaterial, backMaterial);
@@ -588,8 +603,23 @@ function applySliceRenderStyle(
   const backDarkened = style.solidShellEnabled && style.interiorBackfaceEnabled;
   const matteShellFirst =
     style.legibilityExperiment === "bridgePrunedShellFirstMatte";
+  const visibleBuckets =
+    style.segmentationMode === "buckets" ||
+    style.segmentationMode === "buckets-global"
+      ? new Set(style.visibleBucketIndices)
+      : null;
 
   for (const component of slice.components) {
+    const bucketVisible =
+      visibleBuckets === null ||
+      component.bucketIndex === null ||
+      visibleBuckets.has(component.bucketIndex);
+    if (!bucketVisible) {
+      component.frontMesh.visible = false;
+      component.backMesh.visible = false;
+      continue;
+    }
+
     const isSelected =
       style.selectedComponentId !== null &&
       component.componentId === style.selectedComponentId;
@@ -759,10 +789,22 @@ function buildFootprintVisual(
     return null;
   }
 
+  const visibleBuckets =
+    style.segmentationMode === "buckets" ||
+    style.segmentationMode === "buckets-global"
+      ? new Set(style.visibleBucketIndices)
+      : null;
+  const visibleComponents = frame.metadata.components.filter(
+    (component) =>
+      visibleBuckets === null ||
+      component.bucket_index === undefined ||
+      visibleBuckets.has(component.bucket_index)
+  );
+
   const selectedIds =
     style.selectedComponentId !== null
       ? [style.selectedComponentId]
-      : frame.metadata.components
+      : visibleComponents
           .slice()
           .sort((left, right) => right.voxel_count - left.voxel_count)
           .slice(0, 3)
@@ -781,8 +823,13 @@ function buildFootprintVisual(
   for (const componentId of selectedIds) {
     const footprint = footprintLookup.get(componentId);
     if (!footprint) continue;
+    const componentMetadata = frame.metadata.components.find(
+      (component) => component.id === componentId
+    );
 
-    const componentColor = componentColorForId(componentId);
+    const componentColor = componentColorForId(
+      componentMetadata?.bucket_index ?? componentId
+    );
     const opacity =
       style.selectedComponentId !== null && componentId === style.selectedComponentId
         ? 0.96

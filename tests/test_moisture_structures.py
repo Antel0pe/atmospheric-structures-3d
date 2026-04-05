@@ -6,10 +6,17 @@ from pathlib import Path
 
 import numpy as np
 import json
+import xarray as xr
 
 from scripts.moisture_structures import (
+    BUCKET_COUNT,
+    BUCKET_LATITUDE_SMOOTHING_SIGMA,
+    BUCKET_LEVEL_SMOOTHING_SIGMA,
+    BUCKET_LONGITUDE_SMOOTHING_SIGMA,
     BuildConfig,
     SegmentationContext,
+    build_assets,
+    build_bucket_component_specs,
     prepare_segmentation_context,
     build_radius_lookup,
     build_segmentation_mask,
@@ -363,6 +370,159 @@ class MoistureStructuresTests(unittest.TestCase):
                 [component["id"] for component in footprint_payload["components"]],
                 [component["id"] for component in payload["footprints"]],
             )
+
+    def test_bucket_segmentation_context_uses_per_level_edges(self) -> None:
+        threshold_seed_sample = np.array(
+            [
+                [
+                    [[1.0, 2.0], [3.0, 4.0]],
+                    [[10.0, 20.0], [30.0, 40.0]],
+                ]
+            ],
+            dtype=np.float32,
+        )
+        context = prepare_segmentation_context(
+            threshold_seed_sample,
+            BuildConfig(
+                dataset_path=Path("test.nc"),
+                output_dir=Path("tmp/out"),
+                segmentation_mode="buckets",
+            ),
+        )
+
+        self.assertEqual(context.bucket_count, BUCKET_COUNT)
+        self.assertEqual(context.recipe_metadata["bucket_strategy"], "per-pressure-level")
+        self.assertEqual(
+            context.recipe_metadata["preprocessing"]["bucket_gaussian_sigma"],
+            {
+                "pressure_level": BUCKET_LEVEL_SMOOTHING_SIGMA,
+                "latitude": BUCKET_LATITUDE_SMOOTHING_SIGMA,
+                "longitude": BUCKET_LONGITUDE_SMOOTHING_SIGMA,
+            },
+        )
+        self.assertEqual(context.recipe_metadata["bucket_labels"]["lowest_bucket_index"], 0)
+        self.assertEqual(
+            context.recipe_metadata["bucket_labels"]["highest_bucket_index"],
+            BUCKET_COUNT - 1,
+        )
+        self.assertEqual(
+            context.threshold_tables["bucket_boundaries"].shape,
+            (2, BUCKET_COUNT - 1),
+        )
+        self.assertLess(
+            float(context.threshold_tables["bucket_boundaries"][0, -1]),
+            float(context.threshold_tables["bucket_boundaries"][1, 0]),
+        )
+
+    def test_global_bucket_segmentation_context_uses_shared_edges(self) -> None:
+        threshold_seed_sample = np.array(
+            [
+                [
+                    [[1.0, 2.0], [3.0, 4.0]],
+                    [[10.0, 20.0], [30.0, 40.0]],
+                ]
+            ],
+            dtype=np.float32,
+        )
+        context = prepare_segmentation_context(
+            threshold_seed_sample,
+            BuildConfig(
+                dataset_path=Path("test.nc"),
+                output_dir=Path("tmp/out"),
+                segmentation_mode="buckets-global",
+            ),
+        )
+
+        self.assertEqual(context.recipe_metadata["bucket_strategy"], "global-shared")
+        self.assertEqual(
+            context.recipe_metadata["preprocessing"]["bucket_gaussian_sigma"],
+            {
+                "pressure_level": BUCKET_LEVEL_SMOOTHING_SIGMA,
+                "latitude": BUCKET_LATITUDE_SMOOTHING_SIGMA,
+                "longitude": BUCKET_LONGITUDE_SMOOTHING_SIGMA,
+            },
+        )
+        np.testing.assert_allclose(
+            context.threshold_tables["bucket_boundaries"][0],
+            context.threshold_tables["bucket_boundaries"][1],
+        )
+
+    def test_bucket_component_specs_assign_one_component_per_bucket(self) -> None:
+        gradient = np.linspace(0.0, 1.0, 120, dtype=np.float32).reshape(2, 3, 20)
+        field = gradient.copy()
+        context = make_segmentation_context(
+            "buckets",
+            primary_thresholds=np.array([0.5, 0.5], dtype=np.float32),
+            threshold_tables={
+                "bucket_boundaries": np.array(
+                    [
+                        [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                        [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                    ],
+                    dtype=np.float32,
+                ),
+            },
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+        )
+        context = SegmentationContext(
+            **{**context.__dict__, "bucket_count": BUCKET_COUNT}
+        )
+
+        specs = build_bucket_component_specs(field, context)
+        bucket_indices = [spec["metadata"]["bucket_index"] for spec in specs]
+
+        self.assertEqual(bucket_indices, sorted(bucket_indices))
+        self.assertGreaterEqual(bucket_indices[0], 0)
+        self.assertLessEqual(bucket_indices[-1], BUCKET_COUNT - 1)
+        self.assertGreater(bucket_indices[-1], bucket_indices[0])
+        self.assertGreaterEqual(len(specs), BUCKET_COUNT // 2)
+        self.assertGreater(int(specs[0]["mask"].sum()), 0)
+        self.assertGreater(int(specs[-1]["mask"].sum()), 0)
+
+    def test_build_assets_allows_singleton_downsampled_grid_steps_in_bucket_mode(self) -> None:
+        values = np.linspace(0.01, 0.24, 2 * 2 * 5 * 4, dtype=np.float32).reshape(2, 2, 5, 4)
+        dataset = xr.Dataset(
+            data_vars={
+                "q": (
+                    ("valid_time", "pressure_level", "latitude", "longitude"),
+                    values,
+                )
+            },
+            coords={
+                "valid_time": np.array(
+                    ["2021-11-08T00:00", "2021-11-08T06:00"],
+                    dtype="datetime64[m]",
+                ),
+                "pressure_level": np.array([1000.0, 850.0], dtype=np.float32),
+                "latitude": np.array([20.0, 10.0, 0.0, -10.0, -20.0], dtype=np.float32),
+                "longitude": np.array([0.0, 90.0, 180.0, 270.0], dtype=np.float32),
+            },
+        )
+        dataset["q"].attrs["units"] = "kg kg-1"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dataset_path = Path(tmp_dir) / "tiny.nc"
+            output_dir = Path(tmp_dir) / "out"
+            dataset.to_netcdf(dataset_path)
+
+            manifest = build_assets(
+                BuildConfig(
+                    dataset_path=dataset_path,
+                    output_dir=output_dir,
+                    segmentation_mode="buckets",
+                    geometry_mode="voxel-faces",
+                    min_component_size=1,
+                    limit_timestamps=1,
+                )
+            )
+
+            self.assertEqual(manifest["grid"]["latitude_count"], 1)
+            self.assertEqual(manifest["grid"]["longitude_count"], 1)
+            self.assertIsNone(manifest["grid"]["latitude_step_degrees"])
+            self.assertIsNone(manifest["grid"]["longitude_step_degrees"])
+            self.assertEqual(len(manifest["timestamps"]), 1)
+            self.assertTrue((output_dir / "index.json").exists())
 
 
 if __name__ == "__main__":

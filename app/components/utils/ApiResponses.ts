@@ -24,7 +24,9 @@ export type MoistureSegmentationMode =
   | "p95-local-anomaly"
   | "p95-open"
   | "p97-close"
-  | "p95-close-open1";
+  | "p95-close-open1"
+  | "buckets"
+  | "buckets-global";
 
 function moistureStructuresBaseSegments(
   segmentationMode: MoistureSegmentationMode
@@ -217,8 +219,8 @@ export type MoistureStructureManifest = {
     pressure_level_count: number;
     latitude_count: number;
     longitude_count: number;
-    latitude_step_degrees: number;
-    longitude_step_degrees: number;
+    latitude_step_degrees: number | null;
+    longitude_step_degrees: number | null;
   };
   thresholds: MoistureThresholdEntry[];
   timestamps: MoistureStructureManifestTimestamp[];
@@ -226,6 +228,7 @@ export type MoistureStructureManifest = {
 
 export type MoistureStructureComponentMetadata = {
   id: number;
+  bucket_index?: number;
   vertex_offset: number;
   vertex_count: number;
   index_offset: number;
