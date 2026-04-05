@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import json
+import xarray as xr
 
 from scripts.moisture_structures import (
     BUCKET_COUNT,
@@ -14,6 +15,7 @@ from scripts.moisture_structures import (
     BUCKET_LONGITUDE_SMOOTHING_SIGMA,
     BuildConfig,
     SegmentationContext,
+    build_assets,
     build_bucket_component_specs,
     prepare_segmentation_context,
     build_radius_lookup,
@@ -477,6 +479,50 @@ class MoistureStructuresTests(unittest.TestCase):
         self.assertGreaterEqual(len(specs), BUCKET_COUNT // 2)
         self.assertGreater(int(specs[0]["mask"].sum()), 0)
         self.assertGreater(int(specs[-1]["mask"].sum()), 0)
+
+    def test_build_assets_allows_singleton_downsampled_grid_steps_in_bucket_mode(self) -> None:
+        values = np.linspace(0.01, 0.24, 2 * 2 * 5 * 4, dtype=np.float32).reshape(2, 2, 5, 4)
+        dataset = xr.Dataset(
+            data_vars={
+                "q": (
+                    ("valid_time", "pressure_level", "latitude", "longitude"),
+                    values,
+                )
+            },
+            coords={
+                "valid_time": np.array(
+                    ["2021-11-08T00:00", "2021-11-08T06:00"],
+                    dtype="datetime64[m]",
+                ),
+                "pressure_level": np.array([1000.0, 850.0], dtype=np.float32),
+                "latitude": np.array([20.0, 10.0, 0.0, -10.0, -20.0], dtype=np.float32),
+                "longitude": np.array([0.0, 90.0, 180.0, 270.0], dtype=np.float32),
+            },
+        )
+        dataset["q"].attrs["units"] = "kg kg-1"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dataset_path = Path(tmp_dir) / "tiny.nc"
+            output_dir = Path(tmp_dir) / "out"
+            dataset.to_netcdf(dataset_path)
+
+            manifest = build_assets(
+                BuildConfig(
+                    dataset_path=dataset_path,
+                    output_dir=output_dir,
+                    segmentation_mode="buckets",
+                    geometry_mode="voxel-faces",
+                    min_component_size=1,
+                    limit_timestamps=1,
+                )
+            )
+
+            self.assertEqual(manifest["grid"]["latitude_count"], 1)
+            self.assertEqual(manifest["grid"]["longitude_count"], 1)
+            self.assertIsNone(manifest["grid"]["latitude_step_degrees"])
+            self.assertIsNone(manifest["grid"]["longitude_step_degrees"])
+            self.assertEqual(len(manifest["timestamps"]), 1)
+            self.assertTrue((output_dir / "index.json").exists())
 
 
 if __name__ == "__main__":

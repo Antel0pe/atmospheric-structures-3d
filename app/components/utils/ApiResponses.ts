@@ -219,8 +219,8 @@ export type MoistureStructureManifest = {
     pressure_level_count: number;
     latitude_count: number;
     longitude_count: number;
-    latitude_step_degrees: number;
-    longitude_step_degrees: number;
+    latitude_step_degrees: number | null;
+    longitude_step_degrees: number | null;
   };
   thresholds: MoistureThresholdEntry[];
   timestamps: MoistureStructureManifestTimestamp[];

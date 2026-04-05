@@ -274,6 +274,13 @@ def downsample_lat_lon_values(
     return np.asarray(values[tuple(indexer)], dtype=np.float32)
 
 
+def coordinate_step_degrees(values: np.ndarray) -> float | None:
+    axis = np.asarray(values, dtype=np.float32)
+    if axis.size < 2:
+        return None
+    return float(abs(axis[1] - axis[0]))
+
+
 def smooth_bucket_values(values: np.ndarray) -> np.ndarray:
     sigma_axes = [0.0] * values.ndim
     sigma_axes[-3] = BUCKET_LEVEL_SMOOTHING_SIGMA
@@ -1685,12 +1692,8 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 "pressure_level_count": int(pressure_levels.size),
                 "latitude_count": int(effective_latitudes.size),
                 "longitude_count": int(effective_longitudes.size),
-                "latitude_step_degrees": float(
-                    abs(effective_latitudes[1] - effective_latitudes[0])
-                ),
-                "longitude_step_degrees": float(
-                    abs(effective_longitudes[1] - effective_longitudes[0])
-                ),
+                "latitude_step_degrees": coordinate_step_degrees(effective_latitudes),
+                "longitude_step_degrees": coordinate_step_degrees(effective_longitudes),
             },
             "thresholds": build_threshold_table(pressure_levels, thresholds),
             "timestamps": entries,
