@@ -231,6 +231,17 @@ function componentColorForId(id: number) {
   return COMPONENT_PALETTE[id % COMPONENT_PALETTE.length];
 }
 
+function moistureComponentLabel(component: MoistureStructureComponentMetadata) {
+  if (typeof component.bucket_index === "number") {
+    return `Bucket ${component.bucket_index + 1}`;
+  }
+  return `Component ${component.id}`;
+}
+
+function moistureComponentColor(component: MoistureStructureComponentMetadata) {
+  return componentColorForId(component.bucket_index ?? component.id);
+}
+
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`;
 }
@@ -574,7 +585,7 @@ export default function LayerInfoPane() {
                       }}
                     >
                       <div style={{ fontWeight: 700 }}>
-                        Component {selectedMoistureComponent.id}
+                        {moistureComponentLabel(selectedMoistureComponent)}
                       </div>
                       <button
                         type="button"
@@ -636,7 +647,7 @@ export default function LayerInfoPane() {
                               key={`${ringIndex}-${segmentIndex}`}
                               d={ringPath(segment)}
                               fill="none"
-                              stroke={componentColorForId(selectedMoistureFootprint.id)}
+                              stroke={moistureComponentColor(selectedMoistureComponent)}
                               strokeWidth="2.5"
                               strokeLinejoin="round"
                               strokeLinecap="round"
@@ -695,12 +706,12 @@ export default function LayerInfoPane() {
                                 width: 10,
                                 height: 10,
                                 borderRadius: 999,
-                                background: componentColorForId(component.id),
+                                background: moistureComponentColor(component),
                                 boxShadow: "0 0 0 1px rgba(255,255,255,0.18)",
                               }}
                             />
                             <span style={{ fontWeight: 700 }}>
-                              #{index + 1} · Component {component.id}
+                              #{index + 1} · {moistureComponentLabel(component)}
                             </span>
                           </div>
                           <span style={{ opacity: 0.7 }}>

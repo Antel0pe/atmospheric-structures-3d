@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
   BRIDGE_PRUNED_SEGMENTATION_MODE,
   getMoistureStructurePresetState,
   getMoistureVisualPresetState,
@@ -24,6 +25,7 @@ function buildBaseState(): MoistureStructureLayerState {
     ...getMoistureStructurePresetState("componentRead"),
     selectedComponentId: null,
     componentSort: "size",
+    visibleBucketIndices: DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
     legibilityExperiment: "none",
   };
 }

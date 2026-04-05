@@ -33,6 +33,15 @@ LOCAL_ANOMALY_BACKGROUND_SIGMA = 8.0
 P97_CLOSE_QUANTILE = 0.97
 LOCAL_ANOMALY_RAW_QUANTILE = 0.90
 LOCAL_ANOMALY_ANOMALY_QUANTILE = 0.95
+BUCKET_SEGMENTATION_MODE = "buckets"
+BUCKET_GLOBAL_SEGMENTATION_MODE = "buckets-global"
+BUCKET_COUNT = 10
+BUCKET_FIELD_LATITUDE_STRIDE = 6
+BUCKET_FIELD_LONGITUDE_STRIDE = 6
+BUCKET_EDGE_QUANTILES = tuple(index / BUCKET_COUNT for index in range(1, BUCKET_COUNT))
+BUCKET_LEVEL_SMOOTHING_SIGMA = 0.75
+BUCKET_LATITUDE_SMOOTHING_SIGMA = 3.0
+BUCKET_LONGITUDE_SMOOTHING_SIGMA = 3.0
 SUPPORTED_SEGMENTATION_MODES = (
     "p95-close",
     LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE,
@@ -40,6 +49,8 @@ SUPPORTED_SEGMENTATION_MODES = (
     "p95-local-anomaly",
     "p95-open",
     "p97-close",
+    BUCKET_SEGMENTATION_MODE,
+    BUCKET_GLOBAL_SEGMENTATION_MODE,
 )
 LABEL_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
 
@@ -74,6 +85,9 @@ class SegmentationContext:
     threshold_quantile: float
     threshold_kind: str
     recipe_metadata: dict[str, Any]
+    bucket_count: int = 0
+    latitude_stride: int = 1
+    longitude_stride: int = 1
 
 
 def timestamp_to_iso_minute(value: np.datetime64) -> str:
@@ -141,6 +155,71 @@ def compute_per_level_thresholds_from_array(
     return np.asarray(thresholds, dtype=np.float32)
 
 
+def compute_per_level_bucket_boundaries_from_array(
+    values: np.ndarray,
+    quantiles: tuple[float, ...] = BUCKET_EDGE_QUANTILES,
+    value_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    if values.ndim < 2:
+        raise ValueError("Expected values with shape (time, level, ...).")
+    if value_mask is not None and value_mask.shape != values.shape:
+        raise ValueError("Expected value_mask to match values.")
+
+    quantile_values = np.asarray(quantiles, dtype=np.float32)
+    boundaries = np.full(
+        (values.shape[1], quantile_values.size),
+        np.nan,
+        dtype=np.float32,
+    )
+
+    for level_index in range(values.shape[1]):
+        level_values = np.asarray(values[:, level_index, ...], dtype=np.float32).ravel()
+        finite_mask = np.isfinite(level_values)
+        if value_mask is not None:
+            level_mask = np.asarray(
+                value_mask[:, level_index, ...],
+                dtype=bool,
+            ).ravel()
+            finite_mask &= level_mask
+
+        finite_values = level_values[finite_mask]
+        if finite_values.size == 0:
+            continue
+
+        boundaries[level_index] = np.asarray(
+            np.quantile(finite_values, quantile_values),
+            dtype=np.float32,
+        )
+
+    return boundaries
+
+
+def compute_global_bucket_boundaries_from_array(
+    values: np.ndarray,
+    quantiles: tuple[float, ...] = BUCKET_EDGE_QUANTILES,
+    value_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    if values.ndim < 2:
+        raise ValueError("Expected values with shape (time, level, ...).")
+    if value_mask is not None and value_mask.shape != values.shape:
+        raise ValueError("Expected value_mask to match values.")
+
+    flattened = np.asarray(values, dtype=np.float32).ravel()
+    finite_mask = np.isfinite(flattened)
+    if value_mask is not None:
+        finite_mask &= np.asarray(value_mask, dtype=bool).ravel()
+
+    finite_values = flattened[finite_mask]
+    if finite_values.size == 0:
+        return np.full((values.shape[1], len(quantiles)), np.nan, dtype=np.float32)
+
+    shared_boundaries = np.asarray(
+        np.quantile(finite_values, np.asarray(quantiles, dtype=np.float32)),
+        dtype=np.float32,
+    )
+    return np.repeat(shared_boundaries[None, :], values.shape[1], axis=0)
+
+
 def compute_pressure_thresholds(
     specific_humidity: xr.DataArray,
     quantile: float = DEFAULT_THRESHOLD_QUANTILE,
@@ -177,6 +256,35 @@ def load_threshold_seed_sample(variable: netCDF4.Variable) -> np.ndarray:
     midpoint_index = variable.shape[0] // 2
     return np.asarray(
         variable[midpoint_index : midpoint_index + 1, :, :, :],
+        dtype=np.float32,
+    )
+
+
+def downsample_lat_lon_values(
+    values: np.ndarray,
+    latitude_stride: int = 1,
+    longitude_stride: int = 1,
+) -> np.ndarray:
+    latitude_stride = max(int(latitude_stride), 1)
+    longitude_stride = max(int(longitude_stride), 1)
+
+    indexer = [slice(None)] * values.ndim
+    indexer[-2] = slice(None, None, latitude_stride)
+    indexer[-1] = slice(None, None, longitude_stride)
+    return np.asarray(values[tuple(indexer)], dtype=np.float32)
+
+
+def smooth_bucket_values(values: np.ndarray) -> np.ndarray:
+    sigma_axes = [0.0] * values.ndim
+    sigma_axes[-3] = BUCKET_LEVEL_SMOOTHING_SIGMA
+    sigma_axes[-2] = BUCKET_LATITUDE_SMOOTHING_SIGMA
+    sigma_axes[-1] = BUCKET_LONGITUDE_SMOOTHING_SIGMA
+    return np.asarray(
+        ndimage.gaussian_filter(
+            np.asarray(values, dtype=np.float32),
+            sigma=sigma_axes,
+            mode="nearest",
+        ),
         dtype=np.float32,
     )
 
@@ -507,6 +615,104 @@ def prepare_segmentation_context(
             },
         )
 
+    if mode == BUCKET_SEGMENTATION_MODE:
+        sampled = downsample_lat_lon_values(
+            smooth_bucket_values(threshold_seed_sample),
+            latitude_stride=BUCKET_FIELD_LATITUDE_STRIDE,
+            longitude_stride=BUCKET_FIELD_LONGITUDE_STRIDE,
+        )
+        bucket_boundaries = compute_per_level_bucket_boundaries_from_array(sampled)
+        median_bucket_edge = bucket_boundaries[:, bucket_boundaries.shape[1] // 2]
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=median_bucket_edge,
+            threshold_tables={
+                "bucket_boundaries": bucket_boundaries,
+                "bucket_reference": median_bucket_edge,
+            },
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+            threshold_quantile=0.5,
+            threshold_kind="pressure-relative-bucket-heuristic",
+            recipe_metadata={
+                "recipe": "bucketed-specific-humidity",
+                "bucket_count": BUCKET_COUNT,
+                "bucket_strategy": "per-pressure-level",
+                "thresholds": {
+                    "bucket_edge_quantiles": list(BUCKET_EDGE_QUANTILES),
+                },
+                "preprocessing": {
+                    "bucket_gaussian_sigma": {
+                        "pressure_level": BUCKET_LEVEL_SMOOTHING_SIGMA,
+                        "latitude": BUCKET_LATITUDE_SMOOTHING_SIGMA,
+                        "longitude": BUCKET_LONGITUDE_SMOOTHING_SIGMA,
+                    },
+                    "lat_lon_downsample_stride": {
+                        "latitude": BUCKET_FIELD_LATITUDE_STRIDE,
+                        "longitude": BUCKET_FIELD_LONGITUDE_STRIDE,
+                    },
+                    "threshold_seed": "midpoint_time_slice",
+                },
+                "postprocess": {},
+                "bucket_labels": {
+                    "lowest_bucket_index": 0,
+                    "highest_bucket_index": BUCKET_COUNT - 1,
+                },
+            },
+            bucket_count=BUCKET_COUNT,
+            latitude_stride=BUCKET_FIELD_LATITUDE_STRIDE,
+            longitude_stride=BUCKET_FIELD_LONGITUDE_STRIDE,
+        )
+
+    if mode == BUCKET_GLOBAL_SEGMENTATION_MODE:
+        sampled = downsample_lat_lon_values(
+            smooth_bucket_values(threshold_seed_sample),
+            latitude_stride=BUCKET_FIELD_LATITUDE_STRIDE,
+            longitude_stride=BUCKET_FIELD_LONGITUDE_STRIDE,
+        )
+        bucket_boundaries = compute_global_bucket_boundaries_from_array(sampled)
+        median_bucket_edge = bucket_boundaries[:, bucket_boundaries.shape[1] // 2]
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=median_bucket_edge,
+            threshold_tables={
+                "bucket_boundaries": bucket_boundaries,
+                "bucket_reference": median_bucket_edge,
+            },
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+            threshold_quantile=0.5,
+            threshold_kind="global-bucket-heuristic",
+            recipe_metadata={
+                "recipe": "bucketed-specific-humidity",
+                "bucket_count": BUCKET_COUNT,
+                "bucket_strategy": "global-shared",
+                "thresholds": {
+                    "bucket_edge_quantiles": list(BUCKET_EDGE_QUANTILES),
+                },
+                "preprocessing": {
+                    "bucket_gaussian_sigma": {
+                        "pressure_level": BUCKET_LEVEL_SMOOTHING_SIGMA,
+                        "latitude": BUCKET_LATITUDE_SMOOTHING_SIGMA,
+                        "longitude": BUCKET_LONGITUDE_SMOOTHING_SIGMA,
+                    },
+                    "lat_lon_downsample_stride": {
+                        "latitude": BUCKET_FIELD_LATITUDE_STRIDE,
+                        "longitude": BUCKET_FIELD_LONGITUDE_STRIDE,
+                    },
+                    "threshold_seed": "midpoint_time_slice",
+                },
+                "postprocess": {},
+                "bucket_labels": {
+                    "lowest_bucket_index": 0,
+                    "highest_bucket_index": BUCKET_COUNT - 1,
+                },
+            },
+            bucket_count=BUCKET_COUNT,
+            latitude_stride=BUCKET_FIELD_LATITUDE_STRIDE,
+            longitude_stride=BUCKET_FIELD_LONGITUDE_STRIDE,
+        )
+
     raise ValueError(f"Unsupported segmentation mode: {mode}")
 
 
@@ -563,7 +769,60 @@ def build_segmentation_mask(
             opening_radius_cells=context.opening_radius_cells,
         )
 
+    if mode in {BUCKET_SEGMENTATION_MODE, BUCKET_GLOBAL_SEGMENTATION_MODE}:
+        raise ValueError("Bucket segmentation uses bucket component masks, not a binary mask.")
+
     raise ValueError(f"Unsupported segmentation mode: {mode}")
+
+
+def build_bucket_index_field(
+    field: np.ndarray,
+    bucket_boundaries: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    finite_mask = np.isfinite(field)
+    bucket_indices = np.zeros(field.shape, dtype=np.uint8)
+
+    for edge_index in range(bucket_boundaries.shape[1]):
+        threshold_grid = bucket_boundaries[:, edge_index][:, None, None]
+        bucket_indices += np.asarray(
+            finite_mask & (field >= threshold_grid),
+            dtype=np.uint8,
+        )
+
+    return bucket_indices, finite_mask
+
+
+def build_bucket_component_specs(
+    field: np.ndarray,
+    context: SegmentationContext,
+) -> list[dict[str, Any]]:
+    if context.segmentation_mode not in {
+        BUCKET_SEGMENTATION_MODE,
+        BUCKET_GLOBAL_SEGMENTATION_MODE,
+    }:
+        raise ValueError("Bucket component specs are only available in bucket mode.")
+
+    bucket_boundaries = context.threshold_tables["bucket_boundaries"]
+    smoothed_field = smooth_bucket_values(field)
+    bucket_indices, finite_mask = build_bucket_index_field(smoothed_field, bucket_boundaries)
+    specs: list[dict[str, Any]] = []
+
+    for bucket_index in range(context.bucket_count):
+        mask = finite_mask & (bucket_indices == bucket_index)
+        if not bool(mask.any()):
+            continue
+
+        specs.append(
+            {
+                "mask": mask,
+                "metadata": {
+                    "id": bucket_index,
+                    "bucket_index": bucket_index,
+                },
+            }
+        )
+
+    return specs
 
 
 def choose_longitude_roll(component_mask: np.ndarray) -> int:
@@ -1098,14 +1357,16 @@ def build_timestamp_payload(
     geometry_mode: str = DEFAULT_GEOMETRY_MODE,
     write_footprints: bool = True,
     processed_mask: np.ndarray | None = None,
+    component_masks: list[np.ndarray] | None = None,
+    component_metadata_overrides: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    if processed_mask is None:
+    if component_masks is None and processed_mask is None:
         processed_mask = apply_binary_postprocess(
             build_threshold_mask(field, thresholds),
             closing_radius_cells=closing_radius_cells,
             opening_radius_cells=opening_radius_cells,
         )
-    else:
+    elif processed_mask is not None:
         processed_mask = np.asarray(processed_mask, dtype=bool)
 
     position_chunks: list[np.ndarray] = []
@@ -1115,12 +1376,23 @@ def build_timestamp_payload(
     vertex_offset = 0
     index_offset = 0
 
-    wrapped_components = iter_wrapped_components(
-        processed_mask,
-        min_component_size=min_component_size,
-    )
+    if component_masks is None:
+        if processed_mask is None:
+            raise ValueError("Expected processed_mask when component_masks are not provided.")
+        wrapped_components = iter_wrapped_components(
+            processed_mask,
+            min_component_size=min_component_size,
+        )
+        component_masks = wrapped_components
+    else:
+        component_masks = [np.asarray(mask, dtype=bool) for mask in component_masks]
 
-    for component_id, component_mask in enumerate(wrapped_components):
+    if component_metadata_overrides is None:
+        component_metadata_overrides = [{} for _ in component_masks]
+    elif len(component_metadata_overrides) != len(component_masks):
+        raise ValueError("Expected component metadata overrides to match component masks.")
+
+    for component_id, component_mask in enumerate(component_masks):
         voxel_count = int(component_mask.sum())
 
         surface = build_component_surface(
@@ -1139,23 +1411,29 @@ def build_timestamp_payload(
         positions, faces, metadata = surface
         flat_positions = positions.reshape(-1)
         flat_indices = faces.reshape(-1) + vertex_offset
+        metadata_override = component_metadata_overrides[component_id]
+        component_record_id = int(metadata_override.get("id", component_id))
+        component_metadata = {
+            "id": component_record_id,
+            "vertex_offset": int(vertex_offset),
+            "vertex_count": int(positions.shape[0]),
+            "index_offset": int(index_offset),
+            "index_count": int(flat_indices.size),
+            **metadata,
+            **{
+                key: value
+                for key, value in metadata_override.items()
+                if key != "id"
+            },
+        }
 
         position_chunks.append(flat_positions)
         index_chunks.append(flat_indices.astype(np.uint32))
-        components.append(
-            {
-                "id": component_id,
-                "vertex_offset": int(vertex_offset),
-                "vertex_count": int(positions.shape[0]),
-                "index_offset": int(index_offset),
-                "index_count": int(flat_indices.size),
-                **metadata,
-            }
-        )
+        components.append(component_metadata)
         if write_footprints:
             footprints.append(
                 {
-                    "id": component_id,
+                    "id": component_record_id,
                     **build_component_footprint(
                         component_mask=component_mask,
                         latitudes=latitudes,
@@ -1185,7 +1463,11 @@ def build_timestamp_payload(
         "component_count": len(components),
         "vertex_count": int(positions.size // 3),
         "index_count": int(indices.size),
-        "voxel_count": int(processed_mask.sum()),
+        "voxel_count": int(
+            processed_mask.sum()
+            if processed_mask is not None
+            else sum(int(mask.sum()) for mask in component_masks)
+        ),
         "footprints": footprints,
     }
 
@@ -1307,6 +1589,8 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             base_radius=config.base_radius,
             vertical_span=config.vertical_span,
         )
+        effective_latitudes = latitudes[:: segmentation_context.latitude_stride]
+        effective_longitudes = longitudes[:: segmentation_context.longitude_stride]
 
         preserve_children = {"variants"} if config.segmentation_mode == "p95-close" else set()
         clear_output_dir(config.output_dir, preserve_child_names=preserve_children)
@@ -1324,16 +1608,34 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 absolute_index = start + local_index
                 timestamp = timestamps[absolute_index]
                 print(f"Building {timestamp}...", flush=True)
-                processed_mask = build_segmentation_mask(
+                field = downsample_lat_lon_values(
                     window[local_index],
-                    segmentation_context,
+                    latitude_stride=segmentation_context.latitude_stride,
+                    longitude_stride=segmentation_context.longitude_stride,
                 )
+                processed_mask = None
+                component_masks = None
+                component_metadata_overrides = None
+                if config.segmentation_mode in {
+                    BUCKET_SEGMENTATION_MODE,
+                    BUCKET_GLOBAL_SEGMENTATION_MODE,
+                }:
+                    bucket_specs = build_bucket_component_specs(field, segmentation_context)
+                    component_masks = [spec["mask"] for spec in bucket_specs]
+                    component_metadata_overrides = [
+                        spec["metadata"] for spec in bucket_specs
+                    ]
+                else:
+                    processed_mask = build_segmentation_mask(
+                        field,
+                        segmentation_context,
+                    )
                 payload = build_timestamp_payload(
-                    field=window[local_index],
+                    field=field,
                     thresholds=thresholds,
                     pressure_levels=pressure_levels,
-                    latitudes=latitudes,
-                    longitudes=longitudes,
+                    latitudes=effective_latitudes,
+                    longitudes=effective_longitudes,
                     radius_lookup=radius_lookup,
                     min_component_size=config.min_component_size,
                     gaussian_sigma=config.gaussian_sigma,
@@ -1342,6 +1644,8 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                     geometry_mode=config.geometry_mode,
                     write_footprints=config.write_footprints,
                     processed_mask=processed_mask,
+                    component_masks=component_masks,
+                    component_metadata_overrides=component_metadata_overrides,
                 )
                 entry = write_timestamp_assets(config.output_dir, timestamp, payload)
                 entries.append(entry)
@@ -1379,10 +1683,14 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             },
             "grid": {
                 "pressure_level_count": int(pressure_levels.size),
-                "latitude_count": int(latitudes.size),
-                "longitude_count": int(longitudes.size),
-                "latitude_step_degrees": float(abs(latitudes[1] - latitudes[0])),
-                "longitude_step_degrees": float(abs(longitudes[1] - longitudes[0])),
+                "latitude_count": int(effective_latitudes.size),
+                "longitude_count": int(effective_longitudes.size),
+                "latitude_step_degrees": float(
+                    abs(effective_latitudes[1] - effective_latitudes[0])
+                ),
+                "longitude_step_degrees": float(
+                    abs(effective_longitudes[1] - effective_longitudes[0])
+                ),
             },
             "thresholds": build_threshold_table(pressure_levels, thresholds),
             "timestamps": entries,

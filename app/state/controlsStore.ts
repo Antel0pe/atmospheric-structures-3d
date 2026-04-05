@@ -97,7 +97,15 @@ export const MOISTURE_SEGMENTATION_MODE_OPTIONS: ReadonlyArray<{
   { value: "p95-close", label: "Bridge Pruned Baseline" },
   { value: "p95-smooth-open1", label: "Smoothed Support" },
   { value: "p95-local-anomaly", label: "Local Anomaly" },
+  { value: "buckets", label: "Buckets (Per Level)" },
+  { value: "buckets-global", label: "Buckets (Global)" },
 ] as const;
+
+export const MOISTURE_BUCKET_COUNT = 10;
+export const DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES = Array.from(
+  { length: MOISTURE_BUCKET_COUNT },
+  (_, index) => index
+);
 
 export const BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close" as const;
 export const LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close-open1" as const;
@@ -165,6 +173,7 @@ export type MoistureStructureLayerState = {
   verticalWallFadeEnabled: boolean;
   verticalWallFadeStrength: number;
   segmentationMode: MoistureSegmentationMode;
+  visibleBucketIndices: number[];
   footprintOverlayEnabled: boolean;
   legibilityExperiment: MoistureLegibilityExperiment;
 };
@@ -411,6 +420,12 @@ export function moistureSegmentationModeLabel(
   if (segmentationMode === "p97-close") {
     return "Legacy p97 Close";
   }
+  if (segmentationMode === "buckets") {
+    return "Buckets (Per Level)";
+  }
+  if (segmentationMode === "buckets-global") {
+    return "Buckets (Global)";
+  }
 
   return (
     MOISTURE_SEGMENTATION_MODE_OPTIONS.find(
@@ -513,6 +528,7 @@ export const useControls = create<ControlsState>()(
       ...getMoistureStructurePresetState("componentRead"),
       selectedComponentId: null,
       componentSort: "size",
+      visibleBucketIndices: DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
       legibilityExperiment: "bridgePruned",
     },
     moistureStructureFrame: null,
