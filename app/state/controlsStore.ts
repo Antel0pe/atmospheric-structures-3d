@@ -75,6 +75,7 @@ export const MOISTURE_COLOR_MODE_OPTIONS = [
   { value: "pressureBands", label: "Pressure Bands" },
   { value: "componentSolid", label: "Component Solid" },
   { value: "componentHybrid", label: "Component Hybrid" },
+  { value: "componentHeightSteps", label: "Component Height Steps" },
   { value: "selectedMonochrome", label: "Selected Monochrome" },
 ] as const;
 
@@ -95,6 +96,9 @@ export const MOISTURE_SEGMENTATION_MODE_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { value: "p95-close", label: "Bridge Pruned Baseline" },
+  { value: "p95-close-voxel-shell", label: "Bridge Pruned Voxel Shell" },
+  { value: "p95-smooth-open1-voxel-shell", label: "Smoothed Support Voxel Shell" },
+  { value: "p95-close-smoothmesh", label: "Bridge Pruned Smoothed Mesh" },
   { value: "p95-smooth-open1", label: "Smoothed Support" },
   { value: "p95-local-anomaly", label: "Local Anomaly" },
   { value: "buckets", label: "Buckets (Per Level)" },
@@ -123,6 +127,20 @@ export const MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS = [
 
 export type MoistureLegibilityExperiment =
   (typeof MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS)[number]["value"];
+
+export const MOISTURE_SURFACE_CUE_OPTIONS = [
+  { value: "none", label: "None (Current)" },
+  { value: "globalLift", label: "Global Lift" },
+  { value: "topLight", label: "Top Light / Hemi" },
+  { value: "edgeEnhance", label: "Edge Enhancement" },
+  { value: "aerialPerspective", label: "Aerial Perspective" },
+  { value: "heightCue", label: "Top Surface Height Cue" },
+  { value: "roofRelief", label: "Roof Relief Colors" },
+  { value: "viewAdaptive", label: "View-Adaptive" },
+] as const;
+
+export type MoistureSurfaceCueMode =
+  (typeof MOISTURE_SURFACE_CUE_OPTIONS)[number]["value"];
 
 type ExampleShaderMeshLayerState = {
   pressureLevel: ExampleShaderMeshPressure;
@@ -176,6 +194,9 @@ export type MoistureStructureLayerState = {
   visibleBucketIndices: number[];
   footprintOverlayEnabled: boolean;
   legibilityExperiment: MoistureLegibilityExperiment;
+  surfaceCueMode: MoistureSurfaceCueMode;
+  surfaceBrightness: number;
+  surfaceShadowStrength: number;
 };
 
 export type ResolvedMoistureStructureLayerState = MoistureStructureLayerState;
@@ -250,15 +271,15 @@ const MOISTURE_VISUAL_PRESET_STATE: Record<
   },
   solidShell: {
     solidShellEnabled: true,
-    lightingEnabled: false,
+    lightingEnabled: true,
     interiorBackfaceEnabled: false,
     rimEnabled: false,
     distanceFadeEnabled: false,
-    frontOpacity: 1.2,
+    frontOpacity: 1.06,
     backfaceOpacity: 0.28,
-    ambientIntensity: 2,
-    keyLightIntensity: 0,
-    headLightIntensity: 0,
+    ambientIntensity: 1.12,
+    keyLightIntensity: 1.18,
+    headLightIntensity: 0.22,
     rimStrength: 0.6,
     distanceFadeStrength: 0.35,
   },
@@ -408,6 +429,13 @@ export function moistureLegibilityExperimentLabel(
   );
 }
 
+export function moistureSurfaceCueModeLabel(mode: MoistureSurfaceCueMode) {
+  return (
+    MOISTURE_SURFACE_CUE_OPTIONS.find((option) => option.value === mode)?.label ??
+    mode
+  );
+}
+
 export function moistureSegmentationModeLabel(
   segmentationMode: MoistureSegmentationMode
 ) {
@@ -416,6 +444,15 @@ export function moistureSegmentationModeLabel(
   }
   if (segmentationMode === "p95-open") {
     return "Legacy p95 Open";
+  }
+  if (segmentationMode === "p95-close-voxel-shell") {
+    return "Bridge Pruned Voxel Shell";
+  }
+  if (segmentationMode === "p95-smooth-open1-voxel-shell") {
+    return "Smoothed Support Voxel Shell";
+  }
+  if (segmentationMode === "p95-close-smoothmesh") {
+    return "Bridge Pruned Smoothed Mesh";
   }
   if (segmentationMode === "p97-close") {
     return "Legacy p97 Close";
@@ -446,6 +483,7 @@ export function resolveMoistureStructureLayerState(
       resolved.solidShellEnabled = true;
       resolved.distanceFadeEnabled = false;
       resolved.interiorBackfaceEnabled = false;
+      resolved.opacity = Math.max(state.opacity, 0.95);
       resolved.frontOpacity = Math.max(state.frontOpacity, 1.5);
       resolved.backfaceOpacity = 0;
       if (
@@ -518,18 +556,21 @@ export const useControls = create<ControlsState>()(
   subscribeWithSelector((set) => ({
     moistureStructureLayer: {
       visible: true,
-      opacity: 0.78,
-      verticalExaggeration: 4,
-      cameraCutawayEnabled: true,
+      opacity: 0.95,
+      verticalExaggeration: 2.35,
+      cameraCutawayEnabled: false,
       cameraCutawayRadius: 40,
-      visualPreset: "fullPop",
-      structurePreset: "componentRead",
-      ...getMoistureVisualPresetState("fullPop"),
-      ...getMoistureStructurePresetState("componentRead"),
+      visualPreset: "solidShell",
+      structurePreset: "currentDepth",
+      ...getMoistureVisualPresetState("solidShell"),
+      ...getMoistureStructurePresetState("currentDepth"),
       selectedComponentId: null,
       componentSort: "size",
       visibleBucketIndices: DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
       legibilityExperiment: "bridgePruned",
+      surfaceCueMode: "none",
+      surfaceBrightness: 1,
+      surfaceShadowStrength: 1,
     },
     moistureStructureFrame: null,
     // Defaults keep the examples hidden from the UI. Use EXAMPLE_LAYER_PRESETS

@@ -9,12 +9,14 @@ import {
   MOISTURE_FOCUS_MODE_OPTIONS,
   MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS,
   MOISTURE_SEGMENTATION_MODE_OPTIONS,
+  MOISTURE_SURFACE_CUE_OPTIONS,
   MOISTURE_STRUCTURE_PRESET_OPTIONS,
   MOISTURE_VISUAL_PRESET_OPTIONS,
   type MoistureColorMode,
   type MoistureComponentSort,
   type MoistureFocusMode,
   type MoistureLegibilityExperiment,
+  type MoistureSurfaceCueMode,
   type MoistureStructurePreset,
   type MoistureVisualPreset,
   useControls,
@@ -367,6 +369,55 @@ export default function TweakpaneControls() {
                 ))}
               </select>
             </label>
+
+            <label style={{ display: "grid", gap: 8 }}>
+              <div style={sliderLabelStyle()}>
+                <span>Surface Cue Style</span>
+                <span style={{ opacity: 0.68 }}>Depth readability</span>
+              </div>
+              <select
+                value={moistureLayer.surfaceCueMode}
+                onChange={(event) =>
+                  setMoistureLayer({
+                    surfaceCueMode:
+                      event.currentTarget.value as MoistureSurfaceCueMode,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {MOISTURE_SURFACE_CUE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <SliderField
+              label="Surface Brightness"
+              valueLabel={`${moistureLayer.surfaceBrightness.toFixed(2)}x`}
+              min={0.8}
+              max={1.4}
+              step={0.02}
+              value={moistureLayer.surfaceBrightness}
+              accentColor="#ffe68a"
+              onChange={(value) =>
+                setMoistureLayer({ surfaceBrightness: value })
+              }
+            />
+
+            <SliderField
+              label="Shadow Strength"
+              valueLabel={moistureLayer.surfaceShadowStrength.toFixed(2)}
+              min={0}
+              max={1.5}
+              step={0.05}
+              value={moistureLayer.surfaceShadowStrength}
+              accentColor="#9fc1ff"
+              onChange={(value) =>
+                setMoistureLayer({ surfaceShadowStrength: value })
+              }
+            />
 
             <button
               type="button"
@@ -787,6 +838,19 @@ export default function TweakpaneControls() {
               Combine the depth harness with component-aware colors, picking,
               focus modes, wall suppression, and macro footprints to test what
               makes structure easiest to read.
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 4 }}>
+            <div style={infoTitleStyle()}>Surface Cue Style</div>
+            <div style={{ lineHeight: 1.45, opacity: 0.85 }}>
+              `None` keeps the current matte shell behavior. The other modes
+              add one specific readibility idea on top so you can compare a
+              pure global brightness lift, top-lighting, edge emphasis, aerial
+              perspective, top-surface height cues, roof-relief coloring, and
+              a view-adaptive mix.
+              Use the brightness and shadow sliders to tune where the shell
+              feels too dim or not dim enough.
             </div>
           </div>
 

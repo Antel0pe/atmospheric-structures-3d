@@ -103,6 +103,69 @@ class MoistureStructuresTests(unittest.TestCase):
             2,
         )
 
+    def test_prepare_segmentation_context_supports_smoothed_mesh_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-close-smoothmesh",
+            mesh_smoothing_iterations=8,
+            mesh_smoothing_lambda=0.41,
+            mesh_smoothing_mu=-0.43,
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-close-smoothmesh")
+        self.assertEqual(context.recipe_metadata["recipe"], "bridge-pruned-smoothed-mesh")
+        self.assertEqual(
+            context.recipe_metadata["mesh_postprocess"]["iterations"],
+            8,
+        )
+        self.assertEqual(context.recipe_metadata["mesh_postprocess"]["lambda"], 0.41)
+        self.assertEqual(context.recipe_metadata["mesh_postprocess"]["mu"], -0.43)
+
+    def test_prepare_segmentation_context_supports_voxel_shell_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-close-voxel-shell",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-close-voxel-shell")
+        self.assertEqual(context.recipe_metadata["recipe"], "bridge-pruned-voxel-shell")
+        self.assertEqual(context.recipe_metadata["geometry_variant"], "voxel-shell")
+
+    def test_prepare_segmentation_context_supports_smoothed_voxel_shell_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-smooth-open1-voxel-shell",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-smooth-open1-voxel-shell")
+        self.assertEqual(context.recipe_metadata["recipe"], "smoothed-support-voxel-shell")
+        self.assertEqual(
+            context.recipe_metadata["preprocessing"]["lat_lon_gaussian_sigma"],
+            1.0,
+        )
+        self.assertEqual(context.recipe_metadata["geometry_variant"], "voxel-shell")
+
     def test_wraparound_components_merge_across_longitude_seam(self) -> None:
         mask = np.zeros((2, 2, 8), dtype=bool)
         mask[0, 0, 0] = True

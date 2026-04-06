@@ -9,6 +9,7 @@ import {
   getMoistureVisualPresetState,
   moistureLegibilityExperimentLabel,
   moistureSegmentationModeLabel,
+  moistureSurfaceCueModeLabel,
   resolveMoistureStructureLayerState,
   useControls,
   type MoistureStructureLayerState,
@@ -369,6 +370,8 @@ export default function LayerInfoPane() {
           moistureStructureLayer.structurePreset
         )} | ${moistureLegibilityExperimentLabel(
           moistureStructureLayer.legibilityExperiment
+        )} | Cue ${moistureSurfaceCueModeLabel(
+          moistureStructureLayer.surfaceCueMode
         )} | ${moistureOverrideSummary(
           moistureStructureLayerState
         )} + ${moistureStructureOverrideSummary(
