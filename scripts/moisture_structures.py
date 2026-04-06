@@ -58,6 +58,11 @@ SUPPORTED_SEGMENTATION_MODES = (
     BUCKET_SEGMENTATION_MODE,
     BUCKET_GLOBAL_SEGMENTATION_MODE,
 )
+SEGMENTATION_GEOMETRY_MODE_OVERRIDES = {
+    VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
+    SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
+    GEOMETRY_SMOOTHED_SEGMENTATION_MODE: "marching-cubes",
+}
 LABEL_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
 
 
@@ -98,6 +103,13 @@ class SegmentationContext:
     bucket_count: int = 0
     latitude_stride: int = 1
     longitude_stride: int = 1
+
+
+def resolve_geometry_mode(segmentation_mode: str, requested_geometry_mode: str) -> str:
+    return SEGMENTATION_GEOMETRY_MODE_OVERRIDES.get(
+        segmentation_mode,
+        requested_geometry_mode,
+    )
 
 
 def timestamp_to_iso_minute(value: np.datetime64) -> str:
@@ -1698,6 +1710,10 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
     dataset = xr.open_dataset(config.dataset_path, chunks={})
     raw_dataset = netCDF4.Dataset(config.dataset_path, mode="r")
     try:
+        effective_geometry_mode = resolve_geometry_mode(
+            config.segmentation_mode,
+            config.geometry_mode,
+        )
         specific_humidity = dataset[DATASET_VARIABLE]
         specific_humidity_var = raw_dataset.variables[DATASET_VARIABLE]
         pressure_levels = np.asarray(dataset.coords["pressure_level"].values, dtype=np.float32)
@@ -1783,7 +1799,7 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                     gaussian_sigma=config.gaussian_sigma,
                     closing_radius_cells=config.closing_radius_cells,
                     opening_radius_cells=config.opening_radius_cells,
-                    geometry_mode=config.geometry_mode,
+                    geometry_mode=effective_geometry_mode,
                     mesh_smoothing_iterations=config.mesh_smoothing_iterations,
                     mesh_smoothing_lambda=config.mesh_smoothing_lambda,
                     mesh_smoothing_mu=config.mesh_smoothing_mu,
@@ -1826,7 +1842,7 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 },
                 "recipe": segmentation_context.recipe_metadata,
             },
-            "geometry_mode": config.geometry_mode,
+            "geometry_mode": effective_geometry_mode,
             "mesh_postprocess": {
                 "iterations": config.mesh_smoothing_iterations,
                 "lambda": config.mesh_smoothing_lambda,
