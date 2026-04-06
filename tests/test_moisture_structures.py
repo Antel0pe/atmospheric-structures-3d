@@ -25,6 +25,7 @@ from scripts.moisture_structures import (
     compute_per_level_thresholds_from_array,
     iter_wrapped_components,
     DEFAULT_OPENING_RADIUS_CELLS,
+    resolve_geometry_mode,
     write_timestamp_assets,
 )
 
@@ -101,6 +102,87 @@ class MoistureStructuresTests(unittest.TestCase):
         self.assertEqual(
             context.recipe_metadata["postprocess"]["binary_opening_radius_cells"],
             2,
+        )
+
+    def test_prepare_segmentation_context_supports_smoothed_mesh_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-close-smoothmesh",
+            mesh_smoothing_iterations=8,
+            mesh_smoothing_lambda=0.41,
+            mesh_smoothing_mu=-0.43,
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-close-smoothmesh")
+        self.assertEqual(context.recipe_metadata["recipe"], "bridge-pruned-smoothed-mesh")
+        self.assertEqual(
+            context.recipe_metadata["mesh_postprocess"]["iterations"],
+            8,
+        )
+        self.assertEqual(context.recipe_metadata["mesh_postprocess"]["lambda"], 0.41)
+        self.assertEqual(context.recipe_metadata["mesh_postprocess"]["mu"], -0.43)
+
+    def test_prepare_segmentation_context_supports_voxel_shell_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-close-voxel-shell",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-close-voxel-shell")
+        self.assertEqual(context.recipe_metadata["recipe"], "bridge-pruned-voxel-shell")
+        self.assertEqual(context.recipe_metadata["geometry_variant"], "voxel-shell")
+
+    def test_prepare_segmentation_context_supports_smoothed_voxel_shell_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-smooth-open1-voxel-shell",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-smooth-open1-voxel-shell")
+        self.assertEqual(context.recipe_metadata["recipe"], "smoothed-support-voxel-shell")
+        self.assertEqual(
+            context.recipe_metadata["preprocessing"]["lat_lon_gaussian_sigma"],
+            1.0,
+        )
+        self.assertEqual(context.recipe_metadata["geometry_variant"], "voxel-shell")
+
+    def test_resolve_geometry_mode_overrides_variant_specific_modes(self) -> None:
+        self.assertEqual(
+            resolve_geometry_mode("p95-close-voxel-shell", "marching-cubes"),
+            "voxel-faces",
+        )
+        self.assertEqual(
+            resolve_geometry_mode("p95-smooth-open1-voxel-shell", "marching-cubes"),
+            "voxel-faces",
+        )
+        self.assertEqual(
+            resolve_geometry_mode("p95-close-smoothmesh", "voxel-faces"),
+            "marching-cubes",
+        )
+        self.assertEqual(
+            resolve_geometry_mode("p95-close", "marching-cubes"),
+            "marching-cubes",
         )
 
     def test_wraparound_components_merge_across_longitude_seam(self) -> None:
@@ -523,6 +605,43 @@ class MoistureStructuresTests(unittest.TestCase):
             self.assertIsNone(manifest["grid"]["longitude_step_degrees"])
             self.assertEqual(len(manifest["timestamps"]), 1)
             self.assertTrue((output_dir / "index.json").exists())
+
+    def test_build_assets_forces_voxel_geometry_for_voxel_shell_segmentation(self) -> None:
+        values = np.zeros((1, 2, 4, 4), dtype=np.float32)
+        values[:, :, 1:3, 1:3] = 0.9
+        dataset = xr.Dataset(
+            data_vars={
+                "q": (
+                    ("valid_time", "pressure_level", "latitude", "longitude"),
+                    values,
+                )
+            },
+            coords={
+                "valid_time": np.array(["2021-11-08T00:00"], dtype="datetime64[m]"),
+                "pressure_level": np.array([1000.0, 850.0], dtype=np.float32),
+                "latitude": np.array([20.0, 10.0, 0.0, -10.0], dtype=np.float32),
+                "longitude": np.array([0.0, 90.0, 180.0, 270.0], dtype=np.float32),
+            },
+        )
+        dataset["q"].attrs["units"] = "kg kg-1"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dataset_path = Path(tmp_dir) / "tiny.nc"
+            output_dir = Path(tmp_dir) / "out"
+            dataset.to_netcdf(dataset_path)
+
+            manifest = build_assets(
+                BuildConfig(
+                    dataset_path=dataset_path,
+                    output_dir=output_dir,
+                    segmentation_mode="p95-close-voxel-shell",
+                    geometry_mode="marching-cubes",
+                    min_component_size=1,
+                    limit_timestamps=1,
+                )
+            )
+
+            self.assertEqual(manifest["geometry_mode"], "voxel-faces")
 
 
 if __name__ == "__main__":

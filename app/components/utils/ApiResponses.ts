@@ -20,6 +20,9 @@ function buildPublicDataUrl(...segments: string[]) {
 
 export type MoistureSegmentationMode =
   | "p95-close"
+  | "p95-close-voxel-shell"
+  | "p95-smooth-open1-voxel-shell"
+  | "p95-close-smoothmesh"
   | "p95-smooth-open1"
   | "p95-local-anomaly"
   | "p95-open"

@@ -27,6 +27,9 @@ DEFAULT_GEOMETRY_MODE = "marching-cubes"
 DEFAULT_CLOSING_RADIUS_CELLS = 1
 DEFAULT_OPENING_RADIUS_CELLS = 1
 DEFAULT_SEGMENTATION_MODE = "p95-close"
+VOXEL_SHELL_SEGMENTATION_MODE = "p95-close-voxel-shell"
+SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE = "p95-smooth-open1-voxel-shell"
+GEOMETRY_SMOOTHED_SEGMENTATION_MODE = "p95-close-smoothmesh"
 LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close-open1"
 SMOOTH_SUPPORT_SIGMA = 1.0
 LOCAL_ANOMALY_BACKGROUND_SIGMA = 8.0
@@ -44,6 +47,9 @@ BUCKET_LATITUDE_SMOOTHING_SIGMA = 3.0
 BUCKET_LONGITUDE_SMOOTHING_SIGMA = 3.0
 SUPPORTED_SEGMENTATION_MODES = (
     "p95-close",
+    VOXEL_SHELL_SEGMENTATION_MODE,
+    SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE,
+    GEOMETRY_SMOOTHED_SEGMENTATION_MODE,
     LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE,
     "p95-smooth-open1",
     "p95-local-anomaly",
@@ -52,6 +58,11 @@ SUPPORTED_SEGMENTATION_MODES = (
     BUCKET_SEGMENTATION_MODE,
     BUCKET_GLOBAL_SEGMENTATION_MODE,
 )
+SEGMENTATION_GEOMETRY_MODE_OVERRIDES = {
+    VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
+    SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
+    GEOMETRY_SMOOTHED_SEGMENTATION_MODE: "marching-cubes",
+}
 LABEL_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
 
 
@@ -73,6 +84,10 @@ class BuildConfig:
     segmentation_mode: str = DEFAULT_SEGMENTATION_MODE
     write_footprints: bool = True
     limit_timestamps: int | None = None
+    include_timestamps: tuple[str, ...] | None = None
+    mesh_smoothing_iterations: int = 0
+    mesh_smoothing_lambda: float = 0.45
+    mesh_smoothing_mu: float = -0.47
 
 
 @dataclass(frozen=True)
@@ -88,6 +103,13 @@ class SegmentationContext:
     bucket_count: int = 0
     latitude_stride: int = 1
     longitude_stride: int = 1
+
+
+def resolve_geometry_mode(segmentation_mode: str, requested_geometry_mode: str) -> str:
+    return SEGMENTATION_GEOMETRY_MODE_OVERRIDES.get(
+        segmentation_mode,
+        requested_geometry_mode,
+    )
 
 
 def timestamp_to_iso_minute(value: np.datetime64) -> str:
@@ -481,10 +503,36 @@ def prepare_segmentation_context(
     if mode not in SUPPORTED_SEGMENTATION_MODES:
         raise ValueError(f"Unsupported segmentation mode: {mode}")
 
-    if mode in {"p95-close", LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE}:
+    if mode in {
+        "p95-close",
+        VOXEL_SHELL_SEGMENTATION_MODE,
+        GEOMETRY_SMOOTHED_SEGMENTATION_MODE,
+        LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE,
+    }:
         raw_q95 = compute_per_level_thresholds_from_array(
             threshold_seed_sample,
             quantile=config.threshold_quantile,
+        )
+        recipe_name = (
+            "bridge-pruned-smoothed-mesh"
+            if mode == GEOMETRY_SMOOTHED_SEGMENTATION_MODE
+            else "bridge-pruned-voxel-shell"
+            if mode == VOXEL_SHELL_SEGMENTATION_MODE
+            else "bridge-pruned-baseline"
+        )
+        geometry_metadata = (
+            {
+                "mesh_postprocess": {
+                    "algorithm": "taubin-laplacian",
+                    "iterations": config.mesh_smoothing_iterations,
+                    "lambda": config.mesh_smoothing_lambda,
+                    "mu": config.mesh_smoothing_mu,
+                }
+            }
+            if mode == GEOMETRY_SMOOTHED_SEGMENTATION_MODE
+            else {"geometry_variant": "voxel-shell"}
+            if mode == VOXEL_SHELL_SEGMENTATION_MODE
+            else {}
         )
         return SegmentationContext(
             segmentation_mode=mode,
@@ -495,17 +543,18 @@ def prepare_segmentation_context(
             threshold_quantile=config.threshold_quantile,
             threshold_kind="pressure-relative-quantile",
             recipe_metadata={
-                "recipe": "bridge-pruned-baseline",
+                "recipe": recipe_name,
                 "thresholds": {"raw_q95": config.threshold_quantile},
                 "preprocessing": {},
                 "postprocess": {
                     "binary_closing_radius_cells": config.closing_radius_cells,
                     "binary_opening_radius_cells": config.opening_radius_cells,
                 },
+                **geometry_metadata,
             },
         )
 
-    if mode == "p95-smooth-open1":
+    if mode in {"p95-smooth-open1", SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE}:
         smoothed_sample = lat_lon_gaussian_filter(
             threshold_seed_sample,
             sigma=SMOOTH_SUPPORT_SIGMA,
@@ -523,13 +572,22 @@ def prepare_segmentation_context(
             threshold_quantile=DEFAULT_THRESHOLD_QUANTILE,
             threshold_kind="lat-lon-smoothed-quantile",
             recipe_metadata={
-                "recipe": "smoothed-support",
+                "recipe": (
+                    "smoothed-support-voxel-shell"
+                    if mode == SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE
+                    else "smoothed-support"
+                ),
                 "thresholds": {"smoothed_q95": DEFAULT_THRESHOLD_QUANTILE},
                 "preprocessing": {"lat_lon_gaussian_sigma": SMOOTH_SUPPORT_SIGMA},
                 "postprocess": {
                     "binary_closing_radius_cells": DEFAULT_CLOSING_RADIUS_CELLS,
                     "binary_opening_radius_cells": DEFAULT_OPENING_RADIUS_CELLS,
                 },
+                **(
+                    {"geometry_variant": "voxel-shell"}
+                    if mode == SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE
+                    else {}
+                ),
             },
         )
 
@@ -730,14 +788,19 @@ def build_segmentation_mask(
     field = np.asarray(field, dtype=np.float32)
     mode = context.segmentation_mode
 
-    if mode in {"p95-close", LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE}:
+    if mode in {
+        "p95-close",
+        VOXEL_SHELL_SEGMENTATION_MODE,
+        GEOMETRY_SMOOTHED_SEGMENTATION_MODE,
+        LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE,
+    }:
         return apply_binary_postprocess(
             build_threshold_mask(field, context.threshold_tables["raw_q95"]),
             closing_radius_cells=context.closing_radius_cells,
             opening_radius_cells=context.opening_radius_cells,
         )
 
-    if mode == "p95-smooth-open1":
+    if mode in {"p95-smooth-open1", SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE}:
         smoothed = lat_lon_gaussian_filter(field, sigma=SMOOTH_SUPPORT_SIGMA)
         return apply_binary_postprocess(
             build_threshold_mask(smoothed, context.threshold_tables["smoothed_q95"]),
@@ -1000,6 +1063,62 @@ def build_component_marching_cubes_surface(
     return positions, np.asarray(faces, dtype=np.uint32), metadata
 
 
+def build_vertex_neighbors(face_indices: np.ndarray, vertex_count: int) -> list[np.ndarray]:
+    neighbors: list[set[int]] = [set() for _ in range(vertex_count)]
+
+    for a, b, c in np.asarray(face_indices, dtype=np.int64):
+        ai = int(a)
+        bi = int(b)
+        ci = int(c)
+        neighbors[ai].update((bi, ci))
+        neighbors[bi].update((ai, ci))
+        neighbors[ci].update((ai, bi))
+
+    return [
+        np.asarray(sorted(vertex_neighbors), dtype=np.int32)
+        for vertex_neighbors in neighbors
+    ]
+
+
+def laplacian_smooth_positions(
+    positions: np.ndarray,
+    neighbors: list[np.ndarray],
+    step: float,
+) -> np.ndarray:
+    current = np.asarray(positions, dtype=np.float32)
+    next_positions = current.copy()
+
+    for vertex_index, vertex_neighbors in enumerate(neighbors):
+        if vertex_neighbors.size == 0:
+            continue
+        neighbor_mean = np.mean(current[vertex_neighbors], axis=0)
+        next_positions[vertex_index] = current[vertex_index] + step * (
+            neighbor_mean - current[vertex_index]
+        )
+
+    return next_positions
+
+
+def taubin_smooth_mesh(
+    positions: np.ndarray,
+    face_indices: np.ndarray,
+    iterations: int,
+    lambda_step: float,
+    mu_step: float,
+) -> np.ndarray:
+    if iterations <= 0 or positions.shape[0] == 0 or face_indices.shape[0] == 0:
+        return np.asarray(positions, dtype=np.float32)
+
+    neighbors = build_vertex_neighbors(face_indices, positions.shape[0])
+    smoothed = np.asarray(positions, dtype=np.float32)
+
+    for _ in range(iterations):
+        smoothed = laplacian_smooth_positions(smoothed, neighbors, lambda_step)
+        smoothed = laplacian_smooth_positions(smoothed, neighbors, mu_step)
+
+    return smoothed
+
+
 def append_quad(
     corners: list[tuple[int, int, int]],
     vertex_lookup: dict[tuple[int, int, int], int],
@@ -1162,6 +1281,9 @@ def build_component_surface(
     radius_lookup: np.ndarray,
     gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
     geometry_mode: str = DEFAULT_GEOMETRY_MODE,
+    mesh_smoothing_iterations: int = 0,
+    mesh_smoothing_lambda: float = 0.45,
+    mesh_smoothing_mu: float = -0.47,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
     if geometry_mode == "voxel-faces":
         return build_component_voxel_surface(
@@ -1176,7 +1298,7 @@ def build_component_surface(
     if geometry_mode != "marching-cubes":
         raise ValueError(f"Unsupported geometry mode: {geometry_mode}")
 
-    return build_component_marching_cubes_surface(
+    surface = build_component_marching_cubes_surface(
         component_mask=component_mask,
         field=field,
         pressure_levels=pressure_levels,
@@ -1185,6 +1307,18 @@ def build_component_surface(
         radius_lookup=radius_lookup,
         gaussian_sigma=gaussian_sigma,
     )
+    if surface is None:
+        return None
+
+    positions, faces, metadata = surface
+    smoothed_positions = taubin_smooth_mesh(
+        positions=positions,
+        face_indices=faces,
+        iterations=mesh_smoothing_iterations,
+        lambda_step=mesh_smoothing_lambda,
+        mu_step=mesh_smoothing_mu,
+    )
+    return smoothed_positions, faces, metadata
 
 
 GridPoint = tuple[int, int]
@@ -1362,6 +1496,9 @@ def build_timestamp_payload(
     closing_radius_cells: int = DEFAULT_CLOSING_RADIUS_CELLS,
     opening_radius_cells: int = DEFAULT_OPENING_RADIUS_CELLS,
     geometry_mode: str = DEFAULT_GEOMETRY_MODE,
+    mesh_smoothing_iterations: int = 0,
+    mesh_smoothing_lambda: float = 0.45,
+    mesh_smoothing_mu: float = -0.47,
     write_footprints: bool = True,
     processed_mask: np.ndarray | None = None,
     component_masks: list[np.ndarray] | None = None,
@@ -1411,6 +1548,9 @@ def build_timestamp_payload(
             radius_lookup=radius_lookup,
             gaussian_sigma=gaussian_sigma,
             geometry_mode=geometry_mode,
+            mesh_smoothing_iterations=mesh_smoothing_iterations,
+            mesh_smoothing_lambda=mesh_smoothing_lambda,
+            mesh_smoothing_mu=mesh_smoothing_mu,
         )
         if surface is None:
             continue
@@ -1570,6 +1710,10 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
     dataset = xr.open_dataset(config.dataset_path, chunks={})
     raw_dataset = netCDF4.Dataset(config.dataset_path, mode="r")
     try:
+        effective_geometry_mode = resolve_geometry_mode(
+            config.segmentation_mode,
+            config.geometry_mode,
+        )
         specific_humidity = dataset[DATASET_VARIABLE]
         specific_humidity_var = raw_dataset.variables[DATASET_VARIABLE]
         pressure_levels = np.asarray(dataset.coords["pressure_level"].values, dtype=np.float32)
@@ -1579,6 +1723,11 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             timestamp_to_iso_minute(value)
             for value in np.asarray(dataset.coords["valid_time"].values)
         ]
+        allowed_timestamps = (
+            {timestamp for timestamp in config.include_timestamps}
+            if config.include_timestamps
+            else None
+        )
 
         print(
             f"Preparing segmentation recipe {config.segmentation_mode}...",
@@ -1614,6 +1763,8 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
             for local_index in range(window.shape[0]):
                 absolute_index = start + local_index
                 timestamp = timestamps[absolute_index]
+                if allowed_timestamps is not None and timestamp not in allowed_timestamps:
+                    continue
                 print(f"Building {timestamp}...", flush=True)
                 field = downsample_lat_lon_values(
                     window[local_index],
@@ -1648,7 +1799,10 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                     gaussian_sigma=config.gaussian_sigma,
                     closing_radius_cells=config.closing_radius_cells,
                     opening_radius_cells=config.opening_radius_cells,
-                    geometry_mode=config.geometry_mode,
+                    geometry_mode=effective_geometry_mode,
+                    mesh_smoothing_iterations=config.mesh_smoothing_iterations,
+                    mesh_smoothing_lambda=config.mesh_smoothing_lambda,
+                    mesh_smoothing_mu=config.mesh_smoothing_mu,
                     write_footprints=config.write_footprints,
                     processed_mask=processed_mask,
                     component_masks=component_masks,
@@ -1657,10 +1811,16 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 entry = write_timestamp_assets(config.output_dir, timestamp, payload)
                 entries.append(entry)
                 processed_count += 1
+                if allowed_timestamps is not None:
+                    allowed_timestamps.discard(timestamp)
+                    if not allowed_timestamps:
+                        break
 
                 if config.limit_timestamps is not None and processed_count >= config.limit_timestamps:
                     break
 
+            if allowed_timestamps is not None and not allowed_timestamps:
+                break
             if config.limit_timestamps is not None and processed_count >= config.limit_timestamps:
                 break
 
@@ -1682,7 +1842,12 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 },
                 "recipe": segmentation_context.recipe_metadata,
             },
-            "geometry_mode": config.geometry_mode,
+            "geometry_mode": effective_geometry_mode,
+            "mesh_postprocess": {
+                "iterations": config.mesh_smoothing_iterations,
+                "lambda": config.mesh_smoothing_lambda,
+                "mu": config.mesh_smoothing_mu,
+            },
             "globe": {
                 "base_radius": config.base_radius,
                 "vertical_span": config.vertical_span,

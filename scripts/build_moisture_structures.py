@@ -104,6 +104,30 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional cap on the number of timestamps to process. Useful for quick smoke tests.",
     )
+    parser.add_argument(
+        "--include-timestamps",
+        type=str,
+        default="",
+        help="Comma-separated ISO minute timestamps to build, for example 2021-11-08T12:00.",
+    )
+    parser.add_argument(
+        "--mesh-smoothing-iterations",
+        type=int,
+        default=0,
+        help="Number of Taubin mesh smoothing iterations applied after marching cubes.",
+    )
+    parser.add_argument(
+        "--mesh-smoothing-lambda",
+        type=float,
+        default=0.45,
+        help="Taubin smoothing lambda step.",
+    )
+    parser.add_argument(
+        "--mesh-smoothing-mu",
+        type=float,
+        default=-0.47,
+        help="Taubin smoothing mu step.",
+    )
     return parser.parse_args()
 
 
@@ -124,6 +148,15 @@ def main() -> None:
         segmentation_mode=args.segmentation_mode,
         write_footprints=args.write_footprints,
         limit_timestamps=args.limit_timestamps,
+        include_timestamps=tuple(
+            value.strip()
+            for value in args.include_timestamps.split(",")
+            if value.strip()
+        )
+        or None,
+        mesh_smoothing_iterations=args.mesh_smoothing_iterations,
+        mesh_smoothing_lambda=args.mesh_smoothing_lambda,
+        mesh_smoothing_mu=args.mesh_smoothing_mu,
     )
     manifest = build_assets(config)
     print(

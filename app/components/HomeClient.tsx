@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import SidebarPane from "./sidebar/SidebarPane";
-import LayerInfoPane from "./sidebar/LayerInfoPane";
 import DataNoticeOverlay from "./DataNoticeOverlay";
 import { useViewerStore } from "../state/viewerStore";
 
@@ -47,6 +46,11 @@ const ExampleParticleLayer = dynamic(
 const TimeSlider = dynamic(() => import("./TimeSlider"), {
   ssr: false,
   loading: () => <div style={{ height: "100%" }} />,
+});
+
+const LayerInfoPane = dynamic(() => import("./sidebar/LayerInfoPane"), {
+  ssr: false,
+  loading: () => <div style={{ width: "100%", height: "100%" }} />,
 });
 
 export default function HomeClient() {

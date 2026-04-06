@@ -15,25 +15,46 @@ import {
 function buildBaseState(): MoistureStructureLayerState {
   return {
     visible: true,
-    opacity: 0.78,
+    opacity: 0.95,
     verticalExaggeration: 4,
-    cameraCutawayEnabled: true,
+    cameraCutawayEnabled: false,
     cameraCutawayRadius: 40,
-    visualPreset: "fullPop",
+    visualPreset: "solidShell",
     structurePreset: "componentRead",
-    ...getMoistureVisualPresetState("fullPop"),
+    ...getMoistureVisualPresetState("solidShell"),
     ...getMoistureStructurePresetState("componentRead"),
     selectedComponentId: null,
     componentSort: "size",
     visibleBucketIndices: DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
     legibilityExperiment: "none",
+    surfaceCueMode: "none",
+    surfaceBrightness: 1,
+    surfaceShadowStrength: 1,
   };
 }
 
 describe("resolveMoistureStructureLayerState", () => {
-  test("the controls store defaults to the bridge-pruned legibility mode", () => {
+  test("the controls store defaults to the neutral lit solid-shell baseline", () => {
     expect(useControls.getState().moistureStructureLayer.legibilityExperiment).toBe(
       "bridgePruned"
+    );
+    expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
+      2.35
+    );
+    expect(useControls.getState().moistureStructureLayer.structurePreset).toBe(
+      "currentDepth"
+    );
+    expect(useControls.getState().moistureStructureLayer.surfaceCueMode).toBe(
+      "none"
+    );
+    expect(useControls.getState().moistureStructureLayer.surfaceBrightness).toBe(
+      1
+    );
+    expect(
+      useControls.getState().moistureStructureLayer.surfaceShadowStrength
+    ).toBe(1);
+    expect(useControls.getState().moistureStructureLayer.cameraCutawayEnabled).toBe(
+      false
     );
     expect(useControls.getState().moistureStructureLayer.segmentationMode).toBe(
       BRIDGE_PRUNED_SEGMENTATION_MODE
@@ -58,6 +79,7 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(resolved.solidShellEnabled).toBe(true);
     expect(resolved.distanceFadeEnabled).toBe(false);
     expect(resolved.interiorBackfaceEnabled).toBe(false);
+    expect(resolved.opacity).toBeGreaterThanOrEqual(0.95);
     expect(resolved.frontOpacity).toBeGreaterThanOrEqual(1.5);
     expect(resolved.backfaceOpacity).toBe(0);
   });
@@ -83,6 +105,7 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(resolved.solidShellEnabled).toBe(true);
     expect(resolved.distanceFadeEnabled).toBe(false);
     expect(resolved.interiorBackfaceEnabled).toBe(false);
+    expect(resolved.opacity).toBeGreaterThanOrEqual(0.95);
     expect(resolved.frontOpacity).toBeGreaterThanOrEqual(1.5);
     expect(resolved.backfaceOpacity).toBe(0);
   });
@@ -98,6 +121,7 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(resolved.solidShellEnabled).toBe(true);
     expect(resolved.distanceFadeEnabled).toBe(false);
     expect(resolved.interiorBackfaceEnabled).toBe(false);
+    expect(resolved.opacity).toBeGreaterThanOrEqual(0.95);
     expect(resolved.frontOpacity).toBeGreaterThanOrEqual(1.5);
     expect(resolved.backfaceOpacity).toBe(0);
     expect(resolved.keyLightIntensity).toBeLessThanOrEqual(0.72);
