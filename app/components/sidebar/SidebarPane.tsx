@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import ControlsHelp from "./ControlsHelp";
 import ExplainerCard from "./ExplainerCard";
+import LayerVisibilityPane from "./LayerVisibilityPane";
 
 const DevViewerPane = dynamic(() => import("./DevViewerPane"), {
   ssr: false,
@@ -43,6 +44,7 @@ export default function SidebarPane() {
         <ExplainerCard />
         <ControlsHelp />
         <DevViewerPane />
+        <LayerVisibilityPane />
         <TweakpaneControls />
       </div>
     </aside>

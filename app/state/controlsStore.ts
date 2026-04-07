@@ -37,6 +37,14 @@ export const EXAMPLE_PARTICLE_PRESSURE_OPTIONS = [
 export type ExampleParticlePressure =
   (typeof EXAMPLE_PARTICLE_PRESSURE_OPTIONS)[number]["value"];
 
+export const RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS = [
+  { value: "pressureBands", label: "Pressure Bands" },
+  { value: "solidAqua", label: "Solid Aqua" },
+] as const;
+
+export type RelativeHumidityColorMode =
+  (typeof RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS)[number]["value"];
+
 export const MOISTURE_VISUAL_PRESET_OPTIONS = [
   { value: "none", label: "None" },
   { value: "baseline", label: "Baseline" },
@@ -96,6 +104,7 @@ export const MOISTURE_SEGMENTATION_MODE_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { value: "p95-close", label: "Bridge Pruned Baseline" },
+  { value: "simple-voxel-shell", label: "Simple Voxel Shell" },
   { value: "p95-close-voxel-shell", label: "Bridge Pruned Voxel Shell" },
   { value: "p95-smooth-open1-voxel-shell", label: "Smoothed Support Voxel Shell" },
   { value: "p95-close-smoothmesh", label: "Bridge Pruned Smoothed Mesh" },
@@ -160,6 +169,17 @@ type ExampleContoursLayerState = {
 
 type ExampleParticleLayerState = {
   pressureLevel: ExampleParticlePressure;
+};
+
+type PrecipitationRadarLayerState = {
+  visible: boolean;
+  opacity: number;
+};
+
+type RelativeHumidityLayerState = {
+  visible: boolean;
+  opacity: number;
+  colorMode: RelativeHumidityColorMode;
 };
 
 export type MoistureStructureLayerState = {
@@ -445,6 +465,9 @@ export function moistureSegmentationModeLabel(
   if (segmentationMode === "p95-open") {
     return "Legacy p95 Open";
   }
+  if (segmentationMode === "simple-voxel-shell") {
+    return "Simple Voxel Shell";
+  }
   if (segmentationMode === "p95-close-voxel-shell") {
     return "Bridge Pruned Voxel Shell";
   }
@@ -530,6 +553,8 @@ export const EXAMPLE_LAYER_PRESETS = {
 type ControlsState = {
   moistureStructureLayer: MoistureStructureLayerState;
   moistureStructureFrame: MoistureSidebarFrameState;
+  precipitationRadarLayer: PrecipitationRadarLayerState;
+  relativeHumidityLayer: RelativeHumidityLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
   exampleParticleLayer: ExampleParticleLayerState;
@@ -545,6 +570,10 @@ type ControlsState = {
   ) => void;
   resetMoistureLegibilityExperiment: () => void;
   setMoistureStructureFrame: (frame: MoistureSidebarFrameState) => void;
+  setPrecipitationRadarLayer: (
+    patch: Partial<PrecipitationRadarLayerState>
+  ) => void;
+  setRelativeHumidityLayer: (patch: Partial<RelativeHumidityLayerState>) => void;
   setExampleShaderMeshLayer: (
     patch: Partial<ExampleShaderMeshLayerState>
   ) => void;
@@ -573,6 +602,15 @@ export const useControls = create<ControlsState>()(
       surfaceShadowStrength: 1,
     },
     moistureStructureFrame: null,
+    precipitationRadarLayer: {
+      visible: false,
+      opacity: 0.92,
+    },
+    relativeHumidityLayer: {
+      visible: false,
+      opacity: 0.9,
+      colorMode: "pressureBands",
+    },
     // Defaults keep the examples hidden from the UI. Use EXAMPLE_LAYER_PRESETS
     // in code when you want to turn one on for local experimentation.
     exampleShaderMeshLayer: {
@@ -648,6 +686,20 @@ export const useControls = create<ControlsState>()(
     setMoistureStructureFrame: (frame) =>
       set(() => ({
         moistureStructureFrame: frame,
+      })),
+    setPrecipitationRadarLayer: (patch) =>
+      set((state) => ({
+        precipitationRadarLayer: {
+          ...state.precipitationRadarLayer,
+          ...patch,
+        },
+      })),
+    setRelativeHumidityLayer: (patch) =>
+      set((state) => ({
+        relativeHumidityLayer: {
+          ...state.relativeHumidityLayer,
+          ...patch,
+        },
       })),
     setExampleShaderMeshLayer: (patch) =>
       set((state) => ({

@@ -19,6 +19,22 @@ const MoistureStructureLayer = dynamic(
   }
 );
 
+const RelativeHumidityVoxelLayer = dynamic(
+  () => import("./layers/RelativeHumidityVoxelLayer"),
+  {
+    ssr: false,
+    loading: () => <div style={{ width: "100%", height: "100%" }} />,
+  }
+);
+
+const PrecipitationRadarLayer = dynamic(
+  () => import("./layers/PrecipitationRadarLayer"),
+  {
+    ssr: false,
+    loading: () => <div style={{ width: "100%", height: "100%" }} />,
+  }
+);
+
 const ExampleShaderMeshLayer = dynamic(
   () => import("./layers/ExampleShaderMeshLayer"),
   {
@@ -107,7 +123,9 @@ export default function HomeClient() {
             if (timestamp === datehour) setAllReady(ready);
           }}
         >
+          <PrecipitationRadarLayer />
           <MoistureStructureLayer />
+          <RelativeHumidityVoxelLayer />
           <ExampleShaderMeshLayer />
           <ExampleContoursLayer />
           <ExampleParticleLayer heightTex={null} />
