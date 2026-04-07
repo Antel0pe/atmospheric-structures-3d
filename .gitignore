@@ -24,6 +24,8 @@ notes/
 # production
 /build
 /public/moisture-structures/
+/public/precipitation-radar/
+/public/relative-humidity-shell/
 
 # misc
 .DS_Store

@@ -20,6 +20,7 @@ function buildPublicDataUrl(...segments: string[]) {
 
 export type MoistureSegmentationMode =
   | "p95-close"
+  | "simple-voxel-shell"
   | "p95-close-voxel-shell"
   | "p95-smooth-open1-voxel-shell"
   | "p95-close-smoothmesh"
@@ -407,7 +408,15 @@ export async function fetchMoistureStructureFrame(
     segmentationMode,
     notifyOnError,
   });
-  const entry = manifest.timestamps.find((item) => item.timestamp === datehour);
+  let entry = manifest.timestamps.find((item) => item.timestamp === datehour);
+
+  if (!entry && segmentationMode === "simple-voxel-shell") {
+    const availableValues = manifest.timestamps.map((item) => item.timestamp);
+    const fallbackTimestamp = snapTimestampToAvailable(datehour, availableValues);
+    entry =
+      manifest.timestamps.find((item) => item.timestamp === fallbackTimestamp) ??
+      manifest.timestamps[0];
+  }
 
   if (!entry) {
     const error = moistureTimestampNotFoundError(datehour, manifest);

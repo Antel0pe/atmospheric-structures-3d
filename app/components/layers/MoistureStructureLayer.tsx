@@ -41,16 +41,17 @@ type MoistureShaderUniforms = {
 };
 
 type MoistureComponentVisual = {
-  frontMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial>;
-  backMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial>;
-  outlineMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
-  frontMaterial: THREE.MeshPhongMaterial;
-  backMaterial: THREE.MeshPhongMaterial;
-  outlineMaterial: THREE.MeshBasicMaterial;
+  frontMesh: THREE.Object3D;
+  backMesh: THREE.Object3D;
+  outlineMesh: THREE.Object3D;
+  frontMaterial: THREE.Material;
+  backMaterial: THREE.Material;
+  outlineMaterial: THREE.Material;
   opacityWeight: number;
   componentId: number;
   bucketIndex: number | null;
   componentColor: THREE.Color;
+  renderKind: "default" | "simpleVoxelShell";
 };
 
 type MoistureSlice = {
@@ -689,6 +690,25 @@ function createMoistureOutlineMaterial() {
   });
 }
 
+function buildSimpleVoxelShellGeometry(frame: MoistureStructureFrame) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(frame.positions, 3));
+  geometry.setIndex(new THREE.BufferAttribute(frame.indices, 1));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createSimpleVoxelShellMaterial() {
+  return new THREE.MeshBasicMaterial({
+    color: FRONT_TINT.clone(),
+    transparent: false,
+    opacity: 1,
+    depthWrite: true,
+    depthTest: true,
+    side: THREE.DoubleSide,
+  });
+}
+
 function buildSlice(
   frame: MoistureStructureFrame,
   style: MoistureLayerStyle,
@@ -705,7 +725,67 @@ function buildSlice(
   const opacityWeights = buildComponentOpacityWeights(frame);
   const baseRadius = frame.manifest.globe.base_radius;
   const bandScale = buildLevelBandScale(frame);
+  const simpleVoxelShell = style.segmentationMode === "simple-voxel-shell";
   const flatShading = frame.manifest.geometry_mode === "voxel-faces";
+
+  if (simpleVoxelShell) {
+    const component = frame.metadata.components[0];
+    if (component && frame.indices.length >= 3 && frame.positions.length >= 9) {
+      const geometry = buildSimpleVoxelShellGeometry(frame);
+      const frontMaterial = createSimpleVoxelShellMaterial();
+      const backMaterial = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const outlineMaterial = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+      });
+
+      const frontMesh = new THREE.Mesh(geometry, frontMaterial);
+      frontMesh.name = `moisture-component-${component.id}-simple-voxel-shell`;
+      frontMesh.renderOrder = FRONT_RENDER_ORDER;
+      frontMesh.frustumCulled = false;
+      frontMesh.userData.moistureComponentId = component.id;
+
+      const backMesh = new THREE.Group();
+      backMesh.visible = false;
+
+      const outlineMesh = new THREE.Group();
+      outlineMesh.visible = false;
+
+      group.add(frontMesh);
+
+      components.push({
+        outlineMesh,
+        frontMesh,
+        backMesh,
+        outlineMaterial,
+        frontMaterial,
+        backMaterial,
+        opacityWeight: 1,
+        componentId: component.id,
+        bucketIndex: component.bucket_index ?? null,
+        componentColor: componentColorForId(component.bucket_index ?? component.id),
+        renderKind: "simpleVoxelShell",
+      });
+      materials.push(outlineMaterial, frontMaterial, backMaterial);
+      geometries.push(geometry);
+    }
+
+    return {
+      group,
+      components,
+      materials,
+      geometries,
+      baseOpacity,
+      pressureBandCount: bandScale.levelColors.length,
+    };
+  }
 
   frame.metadata.components.forEach((component, index) => {
     if (component.vertex_count <= 0 || component.index_count < 3) return;
@@ -759,6 +839,7 @@ function buildSlice(
       componentId: component.id,
       bucketIndex: component.bucket_index ?? null,
       componentColor,
+      renderKind: "default",
     });
     materials.push(outlineMaterial, frontMaterial, backMaterial);
     geometries.push(geometry);
@@ -797,7 +878,10 @@ function applySliceRenderStyle(
 ) {
   if (!slice) return;
 
-  const frontDepthWrite = style.solidShellEnabled && !isTransitioning;
+  const simpleVoxelShell = style.segmentationMode === "simple-voxel-shell";
+
+  const frontDepthWrite =
+    simpleVoxelShell || (style.solidShellEnabled && !isTransitioning);
   const frontEmissiveIntensity = style.lightingEnabled
     ? 0.025
     : style.solidShellEnabled
@@ -805,7 +889,9 @@ function applySliceRenderStyle(
       : 0.56;
   const frontShininess = style.lightingEnabled ? 58 : 40;
   const showBackfaces =
-    !style.solidShellEnabled || style.interiorBackfaceEnabled;
+    simpleVoxelShell
+      ? false
+      : !style.solidShellEnabled || style.interiorBackfaceEnabled;
   const backDarkened = style.solidShellEnabled && style.interiorBackfaceEnabled;
   const matteShellFirst =
     style.legibilityExperiment === "bridgePrunedShellFirstMatte";
@@ -871,62 +957,90 @@ function applySliceRenderStyle(
       1
     );
     const opaqueFrontPreferred =
-      frontDepthWrite &&
+      (simpleVoxelShell || frontDepthWrite) &&
       !style.distanceFadeEnabled &&
       nonSelectedMultiplier >= 0.98 &&
       frontAlpha >= 0.94;
     const outlineVisible =
+      !simpleVoxelShell &&
       style.solidShellEnabled &&
       !style.interiorBackfaceEnabled &&
       frontAlpha > 0.001;
+
+    if (component.renderKind === "simpleVoxelShell") {
+      const frontMaterial = component.frontMaterial as THREE.MeshBasicMaterial;
+      component.outlineMesh.visible = false;
+      component.backMesh.visible = false;
+      component.frontMesh.visible = frontAlpha > 0.001;
+      frontMaterial.color.copy(FRONT_TINT);
+      frontMaterial.opacity = frontAlpha;
+      frontMaterial.transparent = frontAlpha < 0.999;
+      frontMaterial.depthWrite = true;
+      frontMaterial.depthTest = true;
+      frontMaterial.side = THREE.DoubleSide;
+      continue;
+    }
 
     component.outlineMesh.visible = outlineVisible;
     component.frontMesh.visible = frontAlpha > 0.001;
     component.backMesh.visible = showBackfaces && backAlpha > 0.001;
 
-    component.outlineMaterial.opacity = outlineVisible
+    const outlineMaterial = component.outlineMaterial as THREE.MeshBasicMaterial;
+    const frontMaterial = component.frontMaterial as THREE.MeshPhongMaterial;
+    const backMaterial = component.backMaterial as THREE.MeshPhongMaterial;
+
+    outlineMaterial.opacity = outlineVisible
       ? THREE.MathUtils.clamp(0.04 + frontAlpha * 0.1, 0, 0.14)
       : 0;
-    component.outlineMaterial.color.copy(OUTLINE_TINT);
+    outlineMaterial.color.copy(OUTLINE_TINT);
 
     updateTransparentMode(
-      component.frontMaterial,
+      frontMaterial,
       !opaqueFrontPreferred && (frontAlpha < 0.999 || style.distanceFadeEnabled)
     );
-    component.frontMaterial.opacity = opaqueFrontPreferred ? 1 : frontAlpha;
-    component.frontMaterial.depthWrite = frontDepthWrite;
-    component.frontMaterial.depthTest = true;
-    component.frontMaterial.color.copy(FRONT_TINT);
-    component.frontMaterial.emissive.copy(MOISTURE_EMISSIVE);
-    component.frontMaterial.emissiveIntensity = frontEmissiveIntensity;
-    component.frontMaterial.specular.copy(FRONT_SPECULAR);
-    component.frontMaterial.shininess = matteSolidShell
+    frontMaterial.opacity = opaqueFrontPreferred ? 1 : frontAlpha;
+    frontMaterial.depthWrite = frontDepthWrite;
+    frontMaterial.depthTest = true;
+    frontMaterial.color.copy(FRONT_TINT);
+    frontMaterial.emissive.copy(MOISTURE_EMISSIVE);
+    frontMaterial.emissiveIntensity = frontEmissiveIntensity;
+    frontMaterial.specular.copy(FRONT_SPECULAR);
+    frontMaterial.shininess = matteSolidShell
       ? style.lightingEnabled
         ? 8
         : 8
       : frontShininess;
-    component.frontMaterial.specular.multiplyScalar(
+    frontMaterial.specular.multiplyScalar(
       matteSolidShell ? 0.03 : style.lightingEnabled ? 0.08 : 0.12
     );
 
-    updateTransparentMode(component.backMaterial, true);
-    component.backMaterial.opacity = backAlpha;
-    component.backMaterial.depthWrite = false;
-    component.backMaterial.depthTest = true;
-    component.backMaterial.color.copy(backDarkened ? INTERIOR_TINT : FRONT_TINT);
-    component.backMaterial.emissive.copy(MOISTURE_EMISSIVE);
-    component.backMaterial.emissiveIntensity = backDarkened
+    if (simpleVoxelShell) {
+      updateTransparentMode(frontMaterial, frontAlpha < 0.999);
+      frontMaterial.opacity = frontAlpha;
+      frontMaterial.depthWrite = true;
+      frontMaterial.depthTest = true;
+      frontMaterial.shininess = 8;
+      frontMaterial.specular.setScalar(0.05);
+    }
+
+    updateTransparentMode(backMaterial, true);
+    backMaterial.opacity = backAlpha;
+    backMaterial.depthWrite = false;
+    backMaterial.depthTest = true;
+    backMaterial.color.copy(backDarkened ? INTERIOR_TINT : FRONT_TINT);
+    backMaterial.emissive.copy(MOISTURE_EMISSIVE);
+    backMaterial.emissiveIntensity = backDarkened
       ? 0.04
       : frontEmissiveIntensity;
-    component.backMaterial.specular.copy(backDarkened ? BACK_SPECULAR : FRONT_SPECULAR);
-    component.backMaterial.shininess = matteSolidShell
+    backMaterial.specular.copy(backDarkened ? BACK_SPECULAR : FRONT_SPECULAR);
+    backMaterial.shininess = matteSolidShell
       ? backDarkened
         ? 8
         : 10
       : backDarkened
         ? 18
         : frontShininess;
-    component.backMaterial.specular.multiplyScalar(
+    backMaterial.specular.multiplyScalar(
       matteSolidShell ? (backDarkened ? 0.08 : 0.05) : 0.12
     );
   }
@@ -941,11 +1055,14 @@ function applySliceCameraState(
   if (!slice) return;
   const pressureBandCount = Math.max(slice.pressureBandCount, 1);
   for (const component of slice.components) {
+    if (component.renderKind === "simpleVoxelShell") {
+      continue;
+    }
     const isSelected =
       style.selectedComponentId !== null &&
       component.componentId === style.selectedComponentId;
     setMoistureShaderUniforms(
-      component.frontMaterial,
+      component.frontMaterial as THREE.MeshPhongMaterial,
       cameraPosition,
       cameraDirection,
       style,
@@ -958,7 +1075,7 @@ function applySliceCameraState(
       }
     );
     setMoistureShaderUniforms(
-      component.backMaterial,
+      component.backMaterial as THREE.MeshPhongMaterial,
       cameraPosition,
       cameraDirection,
       style,
