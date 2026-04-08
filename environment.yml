@@ -13,6 +13,7 @@ dependencies:
   - imageio
   - tqdm
   - matplotlib
+  - pytest
   - cartopy
   - scikit-image
   - metpy
