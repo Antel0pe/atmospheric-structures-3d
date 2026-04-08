@@ -3,6 +3,12 @@ import type {
   SavedViewRecord,
   ViewerNavigationCommand,
 } from "./viewerTypes";
+import type {
+  NormalizedScreenTarget,
+  ViewDebugCase,
+  ViewDebugCaseInput,
+  ViewDebugLayerStateSnapshot,
+} from "./viewDebug";
 import type { MoistureLegibilityExperiment } from "../state/controlsStore";
 import type { MoistureSegmentationMode } from "../components/utils/ApiResponses";
 
@@ -167,6 +173,28 @@ export type ViewerAutomationDescribeResult = {
   snapshot: ViewerAutomationSnapshot;
 };
 
+export type ViewerAutomationDebugState = {
+  version: 1;
+  timestamp: string;
+  ready: boolean;
+  paused: boolean;
+  zoom01: number;
+  earthView: EarthViewState | null;
+  layerState: ViewDebugLayerStateSnapshot;
+  analyzers: Record<string, unknown>;
+  savedViews: SavedViewRecord[];
+};
+
+export type ViewerAutomationHitTestRequest = {
+  analyzer: string;
+  target: NormalizedScreenTarget;
+};
+
+export type ViewerAutomationSelectionRequest = {
+  analyzer: string;
+  targetId: unknown;
+};
+
 export type ViewerAutomationApi = {
   enabled: boolean;
   readonly paused: boolean;
@@ -177,6 +205,8 @@ export type ViewerAutomationApi = {
   capturePngDataUrl: () => string | null;
   describe: () => ViewerAutomationDescribeResult;
   getSnapshot: () => ViewerAutomationSnapshot;
+  getViewDebugState: () => ViewerAutomationDebugState;
+  buildViewDebugCase: (input: ViewDebugCaseInput) => ViewDebugCase;
   waitForReady: (timeoutMs?: number) => Promise<ViewerAutomationSnapshot>;
   ensureLayersSidebarOpen: () => Promise<boolean>;
   runNavigationCommand: (
@@ -194,6 +224,16 @@ export type ViewerAutomationApi = {
     input: ViewerAutomationViewInput,
     timeoutMs?: number
   ) => Promise<ViewerAutomationSnapshot>;
+  applyViewDebugCase: (
+    debugCase: ViewDebugCase,
+    timeoutMs?: number
+  ) => Promise<ViewerAutomationDebugState>;
+  hitTestDebugTarget: (
+    request: ViewerAutomationHitTestRequest
+  ) => Promise<unknown>;
+  selectDebugTarget: (
+    request: ViewerAutomationSelectionRequest
+  ) => Promise<unknown>;
   setMoistureLegibilityExperiment: (
     experiment: MoistureLegibilityExperiment,
     timeoutMs?: number

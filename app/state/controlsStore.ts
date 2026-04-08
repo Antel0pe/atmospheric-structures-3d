@@ -151,7 +151,7 @@ export const MOISTURE_SURFACE_CUE_OPTIONS = [
 export type MoistureSurfaceCueMode =
   (typeof MOISTURE_SURFACE_CUE_OPTIONS)[number]["value"];
 
-type ExampleShaderMeshLayerState = {
+export type ExampleShaderMeshLayerState = {
   pressureLevel: ExampleShaderMeshPressure;
   uValueMin: number;
   uValueMax: number;
@@ -161,22 +161,22 @@ type ExampleShaderMeshLayerState = {
   uAsinhK: number;
 };
 
-type ExampleContoursLayerState = {
+export type ExampleContoursLayerState = {
   pressureLevel: ExampleContoursPressure;
   contrast: number;
   opacity: number;
 };
 
-type ExampleParticleLayerState = {
+export type ExampleParticleLayerState = {
   pressureLevel: ExampleParticlePressure;
 };
 
-type PrecipitationRadarLayerState = {
+export type PrecipitationRadarLayerState = {
   visible: boolean;
   opacity: number;
 };
 
-type RelativeHumidityLayerState = {
+export type RelativeHumidityLayerState = {
   visible: boolean;
   opacity: number;
   colorMode: RelativeHumidityColorMode;

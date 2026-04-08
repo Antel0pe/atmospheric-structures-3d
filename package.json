@@ -7,7 +7,8 @@
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "eslint",
-    "capture:webgl": "node skills/playwright-local-webgl-capture/scripts/capture_local_webgl.mjs"
+    "capture:webgl": "node skills/playwright-local-webgl-capture/scripts/capture_local_webgl.mjs",
+    "debug:view": "node skills/view-debug-framework/scripts/run_view_debug_case.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "1.6.1",
