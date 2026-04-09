@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import shutil
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,8 @@ class BuildConfig:
     mesh_smoothing_iterations: int = 0
     mesh_smoothing_lambda: float = 0.45
     mesh_smoothing_mu: float = -0.47
+    mesh_island_min_vertices: int = 0
+    voxel_exterior_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -527,10 +530,14 @@ def prepare_segmentation_context(
                     "iterations": config.mesh_smoothing_iterations,
                     "lambda": config.mesh_smoothing_lambda,
                     "mu": config.mesh_smoothing_mu,
+                    "island_min_vertices": config.mesh_island_min_vertices,
                 }
             }
             if mode == GEOMETRY_SMOOTHED_SEGMENTATION_MODE
-            else {"geometry_variant": "voxel-shell"}
+            else {
+                "geometry_variant": "voxel-shell",
+                "voxel_exterior_only": config.voxel_exterior_only,
+            }
             if mode == VOXEL_SHELL_SEGMENTATION_MODE
             else {}
         )
@@ -1119,6 +1126,59 @@ def taubin_smooth_mesh(
     return smoothed
 
 
+def prune_small_mesh_islands(
+    positions: np.ndarray,
+    face_indices: np.ndarray,
+    min_vertices: int = 0,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    if min_vertices <= 0:
+        return np.asarray(positions, dtype=np.float32), np.asarray(face_indices, dtype=np.uint32)
+    if positions.shape[0] == 0 or face_indices.shape[0] == 0:
+        return None
+
+    neighbors = build_vertex_neighbors(face_indices, positions.shape[0])
+    seen = np.zeros(positions.shape[0], dtype=bool)
+    keep_mask = np.zeros(positions.shape[0], dtype=bool)
+
+    for start_index in range(positions.shape[0]):
+        if seen[start_index]:
+            continue
+
+        stack = [start_index]
+        seen[start_index] = True
+        island_vertices: list[int] = []
+
+        while stack:
+            vertex_index = stack.pop()
+            island_vertices.append(vertex_index)
+            for neighbor_index in neighbors[vertex_index]:
+                neighbor_int = int(neighbor_index)
+                if seen[neighbor_int]:
+                    continue
+                seen[neighbor_int] = True
+                stack.append(neighbor_int)
+
+        if len(island_vertices) >= min_vertices:
+            keep_mask[np.asarray(island_vertices, dtype=np.int32)] = True
+
+    if not keep_mask.any():
+        return None
+
+    kept_faces_mask = keep_mask[face_indices].all(axis=1)
+    kept_faces = np.asarray(face_indices[kept_faces_mask], dtype=np.uint32)
+    if kept_faces.shape[0] == 0:
+        return None
+
+    kept_vertices = np.flatnonzero(keep_mask)
+    remap = np.full(positions.shape[0], -1, dtype=np.int32)
+    remap[kept_vertices] = np.arange(kept_vertices.size, dtype=np.int32)
+
+    return (
+        np.asarray(positions[kept_vertices], dtype=np.float32),
+        np.asarray(remap[kept_faces], dtype=np.uint32),
+    )
+
+
 def append_quad(
     corners: list[tuple[int, int, int]],
     vertex_lookup: dict[tuple[int, int, int], int],
@@ -1157,6 +1217,66 @@ def append_quad(
     )
 
 
+def exterior_empty_mask(mask: np.ndarray) -> np.ndarray:
+    padded_mask = np.pad(np.asarray(mask, dtype=bool), 1, constant_values=False)
+    exterior = np.zeros_like(padded_mask, dtype=bool)
+    queue: deque[tuple[int, int, int]] = deque()
+
+    max_level, max_latitude, max_longitude = (
+        padded_mask.shape[0] - 1,
+        padded_mask.shape[1] - 1,
+        padded_mask.shape[2] - 1,
+    )
+
+    def push_if_exterior(level_index: int, latitude_index: int, longitude_index: int) -> None:
+        if padded_mask[level_index, latitude_index, longitude_index]:
+            return
+        if exterior[level_index, latitude_index, longitude_index]:
+            return
+        exterior[level_index, latitude_index, longitude_index] = True
+        queue.append((level_index, latitude_index, longitude_index))
+
+    for level_index in range(padded_mask.shape[0]):
+        for latitude_index in range(padded_mask.shape[1]):
+            push_if_exterior(level_index, latitude_index, 0)
+            push_if_exterior(level_index, latitude_index, max_longitude)
+
+    for level_index in range(padded_mask.shape[0]):
+        for longitude_index in range(padded_mask.shape[2]):
+            push_if_exterior(level_index, 0, longitude_index)
+            push_if_exterior(level_index, max_latitude, longitude_index)
+
+    for latitude_index in range(padded_mask.shape[1]):
+        for longitude_index in range(padded_mask.shape[2]):
+            push_if_exterior(0, latitude_index, longitude_index)
+            push_if_exterior(max_level, latitude_index, longitude_index)
+
+    neighbor_offsets = (
+        (-1, 0, 0),
+        (1, 0, 0),
+        (0, -1, 0),
+        (0, 1, 0),
+        (0, 0, -1),
+        (0, 0, 1),
+    )
+
+    while queue:
+        level_index, latitude_index, longitude_index = queue.popleft()
+        for d_level, d_latitude, d_longitude in neighbor_offsets:
+            next_level = level_index + d_level
+            next_latitude = latitude_index + d_latitude
+            next_longitude = longitude_index + d_longitude
+            if not (
+                0 <= next_level <= max_level
+                and 0 <= next_latitude <= max_latitude
+                and 0 <= next_longitude <= max_longitude
+            ):
+                continue
+            push_if_exterior(next_level, next_latitude, next_longitude)
+
+    return exterior[1:-1, 1:-1, 1:-1]
+
+
 def build_component_voxel_surface(
     component_mask: np.ndarray,
     field: np.ndarray,
@@ -1164,6 +1284,7 @@ def build_component_voxel_surface(
     latitudes: np.ndarray,
     longitudes: np.ndarray,
     radius_lookup: np.ndarray,
+    exterior_only: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
     roll_start = choose_longitude_roll(component_mask)
     rolled_mask = np.roll(component_mask, -roll_start, axis=2)
@@ -1172,6 +1293,8 @@ def build_component_voxel_surface(
     cropped_mask, mins, maxs = crop_mask(rolled_mask, pad=0)
     if not bool(cropped_mask.any()):
         return None
+
+    exterior_mask = exterior_empty_mask(cropped_mask) if exterior_only else None
 
     radius_bounds = build_axis_bounds(radius_lookup.astype(np.float64))[mins[0] : maxs[0] + 1]
     latitude_bounds = build_axis_bounds(latitudes.astype(np.float64))[mins[1] : maxs[1] + 1]
@@ -1192,7 +1315,8 @@ def build_component_voxel_surface(
         o0 = int(longitude_index)
         o1 = o0 + 1
 
-        if r0 == 0 or not cropped_mask[r0 - 1, a0, o0]:
+        lower_exposed = r0 == 0 or not cropped_mask[r0 - 1, a0, o0]
+        if lower_exposed and (exterior_mask is None or (r0 > 0 and exterior_mask[r0 - 1, a0, o0]) or r0 == 0):
             append_quad(
                 [(r0, a0, o0), (r0, a1, o0), (r0, a1, o1), (r0, a0, o1)],
                 vertex_lookup,
@@ -1202,7 +1326,12 @@ def build_component_voxel_surface(
                 latitude_bounds,
                 longitude_bounds,
             )
-        if r0 == level_count - 1 or not cropped_mask[r0 + 1, a0, o0]:
+        upper_exposed = r0 == level_count - 1 or not cropped_mask[r0 + 1, a0, o0]
+        if upper_exposed and (
+            exterior_mask is None
+            or (r0 < level_count - 1 and exterior_mask[r0 + 1, a0, o0])
+            or r0 == level_count - 1
+        ):
             append_quad(
                 [(r1, a0, o0), (r1, a0, o1), (r1, a1, o1), (r1, a1, o0)],
                 vertex_lookup,
@@ -1212,7 +1341,8 @@ def build_component_voxel_surface(
                 latitude_bounds,
                 longitude_bounds,
             )
-        if a0 == 0 or not cropped_mask[r0, a0 - 1, o0]:
+        south_exposed = a0 == 0 or not cropped_mask[r0, a0 - 1, o0]
+        if south_exposed and (exterior_mask is None or (a0 > 0 and exterior_mask[r0, a0 - 1, o0]) or a0 == 0):
             append_quad(
                 [(r0, a0, o0), (r0, a0, o1), (r1, a0, o1), (r1, a0, o0)],
                 vertex_lookup,
@@ -1222,7 +1352,12 @@ def build_component_voxel_surface(
                 latitude_bounds,
                 longitude_bounds,
             )
-        if a0 == latitude_count - 1 or not cropped_mask[r0, a0 + 1, o0]:
+        north_exposed = a0 == latitude_count - 1 or not cropped_mask[r0, a0 + 1, o0]
+        if north_exposed and (
+            exterior_mask is None
+            or (a0 < latitude_count - 1 and exterior_mask[r0, a0 + 1, o0])
+            or a0 == latitude_count - 1
+        ):
             append_quad(
                 [(r0, a1, o0), (r1, a1, o0), (r1, a1, o1), (r0, a1, o1)],
                 vertex_lookup,
@@ -1232,7 +1367,8 @@ def build_component_voxel_surface(
                 latitude_bounds,
                 longitude_bounds,
             )
-        if o0 == 0 or not cropped_mask[r0, a0, o0 - 1]:
+        west_exposed = o0 == 0 or not cropped_mask[r0, a0, o0 - 1]
+        if west_exposed and (exterior_mask is None or (o0 > 0 and exterior_mask[r0, a0, o0 - 1]) or o0 == 0):
             append_quad(
                 [(r0, a0, o0), (r1, a0, o0), (r1, a1, o0), (r0, a1, o0)],
                 vertex_lookup,
@@ -1242,7 +1378,12 @@ def build_component_voxel_surface(
                 latitude_bounds,
                 longitude_bounds,
             )
-        if o0 == longitude_count - 1 or not cropped_mask[r0, a0, o0 + 1]:
+        east_exposed = o0 == longitude_count - 1 or not cropped_mask[r0, a0, o0 + 1]
+        if east_exposed and (
+            exterior_mask is None
+            or (o0 < longitude_count - 1 and exterior_mask[r0, a0, o0 + 1])
+            or o0 == longitude_count - 1
+        ):
             append_quad(
                 [(r0, a0, o1), (r0, a1, o1), (r1, a1, o1), (r1, a0, o1)],
                 vertex_lookup,
@@ -1284,29 +1425,32 @@ def build_component_surface(
     mesh_smoothing_iterations: int = 0,
     mesh_smoothing_lambda: float = 0.45,
     mesh_smoothing_mu: float = -0.47,
+    mesh_island_min_vertices: int = 0,
+    voxel_exterior_only: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
     if geometry_mode == "voxel-faces":
-        return build_component_voxel_surface(
+        surface = build_component_voxel_surface(
             component_mask=component_mask,
             field=field,
             pressure_levels=pressure_levels,
             latitudes=latitudes,
             longitudes=longitudes,
             radius_lookup=radius_lookup,
+            exterior_only=voxel_exterior_only,
         )
-
-    if geometry_mode != "marching-cubes":
+    elif geometry_mode == "marching-cubes":
+        surface = build_component_marching_cubes_surface(
+            component_mask=component_mask,
+            field=field,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+            gaussian_sigma=gaussian_sigma,
+        )
+    else:
         raise ValueError(f"Unsupported geometry mode: {geometry_mode}")
 
-    surface = build_component_marching_cubes_surface(
-        component_mask=component_mask,
-        field=field,
-        pressure_levels=pressure_levels,
-        latitudes=latitudes,
-        longitudes=longitudes,
-        radius_lookup=radius_lookup,
-        gaussian_sigma=gaussian_sigma,
-    )
     if surface is None:
         return None
 
@@ -1318,7 +1462,16 @@ def build_component_surface(
         lambda_step=mesh_smoothing_lambda,
         mu_step=mesh_smoothing_mu,
     )
-    return smoothed_positions, faces, metadata
+    pruned_surface = prune_small_mesh_islands(
+        positions=smoothed_positions,
+        face_indices=faces,
+        min_vertices=mesh_island_min_vertices,
+    )
+    if pruned_surface is None:
+        return None
+
+    pruned_positions, pruned_faces = pruned_surface
+    return pruned_positions, pruned_faces, metadata
 
 
 GridPoint = tuple[int, int]
@@ -1499,6 +1652,8 @@ def build_timestamp_payload(
     mesh_smoothing_iterations: int = 0,
     mesh_smoothing_lambda: float = 0.45,
     mesh_smoothing_mu: float = -0.47,
+    mesh_island_min_vertices: int = 0,
+    voxel_exterior_only: bool = False,
     write_footprints: bool = True,
     processed_mask: np.ndarray | None = None,
     component_masks: list[np.ndarray] | None = None,
@@ -1551,6 +1706,8 @@ def build_timestamp_payload(
             mesh_smoothing_iterations=mesh_smoothing_iterations,
             mesh_smoothing_lambda=mesh_smoothing_lambda,
             mesh_smoothing_mu=mesh_smoothing_mu,
+            mesh_island_min_vertices=mesh_island_min_vertices,
+            voxel_exterior_only=voxel_exterior_only,
         )
         if surface is None:
             continue
@@ -1803,6 +1960,8 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                     mesh_smoothing_iterations=config.mesh_smoothing_iterations,
                     mesh_smoothing_lambda=config.mesh_smoothing_lambda,
                     mesh_smoothing_mu=config.mesh_smoothing_mu,
+                    mesh_island_min_vertices=config.mesh_island_min_vertices,
+                    voxel_exterior_only=config.voxel_exterior_only,
                     write_footprints=config.write_footprints,
                     processed_mask=processed_mask,
                     component_masks=component_masks,
@@ -1847,7 +2006,9 @@ def build_assets(config: BuildConfig) -> dict[str, Any]:
                 "iterations": config.mesh_smoothing_iterations,
                 "lambda": config.mesh_smoothing_lambda,
                 "mu": config.mesh_smoothing_mu,
+                "island_min_vertices": config.mesh_island_min_vertices,
             },
+            "voxel_exterior_only": config.voxel_exterior_only,
             "globe": {
                 "base_radius": config.base_radius,
                 "vertical_span": config.vertical_span,

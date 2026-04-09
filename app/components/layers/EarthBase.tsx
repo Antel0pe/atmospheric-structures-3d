@@ -487,6 +487,7 @@ export default function EarthBase({
 
     const ambient = new THREE.AmbientLight(0xffffff, 2);
     scene.add(ambient);
+    const debugAdapters = debugAdaptersRef.current;
 
     const moistureLightTarget = new THREE.Object3D();
     moistureLightTarget.position.set(0, 0, 0);
@@ -1148,6 +1149,18 @@ export default function EarthBase({
         useControls.getState().setMoistureLegibilityExperiment(experiment);
         return waitForMoistureState(timeoutMs);
       },
+      async setMoistureVisualPreset(preset, timeoutMs = 90_000) {
+        if (useControls.getState().moistureStructureLayer.visualPreset === preset) {
+          return waitForMoistureState(timeoutMs);
+        }
+
+        useControls.getState().setMoistureVisualPreset(preset);
+        return waitForMoistureState(timeoutMs);
+      },
+      async setMoistureLayerPatch(patch, timeoutMs = 90_000) {
+        useControls.getState().setMoistureStructureLayer(patch);
+        return waitForMoistureState(timeoutMs);
+      },
       async resetMoistureLegibilityExperiment(timeoutMs = 90_000) {
         if (
           useControls.getState().moistureStructureLayer.legibilityExperiment ===
@@ -1272,7 +1285,7 @@ export default function EarthBase({
         host.removeChild(renderer.domElement);
       }
 
-      debugAdaptersRef.current.clear();
+      debugAdapters.clear();
       ambientLightRef.current = null;
       moistureKeyLightRef.current = null;
       moistureHeadLightRef.current = null;
