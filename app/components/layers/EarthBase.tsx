@@ -25,11 +25,23 @@ import type { EarthViewState } from "../../lib/viewerTypes";
 import {
   resolveMoistureStructureLayerState,
   useControls,
+  type ExampleContoursLayerState,
+  type ExampleParticleLayerState,
+  type ExampleShaderMeshLayerState,
   type MoistureLegibilityExperiment,
+  type MoistureStructureLayerState,
+  type PrecipitationRadarLayerState,
+  type RelativeHumidityLayerState,
 } from "../../state/controlsStore";
 import type { MoistureSegmentationMode } from "../utils/ApiResponses";
 import { useViewerStore } from "../../state/viewerStore";
 import { lookAtLatLon } from "../utils/EarthUtils";
+import type {
+  ViewDebugAnalyzerAdapter,
+  ViewDebugCase,
+  ViewDebugCaseInput,
+  ViewDebugLayerStateSnapshot,
+} from "../../lib/viewDebug";
 import {
   applyDiscreteNavigationCommand,
   applyMouseLookDelta,
@@ -68,6 +80,8 @@ export type EarthEngine = {
   allLayersReady: boolean;
   registerFramePass: (key: string, pass: FramePass) => void;
   unregisterFramePass: (key: string) => void;
+  registerDebugAdapter: (adapter: ViewDebugAnalyzerAdapter) => void;
+  unregisterDebugAdapter: (analyzer: string) => void;
   zoom01: number;
   setZoom01: (z: number) => void;
 };
@@ -160,6 +174,7 @@ export default function EarthBase({
   const readyLayersRef = useRef(new Map<string, string>());
   const registeredLayersRef = useRef(new Map<string, number>());
   const framePassesRef = useRef(new Map<string, FramePass>());
+  const debugAdaptersRef = useRef(new Map<string, ViewDebugAnalyzerAdapter>());
   const zoomCommitTimerRef = useRef<number | null>(null);
   const pendingZoomRef = useRef(0);
   const navigationPoseRef = useRef({ yaw: 0, pitch: 0 });
@@ -381,6 +396,14 @@ export default function EarthBase({
     framePassesRef.current.delete(key);
   }, []);
 
+  const registerDebugAdapter = useCallback((adapter: ViewDebugAnalyzerAdapter) => {
+    debugAdaptersRef.current.set(adapter.analyzer, adapter);
+  }, []);
+
+  const unregisterDebugAdapter = useCallback((analyzer: string) => {
+    debugAdaptersRef.current.delete(analyzer);
+  }, []);
+
   const setZoom01 = useCallback(
     (zoom: number) => {
       const camera = cameraRef.current;
@@ -464,6 +487,7 @@ export default function EarthBase({
 
     const ambient = new THREE.AmbientLight(0xffffff, 2);
     scene.add(ambient);
+    const debugAdapters = debugAdaptersRef.current;
 
     const moistureLightTarget = new THREE.Object3D();
     moistureLightTarget.position.set(0, 0, 0);
@@ -655,6 +679,133 @@ export default function EarthBase({
         moistureSegmentationMode: resolvedMoistureLayer.segmentationMode,
         earthView: state.earthView,
         savedViews: state.savedViews,
+      };
+    }
+
+    function cloneMoistureStructureLayerState(
+      state: MoistureStructureLayerState
+    ): MoistureStructureLayerState {
+      return {
+        ...state,
+        visibleBucketIndices: [...state.visibleBucketIndices],
+      };
+    }
+
+    function cloneRelativeHumidityLayerState(
+      state: RelativeHumidityLayerState
+    ): RelativeHumidityLayerState {
+      return { ...state };
+    }
+
+    function clonePrecipitationRadarLayerState(
+      state: PrecipitationRadarLayerState
+    ): PrecipitationRadarLayerState {
+      return { ...state };
+    }
+
+    function cloneExampleShaderMeshLayerState(
+      state: ExampleShaderMeshLayerState
+    ): ExampleShaderMeshLayerState {
+      return { ...state };
+    }
+
+    function cloneExampleContoursLayerState(
+      state: ExampleContoursLayerState
+    ): ExampleContoursLayerState {
+      return { ...state };
+    }
+
+    function cloneExampleParticleLayerState(
+      state: ExampleParticleLayerState
+    ): ExampleParticleLayerState {
+      return { ...state };
+    }
+
+    function getLayerStateSnapshot(): ViewDebugLayerStateSnapshot {
+      const controlsState = useControls.getState();
+      return {
+        moistureStructureLayer: cloneMoistureStructureLayerState(
+          controlsState.moistureStructureLayer
+        ),
+        precipitationRadarLayer: clonePrecipitationRadarLayerState(
+          controlsState.precipitationRadarLayer
+        ),
+        relativeHumidityLayer: cloneRelativeHumidityLayerState(
+          controlsState.relativeHumidityLayer
+        ),
+        exampleShaderMeshLayer: cloneExampleShaderMeshLayerState(
+          controlsState.exampleShaderMeshLayer
+        ),
+        exampleContoursLayer: cloneExampleContoursLayerState(
+          controlsState.exampleContoursLayer
+        ),
+        exampleParticleLayer: cloneExampleParticleLayerState(
+          controlsState.exampleParticleLayer
+        ),
+      };
+    }
+
+    function applyLayerStateSnapshot(snapshot: ViewDebugLayerStateSnapshot) {
+      const controlsState = useControls.getState();
+      controlsState.setMoistureStructureLayer(
+        cloneMoistureStructureLayerState(snapshot.moistureStructureLayer)
+      );
+      controlsState.setPrecipitationRadarLayer(
+        clonePrecipitationRadarLayerState(snapshot.precipitationRadarLayer)
+      );
+      controlsState.setRelativeHumidityLayer(
+        cloneRelativeHumidityLayerState(snapshot.relativeHumidityLayer)
+      );
+      controlsState.setExampleShaderMeshLayer(
+        cloneExampleShaderMeshLayerState(snapshot.exampleShaderMeshLayer)
+      );
+      controlsState.setExampleContoursLayer(
+        cloneExampleContoursLayerState(snapshot.exampleContoursLayer)
+      );
+      controlsState.setExampleParticleLayer(
+        cloneExampleParticleLayerState(snapshot.exampleParticleLayer)
+      );
+    }
+
+    function getViewDebugState() {
+      const viewerSnapshot = getViewerSnapshot();
+      const analyzers = Object.fromEntries(
+        Array.from(debugAdaptersRef.current.entries()).map(([analyzer, adapter]) => [
+          analyzer,
+          adapter.getState?.() ?? null,
+        ])
+      );
+
+      return {
+        version: 1 as const,
+        timestamp: viewerSnapshot.timestamp,
+        ready: viewerSnapshot.ready,
+        paused: viewerSnapshot.paused,
+        zoom01: viewerSnapshot.zoom01,
+        earthView: viewerSnapshot.earthView,
+        layerState: getLayerStateSnapshot(),
+        analyzers,
+        savedViews: viewerSnapshot.savedViews,
+      };
+    }
+
+    function buildViewDebugCase(input: ViewDebugCaseInput): ViewDebugCase {
+      const earthView = useViewerStore.getState().earthView;
+      if (!earthView) {
+        throw new Error("The earth view is not ready yet.");
+      }
+
+      return {
+        version: 1,
+        analyzer: input.analyzer,
+        title: input.title.trim(),
+        createdAt: new Date().toISOString(),
+        source: input.source,
+        timestamp: useViewerStore.getState().timestamp,
+        earthView,
+        layerState: getLayerStateSnapshot(),
+        targets: input.targets.map((target) => ({ ...target })),
+        notes: input.notes?.trim() || undefined,
       };
     }
 
@@ -855,6 +1006,8 @@ export default function EarthBase({
       getSnapshot() {
         return getViewerSnapshot();
       },
+      getViewDebugState,
+      buildViewDebugCase,
       waitForReady,
       async ensureLayersSidebarOpen() {
         const openLabel = VIEWER_AUTOMATION_SELECTORS.layersSidebarToggle.openAriaLabel;
@@ -945,6 +1098,45 @@ export default function EarthBase({
 
         applyEarthViewState(input.earthView);
         return getViewerSnapshot();
+      },
+      async applyViewDebugCase(debugCase, timeoutMs = 90_000) {
+        applyLayerStateSnapshot(debugCase.layerState);
+        const nextTimestamp = debugCase.timestamp.trim();
+        const currentTimestamp = useViewerStore.getState().timestamp;
+
+        if (nextTimestamp && nextTimestamp !== currentTimestamp) {
+          useViewerStore.getState().setTimestamp(nextTimestamp);
+          applyEarthViewState(debugCase.earthView);
+          await waitForReady(timeoutMs);
+        }
+
+        applyEarthViewState(debugCase.earthView);
+        await waitForReady(timeoutMs);
+        await waitForMoistureState(timeoutMs);
+        applyEarthViewState(debugCase.earthView);
+        render();
+        return getViewDebugState();
+      },
+      async hitTestDebugTarget(request) {
+        const adapter = debugAdaptersRef.current.get(request.analyzer);
+        if (!adapter?.hitTest) {
+          throw new Error(`No debug analyzer is registered for "${request.analyzer}".`);
+        }
+
+        await waitForReady();
+        return adapter.hitTest(request.target);
+      },
+      async selectDebugTarget(request) {
+        const adapter = debugAdaptersRef.current.get(request.analyzer);
+        if (!adapter?.selectTarget) {
+          throw new Error(
+            `The debug analyzer "${request.analyzer}" does not support selection.`
+          );
+        }
+
+        const result = adapter.selectTarget(request.targetId);
+        render();
+        return result ?? null;
       },
       async setMoistureLegibilityExperiment(
         experiment: MoistureLegibilityExperiment,
@@ -1093,6 +1285,7 @@ export default function EarthBase({
         host.removeChild(renderer.domElement);
       }
 
+      debugAdapters.clear();
       ambientLightRef.current = null;
       moistureKeyLightRef.current = null;
       moistureHeadLightRef.current = null;
@@ -1230,6 +1423,8 @@ export default function EarthBase({
       allLayersReady,
       registerFramePass,
       unregisterFramePass,
+      registerDebugAdapter,
+      unregisterDebugAdapter,
       zoom01,
       setZoom01,
     }),
@@ -1237,10 +1432,12 @@ export default function EarthBase({
       allLayersReady,
       engineReady,
       registerFramePass,
+      registerDebugAdapter,
       registerLayer,
       setZoom01,
       signalLayerReady,
       timestamp,
+      unregisterDebugAdapter,
       unregisterFramePass,
       unregisterLayer,
       zoom01,

@@ -12,6 +12,10 @@ import {
   type MoistureStructureComponentMetadata,
   type MoistureStructureFrame,
 } from "../utils/ApiResponses";
+import type {
+  NormalizedScreenTarget,
+  ViewDebugAnalyzerAdapter,
+} from "../../lib/viewDebug";
 
 type MoistureLayerStyle = ResolvedMoistureStructureLayerState;
 
@@ -1245,6 +1249,10 @@ function publishMoistureFrameState(
   });
 }
 
+function vector3ToDebugState(vector: THREE.Vector3) {
+  return { x: vector.x, y: vector.y, z: vector.z };
+}
+
 export default function MoistureStructureLayer() {
   const rawMoistureLayer = useControls((state) => state.moistureStructureLayer);
   const moistureLayer = resolveMoistureStructureLayerState(rawMoistureLayer);
@@ -1257,11 +1265,13 @@ export default function MoistureStructureLayer() {
     engineReady,
     moistureHeadLightRef,
     moistureKeyLightRef,
+    registerDebugAdapter,
     registerFramePass,
     rendererRef,
     sceneRef,
     signalReady,
     timestamp,
+    unregisterDebugAdapter,
     unregisterFramePass,
   } = useEarthLayer("moisture-structures");
 
@@ -1379,6 +1389,150 @@ export default function MoistureStructureLayer() {
     );
     updateFootprints(root, currentFrame ?? transitionFrame, style);
   }, [applyCameraDrivenState, applyRenderStyle, updateFootprints]);
+
+  const getMoistureDebugState = useCallback(() => {
+    const rawLayer = useControls.getState().moistureStructureLayer;
+    const resolvedLayer = resolveMoistureStructureLayerState(rawLayer);
+    const frame =
+      currentFrameRef.current ?? transitionFrameRef.current ?? null;
+
+    return {
+      visible: resolvedLayer.visible,
+      rawLayer: {
+        ...rawLayer,
+        visibleBucketIndices: [...rawLayer.visibleBucketIndices],
+      },
+      resolvedLayer: {
+        ...resolvedLayer,
+        visibleBucketIndices: [...resolvedLayer.visibleBucketIndices],
+      },
+      frame: frame
+        ? {
+            timestamp: frame.metadata.timestamp,
+            segmentationMode: resolvedLayer.segmentationMode,
+            dataset: frame.manifest.dataset,
+            geometryMode: frame.manifest.geometry_mode ?? null,
+            thresholdMode: frame.manifest.threshold_mode,
+            thresholds: frame.manifest.thresholds,
+            entry: frame.entry,
+            componentCount: frame.metadata.component_count,
+            thresholdedVoxelCount: frame.metadata.thresholded_voxel_count,
+            components: frame.metadata.components,
+            footprints: frame.footprints,
+            positionsFile: frame.metadata.positions_file,
+            indicesFile: frame.metadata.indices_file,
+          }
+        : null,
+    };
+  }, []);
+
+  const hitTestMoistureTarget = useCallback(
+    (target: NormalizedScreenTarget) => {
+      const renderer = rendererRef.current;
+      const camera = cameraRef.current;
+      if (!renderer || !camera) {
+        throw new Error("The renderer or camera is not ready.");
+      }
+
+      const currentComponents = currentRef.current?.components ?? [];
+      const transitionComponents = transitionRef.current?.components ?? [];
+      const meshes = [
+        ...currentComponents.map((component) => component.frontMesh),
+        ...transitionComponents.map((component) => component.frontMesh),
+      ];
+      if (meshes.length === 0) {
+        return {
+          analyzer: "moisture-structure",
+          target,
+          didHit: false,
+          reason: "no-moisture-meshes",
+        };
+      }
+
+      const pointer = new THREE.Vector2(target.x * 2 - 1, -(target.y * 2 - 1));
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(pointer, camera);
+
+      const hit = raycaster.intersectObjects(meshes, false)[0];
+      if (!hit) {
+        return {
+          analyzer: "moisture-structure",
+          target,
+          didHit: false,
+          reason: "no-intersection",
+        };
+      }
+
+      const componentId =
+        typeof hit.object.userData.moistureComponentId === "number"
+          ? hit.object.userData.moistureComponentId
+          : null;
+      const frame =
+        currentFrameRef.current ?? transitionFrameRef.current ?? null;
+      const resolvedLayer = resolveMoistureStructureLayerState(
+        useControls.getState().moistureStructureLayer
+      );
+      const component =
+        frame?.metadata.components.find((entry) => entry.id === componentId) ?? null;
+      const footprint =
+        frame?.footprints.find((entry) => entry.id === componentId) ?? null;
+
+      return {
+        analyzer: "moisture-structure",
+        target,
+        didHit: true,
+        meshName: hit.object.name,
+        distance: hit.distance,
+        faceIndex: hit.faceIndex ?? null,
+        worldPosition: vector3ToDebugState(hit.point),
+        componentId,
+        component,
+        footprint,
+        frame: frame
+          ? {
+              timestamp: frame.metadata.timestamp,
+              segmentationMode: resolvedLayer.segmentationMode,
+              dataset: frame.manifest.dataset,
+              geometryMode: frame.manifest.geometry_mode ?? null,
+            }
+          : null,
+      };
+    },
+    [cameraRef, rendererRef]
+  );
+
+  const selectMoistureDebugTarget = useCallback((targetId: unknown) => {
+    const selectedComponentId =
+      typeof targetId === "number" ? targetId : targetId === null ? null : null;
+    useControls.getState().setMoistureStructureLayer({ selectedComponentId });
+    return {
+      analyzer: "moisture-structure",
+      selectedComponentId,
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!engineReady) return;
+
+    const adapter: ViewDebugAnalyzerAdapter = {
+      analyzer: "moisture-structure",
+      getState: getMoistureDebugState,
+      hitTest: hitTestMoistureTarget,
+      selectTarget: selectMoistureDebugTarget,
+    };
+
+    registerDebugAdapter(adapter);
+    return () => {
+      unregisterDebugAdapter(adapter.analyzer);
+    };
+  }, [
+    engineReady,
+    getMoistureDebugState,
+    hitTestMoistureTarget,
+    registerDebugAdapter,
+    selectMoistureDebugTarget,
+    unregisterDebugAdapter,
+  ]);
 
   useEffect(() => {
     if (!engineReady || !sceneRef.current) return;
