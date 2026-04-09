@@ -3,7 +3,11 @@ import type {
   SavedViewRecord,
   ViewerNavigationCommand,
 } from "./viewerTypes";
-import type { MoistureLegibilityExperiment } from "../state/controlsStore";
+import type {
+  MoistureLegibilityExperiment,
+  MoistureStructureLayerState,
+  MoistureVisualPreset,
+} from "../state/controlsStore";
 import type { MoistureSegmentationMode } from "../components/utils/ApiResponses";
 
 export const VIEWER_NAVIGATION_CONTROLS = [
@@ -196,6 +200,14 @@ export type ViewerAutomationApi = {
   ) => Promise<ViewerAutomationSnapshot>;
   setMoistureLegibilityExperiment: (
     experiment: MoistureLegibilityExperiment,
+    timeoutMs?: number
+  ) => Promise<ViewerAutomationSnapshot>;
+  setMoistureVisualPreset: (
+    preset: MoistureVisualPreset,
+    timeoutMs?: number
+  ) => Promise<ViewerAutomationSnapshot>;
+  setMoistureLayerPatch: (
+    patch: Partial<MoistureStructureLayerState>,
     timeoutMs?: number
   ) => Promise<ViewerAutomationSnapshot>;
   resetMoistureLegibilityExperiment: (

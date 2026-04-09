@@ -128,6 +128,24 @@ def parse_args() -> argparse.Namespace:
         default=-0.47,
         help="Taubin smoothing mu step.",
     )
+    parser.add_argument(
+        "--mesh-island-min-vertices",
+        type=int,
+        default=0,
+        help=(
+            "Drop disconnected marching-cubes mesh islands smaller than this many "
+            "vertices after smoothing. Use 0 to disable."
+        ),
+    )
+    parser.add_argument(
+        "--voxel-exterior-only",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "For voxel-face geometry, emit only faces adjacent to outside-connected "
+            "empty space. This removes interior cavity walls."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -157,6 +175,8 @@ def main() -> None:
         mesh_smoothing_iterations=args.mesh_smoothing_iterations,
         mesh_smoothing_lambda=args.mesh_smoothing_lambda,
         mesh_smoothing_mu=args.mesh_smoothing_mu,
+        mesh_island_min_vertices=args.mesh_island_min_vertices,
+        voxel_exterior_only=args.voxel_exterior_only,
     )
     manifest = build_assets(config)
     print(
