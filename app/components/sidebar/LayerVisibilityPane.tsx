@@ -2,7 +2,9 @@
 
 import {
   RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS,
+  RELATIVE_HUMIDITY_VARIANT_OPTIONS,
   type RelativeHumidityColorMode,
+  type RelativeHumidityVariant,
   useControls,
 } from "../../state/controlsStore";
 
@@ -110,34 +112,65 @@ export default function LayerVisibilityPane() {
         />
 
         {relativeHumidityLayer.visible ? (
-          <label style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                fontWeight: 600,
-              }}
-            >
-              <span>RH Color Mode</span>
-              <span style={{ opacity: 0.68 }}>Voxel shell</span>
-            </div>
-            <select
-              value={relativeHumidityLayer.colorMode}
-              onChange={(event) =>
-                setRelativeHumidityLayer({
-                  colorMode: event.currentTarget.value as RelativeHumidityColorMode,
-                })
-              }
-              style={selectStyle()}
-            >
-              {RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            <label style={{ display: "grid", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontWeight: 600,
+                }}
+              >
+                <span>RH Color Mode</span>
+                <span style={{ opacity: 0.68 }}>Voxel shell</span>
+              </div>
+              <select
+                value={relativeHumidityLayer.colorMode}
+                onChange={(event) =>
+                  setRelativeHumidityLayer({
+                    colorMode: event.currentTarget.value as RelativeHumidityColorMode,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontWeight: 600,
+                }}
+              >
+                <span>Data Variant</span>
+                <span style={{ opacity: 0.68 }}>Asset source</span>
+              </div>
+              <select
+                value={relativeHumidityLayer.variant}
+                onChange={(event) =>
+                  setRelativeHumidityLayer({
+                    variant: event.currentTarget.value as RelativeHumidityVariant,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {RELATIVE_HUMIDITY_VARIANT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
         ) : null}
 
         <CheckboxRow
@@ -147,9 +180,12 @@ export default function LayerVisibilityPane() {
           onChange={(checked) => setPrecipitationRadarLayer({ visible: checked })}
         />
 
-        <div style={{ lineHeight: 1.45, opacity: 0.75 }}>
-          Relative humidity currently uses the generated shell asset nearest to the
-          active timestamp. The precipitation layer uses static radar textures.
+        <div
+          suppressHydrationWarning
+          style={{ lineHeight: 1.45, opacity: 0.75 }}
+        >
+          Relative humidity uses the selected shell variant nearest to the active
+          timestamp. The precipitation layer uses static radar textures.
         </div>
       </div>
     </section>

@@ -45,6 +45,14 @@ export const RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS = [
 export type RelativeHumidityColorMode =
   (typeof RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS)[number]["value"];
 
+export const RELATIVE_HUMIDITY_VARIANT_OPTIONS = [
+  { value: "baseline", label: "Current Baseline" },
+  { value: "min-component-10", label: "Min 10 Connected Cells" },
+] as const;
+
+export type RelativeHumidityVariant =
+  (typeof RELATIVE_HUMIDITY_VARIANT_OPTIONS)[number]["value"];
+
 export const MOISTURE_VISUAL_PRESET_OPTIONS = [
   { value: "none", label: "None" },
   { value: "baseline", label: "Baseline" },
@@ -106,6 +114,7 @@ export const MOISTURE_SEGMENTATION_MODE_OPTIONS: ReadonlyArray<{
   { value: "p95-close", label: "Bridge Pruned Baseline" },
   { value: "simple-voxel-shell", label: "Simple Voxel Shell" },
   { value: "p95-close-voxel-shell", label: "Bridge Pruned Voxel Shell" },
+  { value: "p95-raw-voxel-shell", label: "Raw Threshold Voxel Shell" },
   { value: "p95-smooth-open1-voxel-shell", label: "Smoothed Support Voxel Shell" },
   { value: "p95-close-smoothmesh", label: "Bridge Pruned Smoothed Mesh" },
   { value: "p95-smooth-open1", label: "Smoothed Support" },
@@ -180,6 +189,7 @@ export type RelativeHumidityLayerState = {
   visible: boolean;
   opacity: number;
   colorMode: RelativeHumidityColorMode;
+  variant: RelativeHumidityVariant;
 };
 
 export type MoistureStructureLayerState = {
@@ -471,6 +481,9 @@ export function moistureSegmentationModeLabel(
   if (segmentationMode === "p95-close-voxel-shell") {
     return "Bridge Pruned Voxel Shell";
   }
+  if (segmentationMode === "p95-raw-voxel-shell") {
+    return "Raw Threshold Voxel Shell";
+  }
   if (segmentationMode === "p95-smooth-open1-voxel-shell") {
     return "Smoothed Support Voxel Shell";
   }
@@ -585,7 +598,7 @@ export const useControls = create<ControlsState>()(
   subscribeWithSelector((set) => ({
     moistureStructureLayer: {
       visible: true,
-      opacity: 0.95,
+      opacity: 1,
       verticalExaggeration: 2.35,
       cameraCutawayEnabled: false,
       cameraCutawayRadius: 40,
@@ -610,6 +623,7 @@ export const useControls = create<ControlsState>()(
       visible: false,
       opacity: 0.9,
       colorMode: "pressureBands",
+      variant: "baseline",
     },
     // Defaults keep the examples hidden from the UI. Use EXAMPLE_LAYER_PRESETS
     // in code when you want to turn one on for local experimentation.

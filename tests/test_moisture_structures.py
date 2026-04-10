@@ -23,6 +23,7 @@ from scripts.moisture_structures import (
     build_threshold_mask,
     build_timestamp_payload,
     compute_per_level_thresholds_from_array,
+    fill_component_vertical_columns,
     iter_wrapped_components,
     DEFAULT_OPENING_RADIUS_CELLS,
     resolve_geometry_mode,
@@ -146,6 +147,25 @@ class MoistureStructuresTests(unittest.TestCase):
         self.assertEqual(context.recipe_metadata["recipe"], "bridge-pruned-voxel-shell")
         self.assertEqual(context.recipe_metadata["geometry_variant"], "voxel-shell")
 
+    def test_prepare_segmentation_context_supports_raw_voxel_shell_variant(self) -> None:
+        threshold_seed_sample = np.array(
+            [[[[0.1, 0.2], [0.3, 0.4]]]],
+            dtype=np.float32,
+        )
+        config = BuildConfig(
+            dataset_path=Path("test.nc"),
+            output_dir=Path("tmp/out"),
+            segmentation_mode="p95-raw-voxel-shell",
+        )
+
+        context = prepare_segmentation_context(threshold_seed_sample, config)
+
+        self.assertEqual(context.segmentation_mode, "p95-raw-voxel-shell")
+        self.assertEqual(context.recipe_metadata["recipe"], "raw-threshold-voxel-shell")
+        self.assertEqual(context.closing_radius_cells, 0)
+        self.assertEqual(context.opening_radius_cells, 0)
+        self.assertEqual(context.recipe_metadata["geometry_variant"], "voxel-shell")
+
     def test_prepare_segmentation_context_supports_smoothed_voxel_shell_variant(self) -> None:
         threshold_seed_sample = np.array(
             [[[[0.1, 0.2], [0.3, 0.4]]]],
@@ -173,6 +193,10 @@ class MoistureStructuresTests(unittest.TestCase):
             "voxel-faces",
         )
         self.assertEqual(
+            resolve_geometry_mode("p95-raw-voxel-shell", "marching-cubes"),
+            "voxel-faces",
+        )
+        self.assertEqual(
             resolve_geometry_mode("p95-smooth-open1-voxel-shell", "marching-cubes"),
             "voxel-faces",
         )
@@ -195,6 +219,21 @@ class MoistureStructuresTests(unittest.TestCase):
 
         self.assertEqual(len(large_components), 1)
         self.assertEqual(int(large_components[0].sum()), 2)
+
+    def test_fill_component_vertical_columns_respects_longitude_wrap(self) -> None:
+        mask = np.zeros((2, 3, 8), dtype=bool)
+        mask[0, 1, 0] = True
+        mask[0, 1, -1] = True
+
+        filled = fill_component_vertical_columns(mask)
+        footprint = filled.any(axis=0)
+
+        expected = np.zeros((3, 8), dtype=bool)
+        expected[1, 0] = True
+        expected[1, -1] = True
+
+        np.testing.assert_array_equal(footprint, expected)
+        self.assertEqual(int(filled.sum()), 2)
 
     def test_pressure_relative_thresholds_keep_upper_level_signal(self) -> None:
         values = np.array(

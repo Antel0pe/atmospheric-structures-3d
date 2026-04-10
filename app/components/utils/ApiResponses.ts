@@ -22,6 +22,7 @@ export type MoistureSegmentationMode =
   | "p95-close"
   | "simple-voxel-shell"
   | "p95-close-voxel-shell"
+  | "p95-raw-voxel-shell"
   | "p95-smooth-open1-voxel-shell"
   | "p95-close-smoothmesh"
   | "p95-smooth-open1"

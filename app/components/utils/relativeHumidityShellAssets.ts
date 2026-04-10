@@ -3,6 +3,7 @@ import {
   fetchJsonOrThrow,
 } from "./dataFetchErrors";
 import { snapTimestampToAvailable } from "./ApiResponses";
+import type { RelativeHumidityVariant } from "../../state/controlsStore";
 
 export type RelativeHumidityThresholdEntry = {
   pressure_hpa: number;
@@ -25,8 +26,14 @@ export type RelativeHumidityShellManifest = {
   variable: string;
   units: string;
   structure_kind: "relative-humidity-voxel-shell";
+  variant?: string;
   threshold_percent: number;
   geometry_mode: "voxel-faces";
+  postprocess?: {
+    minimum_component_size: number;
+    connectivity: string;
+    wraps_longitude: boolean;
+  };
   globe: {
     base_radius: number;
     vertical_span: number;
@@ -71,6 +78,15 @@ export type RelativeHumidityShellMetadata = {
   vertex_count: number;
   index_count: number;
   thresholded_voxel_count: number;
+  postprocess?: {
+    minimum_component_size: number;
+    connectivity: string;
+    wraps_longitude: boolean;
+    component_count_before_filter: number;
+    component_count_after_filter: number;
+    removed_component_count: number;
+    removed_voxel_count: number;
+  };
   components: RelativeHumidityShellComponentMetadata[];
   positions_file: string;
   indices_file: string;
@@ -84,49 +100,70 @@ export type RelativeHumidityShellFrame = {
   indices: Uint32Array;
 };
 
-const relativeHumidityManifestPromise: {
-  current: Promise<RelativeHumidityShellManifest> | null;
-} = {
-  current: null,
-};
+const relativeHumidityManifestPromiseCache = new Map<
+  RelativeHumidityVariant,
+  Promise<RelativeHumidityShellManifest>
+>();
 
-function buildRelativeHumidityShellUrl(...segments: string[]) {
-  return `/${["relative-humidity-shell", ...segments].join("/")}`;
+function relativeHumidityShellBaseSegments(variant: RelativeHumidityVariant) {
+  if (variant === "baseline") {
+    return ["relative-humidity-shell"];
+  }
+
+  return ["relative-humidity-shell", "variants", variant];
+}
+
+function buildRelativeHumidityShellUrl(
+  variant: RelativeHumidityVariant,
+  ...segments: string[]
+) {
+  return `/${[...relativeHumidityShellBaseSegments(variant), ...segments].join("/")}`;
 }
 
 export async function fetchRelativeHumidityShellManifest(opts?: {
+  variant?: RelativeHumidityVariant;
   refresh?: boolean;
   notifyOnError?: boolean;
 }) {
+  const variant = opts?.variant ?? "baseline";
   const refresh = opts?.refresh ?? false;
   const notifyOnError = opts?.notifyOnError ?? true;
 
-  if (!refresh && relativeHumidityManifestPromise.current) {
-    return relativeHumidityManifestPromise.current;
+  if (!refresh) {
+    const cachedPromise = relativeHumidityManifestPromiseCache.get(variant);
+    if (cachedPromise) {
+      return cachedPromise;
+    }
   }
 
-  relativeHumidityManifestPromise.current =
-    fetchJsonOrThrow<RelativeHumidityShellManifest>(
-      buildRelativeHumidityShellUrl("index.json"),
-      "Failed to load relative humidity shell manifest.",
-      {
-        layerLabel: "Relative humidity shell",
-        notifyOnError,
-      }
-    ).catch((error) => {
-      relativeHumidityManifestPromise.current = null;
-      throw error;
-    });
+  const manifestPromise = fetchJsonOrThrow<RelativeHumidityShellManifest>(
+    buildRelativeHumidityShellUrl(variant, "index.json"),
+    "Failed to load relative humidity shell manifest.",
+    {
+      cache: "no-store",
+      layerLabel: "Relative humidity shell",
+      notifyOnError,
+    }
+  ).catch((error) => {
+    relativeHumidityManifestPromiseCache.delete(variant);
+    throw error;
+  });
 
-  return relativeHumidityManifestPromise.current;
+  relativeHumidityManifestPromiseCache.set(variant, manifestPromise);
+  return manifestPromise;
 }
 
 export async function fetchRelativeHumidityShellFrame(
   datehour: string,
-  opts?: { notifyOnError?: boolean }
+  opts?: { notifyOnError?: boolean; variant?: RelativeHumidityVariant }
 ): Promise<RelativeHumidityShellFrame> {
   const notifyOnError = opts?.notifyOnError ?? true;
-  const manifest = await fetchRelativeHumidityShellManifest({ notifyOnError });
+  const variant = opts?.variant ?? "baseline";
+  const manifest = await fetchRelativeHumidityShellManifest({
+    notifyOnError,
+    refresh: true,
+    variant,
+  });
   const availableValues = manifest.timestamps.map((item) => item.timestamp);
   const resolvedTimestamp = snapTimestampToAvailable(datehour, availableValues);
   const entry =
@@ -139,7 +176,7 @@ export async function fetchRelativeHumidityShellFrame(
 
   const [metadata, positionsBlob, indicesBlob] = await Promise.all([
     fetchJsonOrThrow<RelativeHumidityShellMetadata>(
-      buildRelativeHumidityShellUrl(entry.metadata),
+      buildRelativeHumidityShellUrl(variant, entry.metadata),
       "Failed to load relative humidity shell metadata.",
       {
         layerLabel: "Relative humidity shell",
@@ -147,7 +184,7 @@ export async function fetchRelativeHumidityShellFrame(
       }
     ),
     fetchBlobOrThrow(
-      buildRelativeHumidityShellUrl(entry.positions),
+      buildRelativeHumidityShellUrl(variant, entry.positions),
       "Failed to load relative humidity shell positions.",
       {
         layerLabel: "Relative humidity shell",
@@ -155,7 +192,7 @@ export async function fetchRelativeHumidityShellFrame(
       }
     ),
     fetchBlobOrThrow(
-      buildRelativeHumidityShellUrl(entry.indices),
+      buildRelativeHumidityShellUrl(variant, entry.indices),
       "Failed to load relative humidity shell indices.",
       {
         layerLabel: "Relative humidity shell",
