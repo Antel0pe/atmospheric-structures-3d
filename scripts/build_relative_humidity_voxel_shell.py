@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +18,6 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.simple_voxel_builder import (
     build_exposed_face_mesh_from_mask,
-    clear_output_dir,
     coordinate_step_degrees,
     timestamp_to_slug,
 )
@@ -192,6 +192,63 @@ def resolve_output_dir(base_output_dir: Path, variant: str) -> Path:
     return output_root / "variants" / normalized_variant
 
 
+def clear_output_dir(output_dir: Path, preserve_child_names: set[str] | None = None) -> None:
+    preserve = preserve_child_names or set()
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return
+
+    for child in output_dir.iterdir():
+        if child.name in preserve:
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
+def build_seam_merged_component_info(labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    component_count = int(labels.max())
+    if component_count <= 0:
+        return np.zeros(1, dtype=np.int32), np.zeros(1, dtype=np.int32)
+
+    parent = np.arange(component_count + 1, dtype=np.int32)
+
+    def find(label_id: int) -> int:
+        root = label_id
+        while parent[root] != root:
+            root = int(parent[root])
+        while parent[label_id] != label_id:
+            next_label = int(parent[label_id])
+            parent[label_id] = root
+            label_id = next_label
+        return root
+
+    def union(a: int, b: int) -> None:
+        if a <= 0 or b <= 0:
+            return
+        root_a = find(a)
+        root_b = find(b)
+        if root_a == root_b:
+            return
+        if root_a < root_b:
+            parent[root_b] = root_a
+        else:
+            parent[root_a] = root_b
+
+    seam_pairs = np.column_stack(
+        [labels[..., 0].reshape(-1), labels[..., -1].reshape(-1)]
+    )
+    for first_label, duplicate_label in seam_pairs:
+        union(int(first_label), int(duplicate_label))
+
+    root_map = np.zeros(component_count + 1, dtype=np.int32)
+    for label_id in range(1, component_count + 1):
+        root_map[label_id] = find(label_id)
+
+    return root_map, np.unique(root_map[1:])
+
+
 def filter_small_wrapped_components(
     keep_mask: np.ndarray,
     min_component_size: int,
@@ -224,16 +281,8 @@ def filter_small_wrapped_components(
             "removed_voxel_count": 0,
         }
 
-    if normalized_min_component_size <= 1:
-        return np.asarray(keep_mask, dtype=bool), {
-            "minimum_component_size": normalized_min_component_size,
-            "connectivity": "26-connected",
-            "wraps_longitude": True,
-            "component_count_before_filter": int(component_count),
-            "component_count_after_filter": int(component_count),
-            "removed_component_count": 0,
-            "removed_voxel_count": 0,
-        }
+    root_map, unique_root_ids = build_seam_merged_component_info(labels)
+    unique_component_count = int(unique_root_ids.size)
 
     label_ids = np.arange(1, component_count + 1, dtype=np.int32)
     extended_counts = np.asarray(
@@ -244,26 +293,29 @@ def filter_small_wrapped_components(
         ),
         dtype=np.int32,
     )
-    seam_duplicate_counts = np.asarray(
-        ndimage.sum(
-            np.ones_like(labels[..., -1], dtype=np.int32),
-            labels=labels[..., -1],
-            index=label_ids,
-        ),
-        dtype=np.int32,
-    )
-    unique_counts = extended_counts - seam_duplicate_counts
-    kept_label_ids = label_ids[unique_counts >= normalized_min_component_size]
-    filtered_mask = np.isin(labels[..., :longitude_count], kept_label_ids)
+    root_counts = np.zeros(component_count + 1, dtype=np.int32)
+    np.add.at(root_counts, root_map[label_ids], extended_counts)
+
+    seam_duplicate_labels = labels[..., -1][keep_mask[..., 0]]
+    seam_duplicate_counts = np.zeros(component_count + 1, dtype=np.int32)
+    if seam_duplicate_labels.size:
+        np.add.at(seam_duplicate_counts, root_map[seam_duplicate_labels], 1)
+
+    unique_counts = root_counts - seam_duplicate_counts
+    kept_root_ids = unique_root_ids[
+        unique_counts[unique_root_ids] >= normalized_min_component_size
+    ]
+    filtered_mask = np.isin(root_map[labels[..., :longitude_count]], kept_root_ids)
     removed_voxel_count = occupied_voxel_count - int(filtered_mask.sum())
+    kept_component_count = int(kept_root_ids.size)
 
     return filtered_mask, {
         "minimum_component_size": normalized_min_component_size,
         "connectivity": "26-connected",
         "wraps_longitude": True,
-        "component_count_before_filter": int(component_count),
-        "component_count_after_filter": int(kept_label_ids.size),
-        "removed_component_count": int(component_count - kept_label_ids.size),
+        "component_count_before_filter": unique_component_count,
+        "component_count_after_filter": kept_component_count,
+        "removed_component_count": int(unique_component_count - kept_component_count),
         "removed_voxel_count": int(removed_voxel_count),
     }
 
@@ -413,9 +465,11 @@ def main() -> None:
     if not target_timestamps:
         raise ValueError("No matching timestamps were selected for export.")
 
-    output_dir = resolve_output_dir(args.output_dir, args.variant)
+    normalized_variant = args.variant.strip() or DEFAULT_VARIANT
+    output_dir = resolve_output_dir(args.output_dir, normalized_variant)
+    preserve_children = {"variants"} if normalized_variant == DEFAULT_VARIANT else set()
     output_dir.mkdir(parents=True, exist_ok=True)
-    clear_output_dir(output_dir)
+    clear_output_dir(output_dir, preserve_child_names=preserve_children)
 
     raw_dataset = netCDF4.Dataset(dataset_path)
     try:
@@ -478,7 +532,7 @@ def main() -> None:
         threshold_percent=args.threshold_percent,
         base_radius=args.base_radius,
         vertical_span=args.vertical_span,
-        variant=args.variant.strip() or DEFAULT_VARIANT,
+        variant=normalized_variant,
         min_component_size=args.min_component_size,
     )
     write_json(output_dir / "index.json", manifest)
