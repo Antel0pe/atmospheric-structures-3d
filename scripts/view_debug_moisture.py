@@ -221,6 +221,7 @@ def reconstruct_masks(
         if segmentation_mode in {
             "p95-close",
             "p95-close-voxel-shell",
+            "p95-raw-voxel-shell",
             "p95-close-smoothmesh",
             "p95-close-open1",
             "p95-open",

@@ -230,7 +230,9 @@ export default function RelativeHumidityVoxelLayer() {
 
     root.visible = true;
 
-    void fetchRelativeHumidityShellFrame(timestamp)
+    void fetchRelativeHumidityShellFrame(timestamp, {
+      variant: rhLayer.variant,
+    })
       .then((frame) => {
         if (isCancelled()) return;
         frameRef.current = frame;
@@ -246,7 +248,14 @@ export default function RelativeHumidityVoxelLayer() {
     return () => {
       cancelled = true;
     };
-  }, [engineReady, rebuildMesh, rhLayer.visible, signalReady, timestamp]);
+  }, [
+    engineReady,
+    rebuildMesh,
+    rhLayer.variant,
+    rhLayer.visible,
+    signalReady,
+    timestamp,
+  ]);
 
   return null;
 }

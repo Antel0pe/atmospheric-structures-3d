@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--geometry-mode",
-        choices=("marching-cubes", "voxel-faces"),
+        choices=("marching-cubes", "voxel-faces", "signed-distance", "column-envelope"),
         default="marching-cubes",
         help="Mesh generation strategy for each connected moisture component.",
     )

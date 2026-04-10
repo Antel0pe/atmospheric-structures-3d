@@ -964,7 +964,7 @@ function applySliceRenderStyle(
       (simpleVoxelShell || frontDepthWrite) &&
       !style.distanceFadeEnabled &&
       nonSelectedMultiplier >= 0.98 &&
-      frontAlpha >= 0.94;
+      (style.solidShellEnabled || frontAlpha >= 0.94);
     const outlineVisible =
       !simpleVoxelShell &&
       style.solidShellEnabled &&

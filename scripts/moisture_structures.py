@@ -12,7 +12,7 @@ import numpy as np
 import netCDF4
 import xarray as xr
 from scipy import ndimage
-from skimage import measure
+from skimage import measure, morphology
 
 DATASET_VARIABLE = "q"
 OUTPUT_VERSION = 1
@@ -25,10 +25,13 @@ DEFAULT_GAUSSIAN_SIGMA = 0.6
 DEFAULT_THRESHOLD_SAMPLE_STRIDE = 1
 DEFAULT_THRESHOLD_TIME_STRIDE = 1
 DEFAULT_GEOMETRY_MODE = "marching-cubes"
+SIGNED_DISTANCE_GEOMETRY_MODE = "signed-distance"
+COLUMN_ENVELOPE_GEOMETRY_MODE = "column-envelope"
 DEFAULT_CLOSING_RADIUS_CELLS = 1
 DEFAULT_OPENING_RADIUS_CELLS = 1
 DEFAULT_SEGMENTATION_MODE = "p95-close"
 VOXEL_SHELL_SEGMENTATION_MODE = "p95-close-voxel-shell"
+RAW_VOXEL_SHELL_SEGMENTATION_MODE = "p95-raw-voxel-shell"
 SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE = "p95-smooth-open1-voxel-shell"
 GEOMETRY_SMOOTHED_SEGMENTATION_MODE = "p95-close-smoothmesh"
 LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close-open1"
@@ -49,6 +52,7 @@ BUCKET_LONGITUDE_SMOOTHING_SIGMA = 3.0
 SUPPORTED_SEGMENTATION_MODES = (
     "p95-close",
     VOXEL_SHELL_SEGMENTATION_MODE,
+    RAW_VOXEL_SHELL_SEGMENTATION_MODE,
     SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE,
     GEOMETRY_SMOOTHED_SEGMENTATION_MODE,
     LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE,
@@ -61,6 +65,7 @@ SUPPORTED_SEGMENTATION_MODES = (
 )
 SEGMENTATION_GEOMETRY_MODE_OVERRIDES = {
     VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
+    RAW_VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
     SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE: "voxel-faces",
     GEOMETRY_SMOOTHED_SEGMENTATION_MODE: "marching-cubes",
 }
@@ -561,6 +566,32 @@ def prepare_segmentation_context(
             },
         )
 
+    if mode == RAW_VOXEL_SHELL_SEGMENTATION_MODE:
+        raw_q95 = compute_per_level_thresholds_from_array(
+            threshold_seed_sample,
+            quantile=config.threshold_quantile,
+        )
+        return SegmentationContext(
+            segmentation_mode=mode,
+            primary_thresholds=raw_q95,
+            threshold_tables={"raw_q95": raw_q95},
+            closing_radius_cells=0,
+            opening_radius_cells=0,
+            threshold_quantile=config.threshold_quantile,
+            threshold_kind="pressure-relative-quantile",
+            recipe_metadata={
+                "recipe": "raw-threshold-voxel-shell",
+                "thresholds": {"raw_q95": config.threshold_quantile},
+                "preprocessing": {},
+                "postprocess": {
+                    "binary_closing_radius_cells": 0,
+                    "binary_opening_radius_cells": 0,
+                },
+                "geometry_variant": "voxel-shell",
+                "voxel_exterior_only": config.voxel_exterior_only,
+            },
+        )
+
     if mode in {"p95-smooth-open1", SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE}:
         smoothed_sample = lat_lon_gaussian_filter(
             threshold_seed_sample,
@@ -806,6 +837,9 @@ def build_segmentation_mask(
             closing_radius_cells=context.closing_radius_cells,
             opening_radius_cells=context.opening_radius_cells,
         )
+
+    if mode == RAW_VOXEL_SHELL_SEGMENTATION_MODE:
+        return build_threshold_mask(field, context.threshold_tables["raw_q95"])
 
     if mode in {"p95-smooth-open1", SMOOTHED_VOXEL_SHELL_SEGMENTATION_MODE}:
         smoothed = lat_lon_gaussian_filter(field, sigma=SMOOTH_SUPPORT_SIGMA)
@@ -1068,6 +1102,155 @@ def build_component_marching_cubes_surface(
         roll_start=roll_start,
     )
     return positions, np.asarray(faces, dtype=np.uint32), metadata
+
+
+def build_component_signed_distance_surface(
+    component_mask: np.ndarray,
+    field: np.ndarray,
+    pressure_levels: np.ndarray,
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    radius_lookup: np.ndarray,
+    gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]] | None:
+    roll_start = choose_longitude_roll(component_mask)
+    rolled_mask = np.roll(component_mask, -roll_start, axis=2)
+    rolled_longitudes = roll_longitudes(longitudes, roll_start)
+
+    pad = max(2, int(math.ceil(max(float(gaussian_sigma), 1.0) * 3.0)))
+    cropped_mask, mins, _ = crop_mask(rolled_mask, pad=pad)
+
+    inside_distance = ndimage.distance_transform_edt(cropped_mask)
+    outside_distance = ndimage.distance_transform_edt(~cropped_mask)
+    signed_distance = outside_distance - inside_distance
+    smoothed = ndimage.gaussian_filter(
+        signed_distance.astype(np.float32),
+        sigma=max(float(gaussian_sigma), 0.5),
+        mode="nearest",
+    )
+
+    if float(np.min(smoothed)) >= 0 or float(np.max(smoothed)) <= 0:
+        return None
+
+    vertices, faces, _, _ = measure.marching_cubes(smoothed, level=0.0)
+    if vertices.size == 0 or faces.size == 0:
+        return None
+
+    global_level = vertices[:, 0] + mins[0]
+    global_lat = vertices[:, 1] + mins[1]
+    global_lon = vertices[:, 2] + mins[2]
+
+    radius_values = interpolate_radius(pressure_levels, radius_lookup, global_level)
+    latitude_values = np.interp(
+        global_lat,
+        np.arange(latitudes.size, dtype=np.float64),
+        latitudes.astype(np.float64),
+    )
+    longitude_values = np.interp(
+        global_lon,
+        np.arange(rolled_longitudes.size, dtype=np.float64),
+        rolled_longitudes,
+    )
+
+    positions = np.empty((vertices.shape[0], 3), dtype=np.float32)
+    for index in range(vertices.shape[0]):
+        positions[index] = lat_lon_to_xyz(
+            float(latitude_values[index]),
+            float(longitude_values[index]),
+            float(radius_values[index]),
+        )
+
+    metadata = build_component_metadata(
+        component_mask=component_mask,
+        field=field,
+        pressure_levels=pressure_levels,
+        latitudes=latitudes,
+        longitudes=longitudes,
+        rolled_longitudes=rolled_longitudes,
+        roll_start=roll_start,
+    )
+    return positions, np.asarray(faces, dtype=np.uint32), metadata
+
+
+def build_horizontal_closing_structure(radius_cells: int) -> np.ndarray:
+    if radius_cells <= 0:
+        return np.ones((1, 1, 1), dtype=bool)
+    flat_structure = ndimage.iterate_structure(
+        ndimage.generate_binary_structure(2, 1),
+        radius_cells,
+    )
+    structure = np.zeros((1, flat_structure.shape[0], flat_structure.shape[1]), dtype=bool)
+    structure[0] = flat_structure
+    return structure
+
+
+def fill_component_vertical_columns(
+    component_mask: np.ndarray,
+    horizontal_closing_radius: int = 0,
+    horizontal_dilation_radius: int = 0,
+) -> np.ndarray:
+    mask = np.asarray(component_mask, dtype=bool)
+    if not bool(mask.any()):
+        return np.zeros_like(mask, dtype=bool)
+
+    roll_start = choose_longitude_roll(mask)
+    rolled_mask = np.roll(mask, -roll_start, axis=2)
+    filled = np.zeros_like(rolled_mask, dtype=bool)
+    base_footprint = rolled_mask.any(axis=0)
+    target_footprint = morphology.convex_hull_image(base_footprint)
+
+    lower_levels = np.full(base_footprint.shape, -1, dtype=np.int32)
+    upper_levels = np.full(base_footprint.shape, -1, dtype=np.int32)
+
+    for latitude_index, longitude_index in np.argwhere(base_footprint):
+        level_indices = np.flatnonzero(
+            rolled_mask[:, latitude_index, longitude_index]
+        )
+        if level_indices.size == 0:
+            continue
+        lower_levels[int(latitude_index), int(longitude_index)] = int(level_indices[0])
+        upper_levels[int(latitude_index), int(longitude_index)] = int(level_indices[-1])
+
+    _, nearest_indices = ndimage.distance_transform_edt(
+        ~base_footprint,
+        return_indices=True,
+    )
+
+    for latitude_index, longitude_index in np.argwhere(target_footprint):
+        latitude_int = int(latitude_index)
+        longitude_int = int(longitude_index)
+        source_latitude = (
+            latitude_int
+            if base_footprint[latitude_int, longitude_int]
+            else int(nearest_indices[0, latitude_int, longitude_int])
+        )
+        source_longitude = (
+            longitude_int
+            if base_footprint[latitude_int, longitude_int]
+            else int(nearest_indices[1, latitude_int, longitude_int])
+        )
+        lower_level = int(lower_levels[source_latitude, source_longitude])
+        upper_level = int(upper_levels[source_latitude, source_longitude])
+        if lower_level < 0 or upper_level < lower_level:
+            continue
+        filled[
+            lower_level : upper_level + 1,
+            latitude_int,
+            longitude_int,
+        ] = True
+
+    if horizontal_closing_radius > 0:
+        filled = ndimage.binary_closing(
+            filled,
+            structure=build_horizontal_closing_structure(horizontal_closing_radius),
+        )
+    if horizontal_dilation_radius > 0:
+        filled = ndimage.binary_dilation(
+            filled,
+            structure=build_horizontal_closing_structure(horizontal_dilation_radius),
+        )
+
+    return np.roll(filled, roll_start, axis=2)
 
 
 def build_vertex_neighbors(face_indices: np.ndarray, vertex_count: int) -> list[np.ndarray]:
@@ -1441,6 +1624,30 @@ def build_component_surface(
     elif geometry_mode == "marching-cubes":
         surface = build_component_marching_cubes_surface(
             component_mask=component_mask,
+            field=field,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+            gaussian_sigma=gaussian_sigma,
+        )
+    elif geometry_mode == SIGNED_DISTANCE_GEOMETRY_MODE:
+        surface = build_component_signed_distance_surface(
+            component_mask=component_mask,
+            field=field,
+            pressure_levels=pressure_levels,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            radius_lookup=radius_lookup,
+            gaussian_sigma=gaussian_sigma,
+        )
+    elif geometry_mode == COLUMN_ENVELOPE_GEOMETRY_MODE:
+        surface = build_component_signed_distance_surface(
+            component_mask=fill_component_vertical_columns(
+                component_mask,
+                horizontal_closing_radius=max(1, int(round(max(gaussian_sigma, 1.0) / 3.0))),
+                horizontal_dilation_radius=max(1, int(round(max(gaussian_sigma, 1.0)))),
+            ),
             field=field,
             pressure_levels=pressure_levels,
             latitudes=latitudes,

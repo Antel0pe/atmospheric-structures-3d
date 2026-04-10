@@ -42,6 +42,9 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(useControls.getState().relativeHumidityLayer.colorMode).toBe(
       "pressureBands"
     );
+    expect(useControls.getState().relativeHumidityLayer.variant).toBe(
+      "baseline"
+    );
     expect(useControls.getState().precipitationRadarLayer.visible).toBe(false);
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35
