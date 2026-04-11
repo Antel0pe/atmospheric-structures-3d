@@ -591,7 +591,8 @@ function buildComponentGeometry(
   component: MoistureStructureComponentMetadata,
   baseRadius: number,
   verticalExaggeration: number,
-  bandScale: LevelBandScale
+  bandScale: LevelBandScale,
+  flipTriangleWinding: boolean
 ) {
   const positionStart = component.vertex_offset * 3;
   const positionEnd = positionStart + component.vertex_count * 3;
@@ -651,6 +652,14 @@ function buildComponentGeometry(
 
   for (let i = 0; i < component.index_count; i += 1) {
     localIndices[i] = indices[indexStart + i] - component.vertex_offset;
+  }
+
+  if (flipTriangleWinding) {
+    for (let i = 0; i < localIndices.length; i += 3) {
+      const second = localIndices[i + 1];
+      localIndices[i + 1] = localIndices[i + 2];
+      localIndices[i + 2] = second;
+    }
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -800,7 +809,8 @@ function buildSlice(
       component,
       baseRadius,
       style.verticalExaggeration,
-      bandScale
+      bandScale,
+      flatShading && frame.manifest.version < 2
     );
     const frontMaterial = createMoistureMaterial(THREE.FrontSide, flatShading);
     const backMaterial = createMoistureMaterial(THREE.BackSide, flatShading);

@@ -15,7 +15,7 @@ from scipy import ndimage
 from skimage import measure, morphology
 
 DATASET_VARIABLE = "q"
-OUTPUT_VERSION = 1
+OUTPUT_VERSION = 2
 DEFAULT_BASE_RADIUS = 100.0
 DEFAULT_VERTICAL_SPAN = 12.0
 DEFAULT_THRESHOLD_QUANTILE = 0.95
@@ -1391,11 +1391,11 @@ def append_quad(
     faces.extend(
         [
             quad_indices[0],
+            quad_indices[2],
             quad_indices[1],
-            quad_indices[2],
             quad_indices[0],
-            quad_indices[2],
             quad_indices[3],
+            quad_indices[2],
         ]
     )
 

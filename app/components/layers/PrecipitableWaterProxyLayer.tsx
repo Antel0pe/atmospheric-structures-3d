@@ -1,38 +1,30 @@
 import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useEarthLayer } from "./EarthBase";
-import { useControls, type RelativeHumidityColorMode } from "../../state/controlsStore";
+import { useControls } from "../../state/controlsStore";
 import {
-  fetchRelativeHumidityShellFrame,
-  type RelativeHumidityShellFrame,
-} from "../utils/relativeHumidityShellAssets";
+  fetchPrecipitableWaterProxyFrame,
+  type PrecipitableWaterProxyFrame,
+} from "../utils/precipitableWaterProxyAssets";
 
-const LAYER_CLEARANCE = 10.4;
-const LAYER_RENDER_ORDER = 66;
-const PRESSURE_COLOR_BANDS = [
-  { minHpa: 850, color: new THREE.Color("#ff7a59") },
-  { minHpa: 700, color: new THREE.Color("#ffb347") },
-  { minHpa: 500, color: new THREE.Color("#d7e95b") },
-  { minHpa: 350, color: new THREE.Color("#4fd6a7") },
-  { minHpa: 250, color: new THREE.Color("#39b8ff") },
-  { minHpa: 150, color: new THREE.Color("#4e7dff") },
-  { minHpa: 70, color: new THREE.Color("#7a68ff") },
-  { minHpa: 0, color: new THREE.Color("#b06bff") },
-] as const;
+const LAYER_CLEARANCE = 10.8;
+const LAYER_RENDER_ORDER = 67;
 const MOISTURE_DEFAULT_COLOR_STOPS = [
   new THREE.Color("#ff8a63"),
   new THREE.Color("#2dc6d6"),
   new THREE.Color("#5e86ff"),
   new THREE.Color("#b95cff"),
 ] as const;
-const SOLID_COLOR = new THREE.Color("#8feeff");
 
 function pressureToStandardAtmosphereHeightM(pressureHpa: number) {
   const safePressure = Math.max(pressureHpa, 1);
   return 44330.0 * (1.0 - (safePressure / 1013.25) ** 0.1903);
 }
 
-function pressureToRadius(frame: RelativeHumidityShellFrame, pressureHpa: number) {
+function pressureToRadius(
+  frame: PrecipitableWaterProxyFrame,
+  pressureHpa: number
+) {
   const {
     base_radius: baseRadius,
     vertical_span: verticalSpan,
@@ -49,16 +41,6 @@ function pressureToRadius(frame: RelativeHumidityShellFrame, pressureHpa: number
   );
 }
 
-function colorForPressureBand(pressureHpa: number) {
-  for (const band of PRESSURE_COLOR_BANDS) {
-    if (pressureHpa >= band.minHpa) {
-      return band.color.clone();
-    }
-  }
-
-  return PRESSURE_COLOR_BANDS[PRESSURE_COLOR_BANDS.length - 1].color.clone();
-}
-
 function colorAtStopPosition(t: number, stops: readonly THREE.Color[]) {
   const scaled = THREE.MathUtils.clamp(t, 0, 1) * (stops.length - 1);
   const startIndex = Math.floor(scaled);
@@ -67,27 +49,22 @@ function colorAtStopPosition(t: number, stops: readonly THREE.Color[]) {
   return stops[startIndex].clone().lerp(stops[endIndex], mix);
 }
 
-function buildBandScale(
-  frame: RelativeHumidityShellFrame,
-  colorMode: RelativeHumidityColorMode
-) {
-  const radii = frame.manifest.thresholds.map((entry) =>
+function buildBandScale(frame: PrecipitableWaterProxyFrame) {
+  const activeThresholds = frame.manifest.thresholds.filter(
+    (entry) => entry.active_pressure_window
+  );
+  const radii = activeThresholds.map((entry) =>
     pressureToRadius(frame, entry.pressure_hpa)
   );
   const boundaryRadii = radii
     .slice(0, -1)
     .map((radius, index) => (radius + radii[index + 1]) / 2);
-  const levelColors =
-    colorMode === "moistureDefault"
-      ? radii.map((_, index) =>
-          colorAtStopPosition(
-            index / Math.max(radii.length - 1, 1),
-            MOISTURE_DEFAULT_COLOR_STOPS
-          )
-        )
-      : frame.manifest.thresholds.map((entry) =>
-          colorForPressureBand(entry.pressure_hpa)
-        );
+  const levelColors = radii.map((_, index) =>
+    colorAtStopPosition(
+      index / Math.max(radii.length - 1, 1),
+      MOISTURE_DEFAULT_COLOR_STOPS
+    )
+  );
 
   return { boundaryRadii, levelColors };
 }
@@ -109,11 +86,10 @@ function levelIndexForRadius(radius: number, boundaryRadii: number[]) {
 }
 
 function buildGeometry(
-  frame: RelativeHumidityShellFrame,
-  verticalExaggeration: number,
-  colorMode: RelativeHumidityColorMode
+  frame: PrecipitableWaterProxyFrame,
+  verticalExaggeration: number
 ) {
-  const bandScale = buildBandScale(frame, colorMode);
+  const bandScale = buildBandScale(frame);
   const positions = frame.positions.slice();
   const indices = frame.indices.slice();
   const colors = new Float32Array((positions.length / 3) * 3);
@@ -137,9 +113,9 @@ function buildGeometry(
 
     const levelIndex = levelIndexForRadius(radius, bandScale.boundaryRadii);
     const color =
-      colorMode === "solidAqua"
-        ? SOLID_COLOR
-        : bandScale.levelColors[levelIndex] ?? SOLID_COLOR;
+      bandScale.levelColors[levelIndex] ??
+      bandScale.levelColors[bandScale.levelColors.length - 1] ??
+      MOISTURE_DEFAULT_COLOR_STOPS[0];
     colors[i] = color.r;
     colors[i + 1] = color.g;
     colors[i + 2] = color.b;
@@ -162,18 +138,18 @@ function buildGeometry(
   return geometry;
 }
 
-export default function RelativeHumidityVoxelLayer() {
-  const rhLayer = useControls((state) => state.relativeHumidityLayer);
+export default function PrecipitableWaterProxyLayer() {
+  const layerState = useControls((state) => state.precipitableWaterLayer);
   const verticalExaggeration = useControls(
     (state) => state.moistureStructureLayer.verticalExaggeration
   );
   const { engineReady, sceneRef, globeRef, signalReady, timestamp } =
-    useEarthLayer("relative-humidity-shell");
+    useEarthLayer("precipitable-water-proxy");
 
   const rootRef = useRef<THREE.Group | null>(null);
   const meshRef = useRef<THREE.Mesh | null>(null);
   const materialRef = useRef<THREE.MeshLambertMaterial | null>(null);
-  const frameRef = useRef<RelativeHumidityShellFrame | null>(null);
+  const frameRef = useRef<PrecipitableWaterProxyFrame | null>(null);
   const reqIdRef = useRef(0);
 
   const rebuildMesh = useCallback(() => {
@@ -185,40 +161,34 @@ export default function RelativeHumidityVoxelLayer() {
     meshRef.current?.removeFromParent();
     meshRef.current?.geometry.dispose();
 
-    const geometry = buildGeometry(
-      frame,
-      verticalExaggeration,
-      rhLayer.colorMode
-    );
+    const geometry = buildGeometry(frame, verticalExaggeration);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = "relative-humidity-shell";
+    mesh.name = "precipitable-water-proxy";
     mesh.renderOrder = LAYER_RENDER_ORDER;
     mesh.frustumCulled = false;
     root.add(mesh);
     meshRef.current = mesh;
-  }, [rhLayer.colorMode, verticalExaggeration]);
+  }, [verticalExaggeration]);
 
   useEffect(() => {
     if (!engineReady) return;
     if (!sceneRef.current || !globeRef.current) return;
 
     const root = new THREE.Group();
-    root.name = "relative-humidity-shell-root";
-    root.visible = rhLayer.visible;
+    root.name = "precipitable-water-proxy-root";
+    root.visible = layerState.visible;
     root.renderOrder = LAYER_RENDER_ORDER;
     root.frustumCulled = false;
     sceneRef.current.add(root);
     rootRef.current = root;
 
-    // Keep the RH shell in the transparent pass so it stays legible above the
-    // globe, but force full opacity and depth writes so it does not read as see-through.
     const material = new THREE.MeshLambertMaterial({
       vertexColors: true,
-      transparent: true,
+      transparent: false,
       opacity: 1,
       depthWrite: true,
       depthTest: true,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
       flatShading: true,
     });
     materialRef.current = material;
@@ -239,13 +209,14 @@ export default function RelativeHumidityVoxelLayer() {
     const material = materialRef.current;
     if (!root || !material) return;
 
-    root.visible = rhLayer.visible;
+    root.visible = layerState.visible;
     material.opacity = 1;
     material.depthWrite = true;
+    material.side = THREE.FrontSide;
     if (frameRef.current) {
       rebuildMesh();
     }
-  }, [engineReady, rebuildMesh, rhLayer.opacity, rhLayer.visible]);
+  }, [engineReady, rebuildMesh, layerState.opacity, layerState.visible]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -256,7 +227,7 @@ export default function RelativeHumidityVoxelLayer() {
     const requestId = ++reqIdRef.current;
     const isCancelled = () => cancelled || requestId !== reqIdRef.current;
 
-    if (!rhLayer.visible) {
+    if (!layerState.visible) {
       root.visible = false;
       signalReady(timestamp);
       return () => {
@@ -266,32 +237,22 @@ export default function RelativeHumidityVoxelLayer() {
 
     root.visible = true;
 
-    void fetchRelativeHumidityShellFrame(timestamp, {
-      variant: rhLayer.variant,
-    })
+    void fetchPrecipitableWaterProxyFrame(timestamp)
       .then((frame) => {
         if (isCancelled()) return;
         frameRef.current = frame;
         rebuildMesh();
         signalReady(timestamp);
       })
-      .catch((error) => {
+      .catch(() => {
         if (isCancelled()) return;
-        console.error("Failed to load relative humidity shell layer", error);
         signalReady(timestamp);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [
-    engineReady,
-    rebuildMesh,
-    rhLayer.variant,
-    rhLayer.visible,
-    signalReady,
-    timestamp,
-  ]);
+  }, [engineReady, layerState.visible, rebuildMesh, signalReady, timestamp]);
 
   return null;
 }

@@ -17,6 +17,7 @@ Purpose:
 - preserve rejected ideas so they are not revisited without context
 - track how conclusions changed and what observations or data caused the change
 - maintain short meteorological and visualization notes that help future work
+- preserve durable technical lessons from difficult bugs so future agents can reuse them
 
 How to use it:
 - start with `notes/instructions.md`
@@ -24,6 +25,7 @@ How to use it:
 - read `notes/current-direction.md` before making product or design decisions
 - read `notes/evolution.md` to understand how the user's thinking has changed
 - consult `notes/open-questions.md` when brainstorming or deciding what to investigate next
+- consult `notes/technical-notes.md` before deep debugging or when an issue resembles a past rendering/data failure
 - update the notes when the user's preferences, reasoning, or priorities change in a meaningful way
 
 Conventions:
@@ -32,6 +34,7 @@ Conventions:
 - separate current best direction from open experiments and discarded ideas
 - keep entries concise and practical
 - if a view changed because of a data observation or a viewer experiment, record that cause
+- if a non-obvious bug is solved, record the symptom, diagnosis path, root cause, and fix in `notes/technical-notes.md`
 - keep all references repo-relative; never write full local filesystem paths into the notes
 
 When to update:
@@ -39,6 +42,7 @@ When to update:
 - after discovering a meaningful constraint in the data or rendering
 - after identifying a new success criterion or product framing
 - after ruling out an approach for scientific or product reasons
+- after solving a difficult technical issue that could plausibly recur
 
 Treat the notes as an active tool. Before major brainstorming, planning, or implementation work in this repo, check whether the notes contain relevant context and refresh them if needed.
 

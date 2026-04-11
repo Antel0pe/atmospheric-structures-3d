@@ -39,6 +39,7 @@ export type ExampleParticlePressure =
 
 export const RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS = [
   { value: "pressureBands", label: "Pressure Bands" },
+  { value: "moistureDefault", label: "Moisture Default" },
   { value: "solidAqua", label: "Solid Aqua" },
 ] as const;
 
@@ -130,6 +131,7 @@ export const DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES = Array.from(
 );
 
 export const BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close" as const;
+export const DEFAULT_MOISTURE_SEGMENTATION_MODE = "p95-raw-voxel-shell" as const;
 export const LEGACY_BRIDGE_PRUNED_SEGMENTATION_MODE = "p95-close-open1" as const;
 
 export const MOISTURE_LEGIBILITY_EXPERIMENT_OPTIONS = [
@@ -181,6 +183,11 @@ export type ExampleParticleLayerState = {
 };
 
 export type PrecipitationRadarLayerState = {
+  visible: boolean;
+  opacity: number;
+};
+
+export type PrecipitableWaterLayerState = {
   visible: boolean;
   opacity: number;
 };
@@ -392,7 +399,7 @@ const MOISTURE_STRUCTURE_PRESET_STATE: Record<
     colorMode: "pressureBands",
     verticalWallFadeEnabled: false,
     verticalWallFadeStrength: 0.55,
-    segmentationMode: "p95-close",
+    segmentationMode: DEFAULT_MOISTURE_SEGMENTATION_MODE,
     footprintOverlayEnabled: false,
   },
   componentRead: {
@@ -567,6 +574,7 @@ type ControlsState = {
   moistureStructureLayer: MoistureStructureLayerState;
   moistureStructureFrame: MoistureSidebarFrameState;
   precipitationRadarLayer: PrecipitationRadarLayerState;
+  precipitableWaterLayer: PrecipitableWaterLayerState;
   relativeHumidityLayer: RelativeHumidityLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
@@ -585,6 +593,9 @@ type ControlsState = {
   setMoistureStructureFrame: (frame: MoistureSidebarFrameState) => void;
   setPrecipitationRadarLayer: (
     patch: Partial<PrecipitationRadarLayerState>
+  ) => void;
+  setPrecipitableWaterLayer: (
+    patch: Partial<PrecipitableWaterLayerState>
   ) => void;
   setRelativeHumidityLayer: (patch: Partial<RelativeHumidityLayerState>) => void;
   setExampleShaderMeshLayer: (
@@ -619,9 +630,13 @@ export const useControls = create<ControlsState>()(
       visible: false,
       opacity: 0.92,
     },
+    precipitableWaterLayer: {
+      visible: false,
+      opacity: 1,
+    },
     relativeHumidityLayer: {
       visible: false,
-      opacity: 0.9,
+      opacity: 1,
       colorMode: "pressureBands",
       variant: "baseline",
     },
@@ -708,11 +723,20 @@ export const useControls = create<ControlsState>()(
           ...patch,
         },
       })),
+    setPrecipitableWaterLayer: (patch) =>
+      set((state) => ({
+        precipitableWaterLayer: {
+          ...state.precipitableWaterLayer,
+          ...patch,
+          opacity: 1,
+        },
+      })),
     setRelativeHumidityLayer: (patch) =>
       set((state) => ({
         relativeHumidityLayer: {
           ...state.relativeHumidityLayer,
           ...patch,
+          opacity: 1,
         },
       })),
     setExampleShaderMeshLayer: (patch) =>

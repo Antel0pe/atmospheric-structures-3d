@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   DEFAULT_VISIBLE_MOISTURE_BUCKET_INDICES,
-  BRIDGE_PRUNED_SEGMENTATION_MODE,
+  DEFAULT_MOISTURE_SEGMENTATION_MODE,
   getMoistureStructurePresetState,
   getMoistureVisualPresetState,
   resolveMoistureStructureLayerState,
@@ -39,6 +39,7 @@ describe("resolveMoistureStructureLayerState", () => {
       "bridgePruned"
     );
     expect(useControls.getState().relativeHumidityLayer.visible).toBe(false);
+    expect(useControls.getState().relativeHumidityLayer.opacity).toBe(1);
     expect(useControls.getState().relativeHumidityLayer.colorMode).toBe(
       "pressureBands"
     );
@@ -65,7 +66,7 @@ describe("resolveMoistureStructureLayerState", () => {
       false
     );
     expect(useControls.getState().moistureStructureLayer.segmentationMode).toBe(
-      BRIDGE_PRUNED_SEGMENTATION_MODE
+      DEFAULT_MOISTURE_SEGMENTATION_MODE
     );
   });
 
