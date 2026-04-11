@@ -3,6 +3,7 @@ import type {
   ExampleParticleLayerState,
   ExampleShaderMeshLayerState,
   MoistureStructureLayerState,
+  PrecipitableWaterLayerState,
   PrecipitationRadarLayerState,
   RelativeHumidityLayerState,
 } from "../state/controlsStore";
@@ -34,6 +35,7 @@ export type ViewDebugSource = ViewDebugSavedViewSource | ViewDebugExplicitSource
 export type ViewDebugLayerStateSnapshot = {
   moistureStructureLayer: MoistureStructureLayerState;
   precipitationRadarLayer: PrecipitationRadarLayerState;
+  precipitableWaterLayer: PrecipitableWaterLayerState;
   relativeHumidityLayer: RelativeHumidityLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
@@ -109,6 +111,7 @@ function isLayerStateSnapshot(value: unknown): value is ViewDebugLayerStateSnaps
   return (
     !!candidate.moistureStructureLayer &&
     !!candidate.precipitationRadarLayer &&
+    !!candidate.precipitableWaterLayer &&
     !!candidate.relativeHumidityLayer &&
     !!candidate.exampleShaderMeshLayer &&
     !!candidate.exampleContoursLayer &&

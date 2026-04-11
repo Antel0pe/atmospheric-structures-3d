@@ -70,6 +70,9 @@ export default function LayerVisibilityPane() {
     (state) => state.moistureStructureLayer.visible
   );
   const precipitationLayer = useControls((state) => state.precipitationRadarLayer);
+  const precipitableWaterLayer = useControls(
+    (state) => state.precipitableWaterLayer
+  );
   const relativeHumidityLayer = useControls(
     (state) => state.relativeHumidityLayer
   );
@@ -78,6 +81,9 @@ export default function LayerVisibilityPane() {
   );
   const setPrecipitationRadarLayer = useControls(
     (state) => state.setPrecipitationRadarLayer
+  );
+  const setPrecipitableWaterLayer = useControls(
+    (state) => state.setPrecipitableWaterLayer
   );
   const setRelativeHumidityLayer = useControls(
     (state) => state.setRelativeHumidityLayer
@@ -174,6 +180,13 @@ export default function LayerVisibilityPane() {
         ) : null}
 
         <CheckboxRow
+          label="Precipitable Water Proxy"
+          checked={precipitableWaterLayer.visible}
+          accentColor="#f3de6f"
+          onChange={(checked) => setPrecipitableWaterLayer({ visible: checked })}
+        />
+
+        <CheckboxRow
           label="Precipitation Radar"
           checked={precipitationLayer.visible}
           accentColor="#8dff75"
@@ -185,7 +198,9 @@ export default function LayerVisibilityPane() {
           style={{ lineHeight: 1.45, opacity: 0.75 }}
         >
           Relative humidity uses the selected shell variant nearest to the active
-          timestamp. The precipitation layer uses static radar textures.
+          timestamp. The precipitable water proxy keeps only 500-1000 hPa voxels
+          that pass the top-40%-q, RH, and 3-level depth gates. The precipitation
+          layer uses static radar textures.
         </div>
       </div>
     </section>

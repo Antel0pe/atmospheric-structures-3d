@@ -42,6 +42,7 @@ function buildCase(): ViewDebugCase {
         visibleBucketIndices: [...controls.moistureStructureLayer.visibleBucketIndices],
       },
       precipitationRadarLayer: { ...controls.precipitationRadarLayer },
+      precipitableWaterLayer: { ...controls.precipitableWaterLayer },
       relativeHumidityLayer: { ...controls.relativeHumidityLayer },
       exampleShaderMeshLayer: { ...controls.exampleShaderMeshLayer },
       exampleContoursLayer: { ...controls.exampleContoursLayer },
