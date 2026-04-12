@@ -30,6 +30,7 @@ import {
   type ExampleShaderMeshLayerState,
   type MoistureLegibilityExperiment,
   type MoistureStructureLayerState,
+  type PotentialTemperatureLayerState,
   type PrecipitableWaterLayerState,
   type PrecipitationRadarLayerState,
   type RelativeHumidityLayerState,
@@ -710,6 +711,12 @@ export default function EarthBase({
       return { ...state };
     }
 
+    function clonePotentialTemperatureLayerState(
+      state: PotentialTemperatureLayerState
+    ): PotentialTemperatureLayerState {
+      return { ...state };
+    }
+
     function cloneExampleShaderMeshLayerState(
       state: ExampleShaderMeshLayerState
     ): ExampleShaderMeshLayerState {
@@ -740,6 +747,9 @@ export default function EarthBase({
         precipitableWaterLayer: clonePrecipitableWaterLayerState(
           controlsState.precipitableWaterLayer
         ),
+        potentialTemperatureLayer: clonePotentialTemperatureLayerState(
+          controlsState.potentialTemperatureLayer
+        ),
         relativeHumidityLayer: cloneRelativeHumidityLayerState(
           controlsState.relativeHumidityLayer
         ),
@@ -765,6 +775,9 @@ export default function EarthBase({
       );
       controlsState.setPrecipitableWaterLayer(
         clonePrecipitableWaterLayerState(snapshot.precipitableWaterLayer)
+      );
+      controlsState.setPotentialTemperatureLayer(
+        clonePotentialTemperatureLayerState(snapshot.potentialTemperatureLayer)
       );
       controlsState.setRelativeHumidityLayer(
         cloneRelativeHumidityLayerState(snapshot.relativeHumidityLayer)

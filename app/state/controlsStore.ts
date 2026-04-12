@@ -192,6 +192,11 @@ export type PrecipitableWaterLayerState = {
   opacity: number;
 };
 
+export type PotentialTemperatureLayerState = {
+  visible: boolean;
+  opacity: number;
+};
+
 export type RelativeHumidityLayerState = {
   visible: boolean;
   opacity: number;
@@ -575,6 +580,7 @@ type ControlsState = {
   moistureStructureFrame: MoistureSidebarFrameState;
   precipitationRadarLayer: PrecipitationRadarLayerState;
   precipitableWaterLayer: PrecipitableWaterLayerState;
+  potentialTemperatureLayer: PotentialTemperatureLayerState;
   relativeHumidityLayer: RelativeHumidityLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
@@ -596,6 +602,9 @@ type ControlsState = {
   ) => void;
   setPrecipitableWaterLayer: (
     patch: Partial<PrecipitableWaterLayerState>
+  ) => void;
+  setPotentialTemperatureLayer: (
+    patch: Partial<PotentialTemperatureLayerState>
   ) => void;
   setRelativeHumidityLayer: (patch: Partial<RelativeHumidityLayerState>) => void;
   setExampleShaderMeshLayer: (
@@ -631,6 +640,10 @@ export const useControls = create<ControlsState>()(
       opacity: 0.92,
     },
     precipitableWaterLayer: {
+      visible: false,
+      opacity: 1,
+    },
+    potentialTemperatureLayer: {
       visible: false,
       opacity: 1,
     },
@@ -727,6 +740,14 @@ export const useControls = create<ControlsState>()(
       set((state) => ({
         precipitableWaterLayer: {
           ...state.precipitableWaterLayer,
+          ...patch,
+          opacity: 1,
+        },
+      })),
+    setPotentialTemperatureLayer: (patch) =>
+      set((state) => ({
+        potentialTemperatureLayer: {
+          ...state.potentialTemperatureLayer,
           ...patch,
           opacity: 1,
         },

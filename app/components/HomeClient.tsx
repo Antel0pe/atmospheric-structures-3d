@@ -35,6 +35,14 @@ const PrecipitableWaterProxyLayer = dynamic(
   }
 );
 
+const PotentialTemperatureStructuresLayer = dynamic(
+  () => import("./layers/PotentialTemperatureStructuresLayer"),
+  {
+    ssr: false,
+    loading: () => <div style={{ width: "100%", height: "100%" }} />,
+  }
+);
+
 const PrecipitationRadarLayer = dynamic(
   () => import("./layers/PrecipitationRadarLayer"),
   {
@@ -135,6 +143,7 @@ export default function HomeClient() {
           <MoistureStructureLayer />
           <RelativeHumidityVoxelLayer />
           <PrecipitableWaterProxyLayer />
+          <PotentialTemperatureStructuresLayer />
           <ExampleShaderMeshLayer />
           <ExampleContoursLayer />
           <ExampleParticleLayer heightTex={null} />

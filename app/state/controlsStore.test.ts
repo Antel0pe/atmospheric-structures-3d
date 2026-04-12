@@ -47,6 +47,8 @@ describe("resolveMoistureStructureLayerState", () => {
       "baseline"
     );
     expect(useControls.getState().precipitationRadarLayer.visible).toBe(false);
+    expect(useControls.getState().potentialTemperatureLayer.visible).toBe(false);
+    expect(useControls.getState().potentialTemperatureLayer.opacity).toBe(1);
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35
     );
