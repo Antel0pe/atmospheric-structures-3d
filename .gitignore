@@ -24,6 +24,7 @@ notes/
 # production
 /build
 /public/moisture-structures/
+/public/potential-temperature-structures/
 /public/precipitable-water-proxy/
 /public/precipitation-radar/
 /public/relative-humidity-shell/

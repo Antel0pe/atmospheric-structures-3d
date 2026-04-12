@@ -73,6 +73,9 @@ export default function LayerVisibilityPane() {
   const precipitableWaterLayer = useControls(
     (state) => state.precipitableWaterLayer
   );
+  const potentialTemperatureLayer = useControls(
+    (state) => state.potentialTemperatureLayer
+  );
   const relativeHumidityLayer = useControls(
     (state) => state.relativeHumidityLayer
   );
@@ -84,6 +87,9 @@ export default function LayerVisibilityPane() {
   );
   const setPrecipitableWaterLayer = useControls(
     (state) => state.setPrecipitableWaterLayer
+  );
+  const setPotentialTemperatureLayer = useControls(
+    (state) => state.setPotentialTemperatureLayer
   );
   const setRelativeHumidityLayer = useControls(
     (state) => state.setRelativeHumidityLayer
@@ -187,6 +193,13 @@ export default function LayerVisibilityPane() {
         />
 
         <CheckboxRow
+          label="Potential Temperature"
+          checked={potentialTemperatureLayer.visible}
+          accentColor="#ff9b7d"
+          onChange={(checked) => setPotentialTemperatureLayer({ visible: checked })}
+        />
+
+        <CheckboxRow
           label="Precipitation Radar"
           checked={precipitationLayer.visible}
           accentColor="#8dff75"
@@ -199,8 +212,11 @@ export default function LayerVisibilityPane() {
         >
           Relative humidity uses the selected shell variant nearest to the active
           timestamp. The precipitable water proxy keeps only 500-1000 hPa voxels
-          that pass the top-40%-q, RH, and 3-level depth gates. The precipitation
-          layer uses static radar textures.
+          that pass the top-40%-q, RH, and 3-level depth gates. Potential
+          temperature now derives dry potential temperature in 3D, finds the
+          global top-20% threshold, keeps hot-side and cool-side components that
+          touch that boundary, and renders both as opaque voxel shells. The
+          precipitation layer uses static radar textures.
         </div>
       </div>
     </section>
