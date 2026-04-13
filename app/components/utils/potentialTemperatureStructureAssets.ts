@@ -4,11 +4,11 @@ import { snapTimestampToAvailable } from "./ApiResponses";
 export type PotentialTemperatureManifestTimestamp = {
   timestamp: string;
   metadata: string;
-  threshold_value: number;
-  hot_voxel_count: number;
-  cool_voxel_count: number;
-  hot_component_count: number;
-  cool_component_count: number;
+  positions: string;
+  indices: string;
+  coldness_sigma: string;
+  voxel_count: number;
+  component_count: number;
 };
 
 export type PotentialTemperatureStructureManifest = {
@@ -22,24 +22,27 @@ export type PotentialTemperatureStructureManifest = {
     reference_pressure_hpa: number;
     kappa: number;
   };
-  structure_kind: "potential-temperature-threshold-shells";
+  structure_kind: "potential-temperature-cold-zonal-anomaly-shell";
   geometry_mode: "voxel-faces";
-  threshold: {
-    kind: "global_top_percent";
-    top_percent: number;
-    quantile: number;
-  };
   selection: {
-    connectivity: "26-connected";
+    background: "per-level_zonal_mean";
+    standardization: "per-level_stddev";
+    keep_side: "cold_only";
+    z_threshold_sigma: number;
+    minimum_level_component_size: number;
+    level_component_connectivity: string;
+    volume_connectivity: string;
     wraps_longitude: true;
-    side_rule: "components_touching_opposite_threshold_side";
-    hot_interface_faces_visible: boolean;
-    cool_interface_faces_visible: boolean;
   };
   sampling: {
     latitude_stride: number;
     longitude_stride: number;
     method: string;
+  };
+  pressure_window_hpa: {
+    min: number;
+    max: number;
+    level_count: number;
   };
   globe: {
     base_radius: number;
@@ -59,42 +62,52 @@ export type PotentialTemperatureStructureManifest = {
   timestamps: PotentialTemperatureManifestTimestamp[];
 };
 
-export type PotentialTemperatureThresholdSideMetadata = {
-  voxel_count: number;
-  component_count: number;
-  touching_component_count: number;
-  vertex_count: number;
-  index_count: number;
-  theta_min: number | null;
-  theta_max: number | null;
-  theta_mean: number | null;
-  pressure_min_hpa: number | null;
-  pressure_max_hpa: number | null;
-  positions_file: string;
-  indices_file: string;
-};
-
 export type PotentialTemperatureStructureMetadata = {
   version: number;
   timestamp: string;
-  top_percent: number;
-  threshold_value: number;
-  finite_voxel_count: number;
-  hot_side: PotentialTemperatureThresholdSideMetadata;
-  cool_side: PotentialTemperatureThresholdSideMetadata;
-};
-
-export type PotentialTemperatureSideMesh = {
-  positions: Float32Array;
-  indices: Uint32Array;
+  component_count: number;
+  largest_component_voxel_count: number;
+  thresholded_voxel_count: number;
+  vertex_count: number;
+  index_count: number;
+  theta_min: number;
+  theta_max: number;
+  theta_mean: number;
+  coldness_sigma_min: number;
+  coldness_sigma_max: number;
+  coldness_sigma_mean: number;
+  pressure_min_hpa: number;
+  pressure_max_hpa: number;
+  latitude_min_deg: number;
+  latitude_max_deg: number;
+  longitude_min_deg: number;
+  longitude_max_deg: number;
+  z_threshold_sigma: number;
+  selection: {
+    raw_voxel_count: number;
+    removed_voxel_count: number;
+    postprocess: {
+      minimum_component_size: number;
+      connectivity: string;
+      wraps_longitude: boolean;
+      component_count_before_filter: number;
+      component_count_after_filter: number;
+      removed_component_count: number;
+      removed_voxel_count: number;
+    };
+  };
+  positions_file: string;
+  indices_file: string;
+  coldness_sigma_file: string;
 };
 
 export type PotentialTemperatureStructureFrame = {
   manifest: PotentialTemperatureStructureManifest;
   entry: PotentialTemperatureManifestTimestamp;
   metadata: PotentialTemperatureStructureMetadata;
-  hotSide: PotentialTemperatureSideMesh;
-  coolSide: PotentialTemperatureSideMesh;
+  positions: Float32Array;
+  indices: Uint32Array;
+  coldnessSigma: Float32Array;
 };
 
 let potentialTemperatureManifestPromise: Promise<PotentialTemperatureStructureManifest> | null =
@@ -151,70 +164,53 @@ export async function fetchPotentialTemperatureStructureFrame(
     throw new Error("No potential temperature structure assets are available.");
   }
 
-  const metadata = await fetchJsonOrThrow<PotentialTemperatureStructureMetadata>(
-    buildPotentialTemperatureStructureUrl(entry.metadata),
-    "Failed to load potential temperature structure metadata.",
-    {
-      layerLabel: "Potential temperature structures",
-      notifyOnError,
-    }
-  );
+  const [metadata, positionsBlob, indicesBlob, coldnessSigmaBlob] = await Promise.all([
+    fetchJsonOrThrow<PotentialTemperatureStructureMetadata>(
+      buildPotentialTemperatureStructureUrl(entry.metadata),
+      "Failed to load potential temperature structure metadata.",
+      {
+        layerLabel: "Potential temperature structures",
+        notifyOnError,
+      }
+    ),
+    fetchBlobOrThrow(
+      buildPotentialTemperatureStructureUrl(entry.positions),
+      "Failed to load potential temperature structure positions.",
+      {
+        layerLabel: "Potential temperature structures",
+        notifyOnError,
+      }
+    ),
+    fetchBlobOrThrow(
+      buildPotentialTemperatureStructureUrl(entry.indices),
+      "Failed to load potential temperature structure indices.",
+      {
+        layerLabel: "Potential temperature structures",
+        notifyOnError,
+      }
+    ),
+    fetchBlobOrThrow(
+      buildPotentialTemperatureStructureUrl(entry.coldness_sigma),
+      "Failed to load potential temperature coldness values.",
+      {
+        layerLabel: "Potential temperature structures",
+        notifyOnError,
+      }
+    ),
+  ]);
 
-  const [hotPositionsBlob, hotIndicesBlob, coolPositionsBlob, coolIndicesBlob] =
-    await Promise.all([
-      fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(metadata.hot_side.positions_file),
-        "Failed to load hot-side potential temperature positions.",
-        {
-          layerLabel: "Potential temperature structures",
-          notifyOnError,
-        }
-      ),
-      fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(metadata.hot_side.indices_file),
-        "Failed to load hot-side potential temperature indices.",
-        {
-          layerLabel: "Potential temperature structures",
-          notifyOnError,
-        }
-      ),
-      fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(metadata.cool_side.positions_file),
-        "Failed to load cool-side potential temperature positions.",
-        {
-          layerLabel: "Potential temperature structures",
-          notifyOnError,
-        }
-      ),
-      fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(metadata.cool_side.indices_file),
-        "Failed to load cool-side potential temperature indices.",
-        {
-          layerLabel: "Potential temperature structures",
-          notifyOnError,
-        }
-      ),
-    ]);
-
-  const [hotPositionsBuffer, hotIndicesBuffer, coolPositionsBuffer, coolIndicesBuffer] =
-    await Promise.all([
-      hotPositionsBlob.arrayBuffer(),
-      hotIndicesBlob.arrayBuffer(),
-      coolPositionsBlob.arrayBuffer(),
-      coolIndicesBlob.arrayBuffer(),
-    ]);
+  const [positionsBuffer, indicesBuffer, coldnessSigmaBuffer] = await Promise.all([
+    positionsBlob.arrayBuffer(),
+    indicesBlob.arrayBuffer(),
+    coldnessSigmaBlob.arrayBuffer(),
+  ]);
 
   return {
     manifest,
     entry,
     metadata,
-    hotSide: {
-      positions: new Float32Array(hotPositionsBuffer),
-      indices: new Uint32Array(hotIndicesBuffer),
-    },
-    coolSide: {
-      positions: new Float32Array(coolPositionsBuffer),
-      indices: new Uint32Array(coolIndicesBuffer),
-    },
+    positions: new Float32Array(positionsBuffer),
+    indices: new Uint32Array(indicesBuffer),
+    coldnessSigma: new Float32Array(coldnessSigmaBuffer),
   };
 }
