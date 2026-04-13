@@ -4,108 +4,65 @@ import { useEarthLayer } from "./EarthBase";
 import { useControls } from "../../state/controlsStore";
 import {
   fetchPotentialTemperatureStructureFrame,
-  type PotentialTemperatureSideMesh,
   type PotentialTemperatureStructureFrame,
 } from "../utils/potentialTemperatureStructureAssets";
 
-const COOL_LAYER_CLEARANCE = 10.8;
-const HOT_LAYER_CLEARANCE = 11.2;
-const COOL_RENDER_ORDER = 68;
-const HOT_RENDER_ORDER = 69;
-const HOT_COLOR = new THREE.Color("#ff9b6a");
-const COOL_COLOR = new THREE.Color("#6a96ff");
+const LAYER_CLEARANCE = 10.8;
+const LAYER_RENDER_ORDER = 68;
+const COLDNESS_COLOR_STOPS = [
+  new THREE.Color("#dff4ff"),
+  new THREE.Color("#7dc4ff"),
+  new THREE.Color("#3f7ff7"),
+  new THREE.Color("#172d88"),
+] as const;
 
-type ThermalCutawayUniforms = {
-  cutawayCenter: { value: THREE.Vector3 };
-  cutawayRadius: { value: number };
-  enabled: { value: number };
-};
-
-function attachThermalCutawayShader(material: THREE.MeshLambertMaterial) {
-  const uniforms: ThermalCutawayUniforms = {
-    cutawayCenter: { value: new THREE.Vector3() },
-    cutawayRadius: { value: 0 },
-    enabled: { value: 1 },
-  };
-
-  material.userData.thermalCutawayUniforms = uniforms;
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uThermalCutawayCenter = uniforms.cutawayCenter;
-    shader.uniforms.uThermalCutawayRadius = uniforms.cutawayRadius;
-    shader.uniforms.uThermalCutawayEnabled = uniforms.enabled;
-
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-varying vec3 vThermalWorldPosition;`
-      )
-      .replace(
-        "#include <worldpos_vertex>",
-        `#include <worldpos_vertex>
-vec4 thermalWorldPosition = vec4( transformed, 1.0 );
-#ifdef USE_BATCHING
-thermalWorldPosition = batchingMatrix * thermalWorldPosition;
-#endif
-#ifdef USE_INSTANCING
-thermalWorldPosition = instanceMatrix * thermalWorldPosition;
-#endif
-thermalWorldPosition = modelMatrix * thermalWorldPosition;
-vThermalWorldPosition = thermalWorldPosition.xyz;`
-      );
-
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-uniform vec3 uThermalCutawayCenter;
-uniform float uThermalCutawayRadius;
-uniform float uThermalCutawayEnabled;
-varying vec3 vThermalWorldPosition;`
-      )
-      .replace(
-        "#include <clipping_planes_fragment>",
-        `#include <clipping_planes_fragment>
-if ( uThermalCutawayEnabled > 0.5 ) {
-  vec3 cutawayDelta = vThermalWorldPosition - uThermalCutawayCenter;
-  if ( dot( cutawayDelta, cutawayDelta ) < uThermalCutawayRadius * uThermalCutawayRadius ) {
-    discard;
-  }
-}`
-      );
-  };
-  material.customProgramCacheKey = () => "potential-temperature-cutaway-v1";
-  material.needsUpdate = true;
-  return uniforms;
+function colorAtStopPosition(t: number, stops: readonly THREE.Color[]) {
+  const scaled = THREE.MathUtils.clamp(t, 0, 1) * (stops.length - 1);
+  const startIndex = Math.floor(scaled);
+  const endIndex = Math.min(startIndex + 1, stops.length - 1);
+  const mix = scaled - startIndex;
+  return stops[startIndex].clone().lerp(stops[endIndex], mix);
 }
 
 function buildGeometry(
   frame: PotentialTemperatureStructureFrame,
-  side: PotentialTemperatureSideMesh,
-  verticalExaggeration: number,
-  clearance: number
+  verticalExaggeration: number
 ) {
-  const positions = side.positions.slice();
-  const indices = side.indices.slice();
+  const positions = frame.positions.slice();
+  const indices = frame.indices.slice();
+  const coldnessSigma = frame.coldnessSigma;
+  const colors = new Float32Array((positions.length / 3) * 3);
   const baseRadius = frame.manifest.globe.base_radius;
+  const threshold = frame.manifest.selection.z_threshold_sigma;
+  const maxColdness = Math.max(frame.metadata.coldness_sigma_max, threshold + 1e-6);
+  const coldnessRange = Math.max(maxColdness - threshold, 1e-6);
 
   for (let i = 0; i < positions.length; i += 3) {
     const x = positions[i];
     const y = positions[i + 1];
     const z = positions[i + 2];
     const radius = Math.hypot(x, y, z);
-    if (radius <= 1e-6) continue;
+    if (radius > 1e-6) {
+      const radialOffset = Math.max(radius - baseRadius, 0);
+      const exaggeratedRadius =
+        baseRadius + LAYER_CLEARANCE + radialOffset * verticalExaggeration;
+      const scale = exaggeratedRadius / radius;
+      positions[i] *= scale;
+      positions[i + 1] *= scale;
+      positions[i + 2] *= scale;
+    }
 
-    const radialOffset = Math.max(radius - baseRadius, 0);
-    const exaggeratedRadius = baseRadius + clearance + radialOffset * verticalExaggeration;
-    const scale = exaggeratedRadius / radius;
-    positions[i] *= scale;
-    positions[i + 1] *= scale;
-    positions[i + 2] *= scale;
+    const coldnessValue = coldnessSigma[i / 3] ?? threshold;
+    const normalized = (coldnessValue - threshold) / coldnessRange;
+    const color = colorAtStopPosition(normalized, COLDNESS_COLOR_STOPS);
+    colors[i] = color.r;
+    colors[i + 1] = color.g;
+    colors[i + 2] = color.b;
   }
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
@@ -117,71 +74,31 @@ export default function PotentialTemperatureStructuresLayer() {
   const verticalExaggeration = useControls(
     (state) => state.moistureStructureLayer.verticalExaggeration
   );
-  const {
-    cameraRef,
-    engineReady,
-    globeRef,
-    registerFramePass,
-    sceneRef,
-    signalReady,
-    timestamp,
-    unregisterFramePass,
-  } = useEarthLayer("potential-temperature-structures");
+  const { engineReady, sceneRef, globeRef, signalReady, timestamp } =
+    useEarthLayer("potential-temperature-structures");
 
   const rootRef = useRef<THREE.Group | null>(null);
-  const hotMeshRef = useRef<THREE.Mesh | null>(null);
-  const coolMeshRef = useRef<THREE.Mesh | null>(null);
-  const hotMaterialRef = useRef<THREE.MeshLambertMaterial | null>(null);
-  const coolMaterialRef = useRef<THREE.MeshLambertMaterial | null>(null);
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  const materialRef = useRef<THREE.MeshLambertMaterial | null>(null);
   const frameRef = useRef<PotentialTemperatureStructureFrame | null>(null);
   const reqIdRef = useRef(0);
-  const cameraPositionRef = useRef(new THREE.Vector3());
 
-  const rebuildMeshes = useCallback(() => {
+  const rebuildMesh = useCallback(() => {
     const root = rootRef.current;
-    const hotMaterial = hotMaterialRef.current;
-    const coolMaterial = coolMaterialRef.current;
+    const material = materialRef.current;
     const frame = frameRef.current;
-    if (!root || !hotMaterial || !coolMaterial || !frame) return;
+    if (!root || !material || !frame) return;
 
-    hotMeshRef.current?.removeFromParent();
-    hotMeshRef.current?.geometry.dispose();
-    coolMeshRef.current?.removeFromParent();
-    coolMeshRef.current?.geometry.dispose();
+    meshRef.current?.removeFromParent();
+    meshRef.current?.geometry.dispose();
 
-    if (frame.coolSide.indices.length > 0) {
-      const coolGeometry = buildGeometry(
-        frame,
-        frame.coolSide,
-        verticalExaggeration,
-        COOL_LAYER_CLEARANCE
-      );
-      const coolMesh = new THREE.Mesh(coolGeometry, coolMaterial);
-      coolMesh.name = "potential-temperature-cool-side";
-      coolMesh.renderOrder = COOL_RENDER_ORDER;
-      coolMesh.frustumCulled = false;
-      root.add(coolMesh);
-      coolMeshRef.current = coolMesh;
-    } else {
-      coolMeshRef.current = null;
-    }
-
-    if (frame.hotSide.indices.length > 0) {
-      const hotGeometry = buildGeometry(
-        frame,
-        frame.hotSide,
-        verticalExaggeration,
-        HOT_LAYER_CLEARANCE
-      );
-      const hotMesh = new THREE.Mesh(hotGeometry, hotMaterial);
-      hotMesh.name = "potential-temperature-hot-side";
-      hotMesh.renderOrder = HOT_RENDER_ORDER;
-      hotMesh.frustumCulled = false;
-      root.add(hotMesh);
-      hotMeshRef.current = hotMesh;
-    } else {
-      hotMeshRef.current = null;
-    }
+    const geometry = buildGeometry(frame, verticalExaggeration);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = "potential-temperature-cold-anomaly-shell";
+    mesh.renderOrder = LAYER_RENDER_ORDER;
+    mesh.frustumCulled = false;
+    root.add(mesh);
+    meshRef.current = mesh;
   }, [verticalExaggeration]);
 
   useEffect(() => {
@@ -191,39 +108,27 @@ export default function PotentialTemperatureStructuresLayer() {
     const root = new THREE.Group();
     root.name = "potential-temperature-structures-root";
     root.visible = layerState.visible;
-    root.renderOrder = HOT_RENDER_ORDER;
+    root.renderOrder = LAYER_RENDER_ORDER;
     root.frustumCulled = false;
     sceneRef.current.add(root);
     rootRef.current = root;
 
-    const baseMaterial = {
-      transparent: false,
+    const material = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      transparent: true,
       opacity: 1,
       depthWrite: true,
       depthTest: true,
       side: THREE.DoubleSide,
       flatShading: true,
-    } as const;
-    coolMaterialRef.current = new THREE.MeshLambertMaterial({
-      ...baseMaterial,
-      color: COOL_COLOR,
     });
-    hotMaterialRef.current = new THREE.MeshLambertMaterial({
-      ...baseMaterial,
-      color: HOT_COLOR,
-    });
-    attachThermalCutawayShader(coolMaterialRef.current);
-    attachThermalCutawayShader(hotMaterialRef.current);
+    materialRef.current = material;
 
     return () => {
-      hotMeshRef.current?.geometry.dispose();
-      coolMeshRef.current?.geometry.dispose();
-      hotMaterialRef.current?.dispose();
-      coolMaterialRef.current?.dispose();
-      hotMaterialRef.current = null;
-      coolMaterialRef.current = null;
-      hotMeshRef.current = null;
-      coolMeshRef.current = null;
+      meshRef.current?.geometry.dispose();
+      material.dispose();
+      materialRef.current = null;
+      meshRef.current = null;
       rootRef.current = null;
       root.removeFromParent();
     };
@@ -232,49 +137,16 @@ export default function PotentialTemperatureStructuresLayer() {
   useEffect(() => {
     if (!engineReady) return;
     const root = rootRef.current;
-    const hotMaterial = hotMaterialRef.current;
-    const coolMaterial = coolMaterialRef.current;
-    if (!root || !hotMaterial || !coolMaterial) return;
+    const material = materialRef.current;
+    if (!root || !material) return;
 
     root.visible = layerState.visible;
-    hotMaterial.opacity = 1;
-    hotMaterial.depthWrite = true;
-    hotMaterial.side = THREE.DoubleSide;
-    coolMaterial.opacity = 1;
-    coolMaterial.depthWrite = true;
-    coolMaterial.side = THREE.DoubleSide;
+    material.opacity = layerState.opacity;
+    material.depthWrite = layerState.opacity >= 0.999;
     if (frameRef.current) {
-      rebuildMeshes();
+      rebuildMesh();
     }
-  }, [engineReady, layerState.visible, rebuildMeshes]);
-
-  useEffect(() => {
-    if (!engineReady) return;
-
-    const applyCutawayState = () => {
-      const camera = cameraRef.current;
-      if (!camera) return;
-
-      camera.getWorldPosition(cameraPositionRef.current);
-      const cutawayRadius = Math.max(cameraPositionRef.current.length() - 90, 0);
-
-      for (const material of [hotMaterialRef.current, coolMaterialRef.current]) {
-        const uniforms = material?.userData
-          ?.thermalCutawayUniforms as ThermalCutawayUniforms | undefined;
-        if (!uniforms) continue;
-        uniforms.cutawayCenter.value.copy(cameraPositionRef.current);
-        uniforms.cutawayRadius.value = cutawayRadius;
-        uniforms.enabled.value = 1;
-      }
-    };
-
-    const framePassKey = "potential-temperature-cutaway";
-    applyCutawayState();
-    registerFramePass(framePassKey, applyCutawayState);
-    return () => {
-      unregisterFramePass(framePassKey);
-    };
-  }, [cameraRef, engineReady, registerFramePass, unregisterFramePass]);
+  }, [engineReady, layerState.opacity, layerState.visible, rebuildMesh]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -299,7 +171,7 @@ export default function PotentialTemperatureStructuresLayer() {
       .then((frame) => {
         if (isCancelled()) return;
         frameRef.current = frame;
-        rebuildMeshes();
+        rebuildMesh();
         signalReady(timestamp);
       })
       .catch((error) => {
@@ -311,7 +183,7 @@ export default function PotentialTemperatureStructuresLayer() {
     return () => {
       cancelled = true;
     };
-  }, [engineReady, layerState.visible, rebuildMeshes, signalReady, timestamp]);
+  }, [engineReady, layerState.visible, rebuildMesh, signalReady, timestamp]);
 
   return null;
 }

@@ -30,16 +30,20 @@ DERIVED_VARIABLE_NAME = "dry_potential_temperature"
 DERIVED_UNITS = "K"
 REFERENCE_PRESSURE_HPA = 1000.0
 POTENTIAL_TEMPERATURE_KAPPA = 287.05 / 1004.0
-LABEL_STRUCTURE = ndimage.generate_binary_structure(3, 3)
-OUTPUT_VERSION = 5
+LEVEL_COMPONENT_STRUCTURE = np.ones((3, 3), dtype=np.uint8)
+VOLUME_COMPONENT_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
+OUTPUT_VERSION = 6
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
 DEFAULT_OUTPUT_DIR = Path("public/potential-temperature-structures")
-DEFAULT_TOP_PERCENT = 20.0
+DEFAULT_Z_THRESHOLD_SIGMA = 1.0
 DEFAULT_INCLUDE_TIMESTAMPS = ("2021-11-08T12:00",)
 DEFAULT_BASE_RADIUS = 100.0
 DEFAULT_VERTICAL_SPAN = 12.0
 DEFAULT_LATITUDE_STRIDE = 4
 DEFAULT_LONGITUDE_STRIDE = 4
+DEFAULT_MIN_LEVEL_COMPONENT_SIZE = 32
+DEFAULT_PRESSURE_MIN_HPA = 250.0
+DEFAULT_PRESSURE_MAX_HPA = 1000.0
 
 
 @dataclass(frozen=True)
@@ -54,44 +58,32 @@ class DatasetContents:
 
 
 @dataclass(frozen=True)
-class VoxelSurfaceMesh:
+class ColdShellMesh:
     positions: np.ndarray
     indices: np.ndarray
+    coldness_sigma: np.ndarray
     voxel_count: int
 
 
 @dataclass(frozen=True)
-class ThresholdSidePayload:
-    positions: np.ndarray
-    indices: np.ndarray
-    voxel_count: int
-    component_count: int
-    touching_component_count: int
-    theta_min: float | None
-    theta_max: float | None
-    theta_mean: float | None
-    pressure_min_hpa: float | None
-    pressure_max_hpa: float | None
-
-
-@dataclass(frozen=True)
-class PotentialTemperatureAssetPayload:
+class ColdShellAssetPayload:
     timestamp: str
-    top_percent: float
-    threshold_value: float
-    finite_voxel_count: int
-    hot_side: ThresholdSidePayload
-    cool_side: ThresholdSidePayload
+    positions: np.ndarray
+    indices: np.ndarray
+    coldness_sigma: np.ndarray
+    voxel_count: int
+    metadata: dict[str, Any]
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build two opaque dry-potential-temperature voxel structures from ERA5 "
+            "Build cold dry-potential-temperature anomaly voxel shells from ERA5 "
             "pressure-level temperature. The builder derives dry potential "
-            "temperature in 3D, finds the global top 20 percent threshold by "
-            "default, keeps connected components on the hot and cool sides that "
-            "touch that threshold boundary, and exports voxel-face shells for both."
+            "temperature, subtracts a per-level zonal mean background, "
+            "standardizes the anomaly by level, keeps only cold anomalies at "
+            "or below a sigma threshold, removes small 2D level components, "
+            "and exports one 3D voxel-face shell colored by coldness."
         )
     )
     parser.add_argument(
@@ -107,22 +99,37 @@ def parse_args() -> argparse.Namespace:
         help="Directory where the generated potential-temperature assets will be written.",
     )
     parser.add_argument(
-        "--top-percent",
+        "--z-threshold-sigma",
         type=float,
-        default=DEFAULT_TOP_PERCENT,
+        default=DEFAULT_Z_THRESHOLD_SIGMA,
+        help="Keep voxels whose standardized cold anomaly is at or above this sigma value.",
+    )
+    parser.add_argument(
+        "--min-level-component-size",
+        type=int,
+        default=DEFAULT_MIN_LEVEL_COMPONENT_SIZE,
         help=(
-            "Use the global top N percent of dry potential temperature values as "
-            "the hot side of the threshold."
+            "Drop 2D connected components smaller than this many strided grid cells "
+            "on each pressure level before building the 3D shell."
         ),
+    )
+    parser.add_argument(
+        "--pressure-min-hpa",
+        type=float,
+        default=DEFAULT_PRESSURE_MIN_HPA,
+        help="Lowest pressure level to keep in the shell.",
+    )
+    parser.add_argument(
+        "--pressure-max-hpa",
+        type=float,
+        default=DEFAULT_PRESSURE_MAX_HPA,
+        help="Highest pressure level to keep in the shell.",
     )
     parser.add_argument(
         "--include-timestamps",
         type=str,
         default=",".join(DEFAULT_INCLUDE_TIMESTAMPS),
-        help=(
-            "Comma-separated ISO minute timestamps to build. "
-            "Defaults to the comparison frame."
-        ),
+        help="Comma-separated ISO minute timestamps to build.",
     )
     parser.add_argument(
         "--base-radius",
@@ -140,13 +147,13 @@ def parse_args() -> argparse.Namespace:
         "--latitude-stride",
         type=int,
         default=DEFAULT_LATITUDE_STRIDE,
-        help="Keep every Nth latitude sample when building the voxel shells.",
+        help="Keep every Nth latitude sample when building the voxel shell.",
     )
     parser.add_argument(
         "--longitude-stride",
         type=int,
         default=DEFAULT_LONGITUDE_STRIDE,
-        help="Keep every Nth longitude sample when building the voxel shells.",
+        help="Keep every Nth longitude sample when building the voxel shell.",
     )
     return parser.parse_args()
 
@@ -236,25 +243,11 @@ def compute_dry_potential_temperature(
 ) -> np.ndarray:
     temperature = np.asarray(temperature_values, dtype=np.float32)
     pressure_levels = np.asarray(pressure_levels_hpa, dtype=np.float32)
-
-    if temperature.ndim == 4:
-        pressure_scale = np.power(
-            REFERENCE_PRESSURE_HPA / pressure_levels[None, :, None, None],
-            POTENTIAL_TEMPERATURE_KAPPA,
-            dtype=np.float32,
-        )
-    elif temperature.ndim == 3:
-        pressure_scale = np.power(
-            REFERENCE_PRESSURE_HPA / pressure_levels[:, None, None],
-            POTENTIAL_TEMPERATURE_KAPPA,
-            dtype=np.float32,
-        )
-    else:
-        raise ValueError(
-            f"Expected temperature values with shape (time, level, lat, lon) or "
-            f"(level, lat, lon), got {temperature.shape}"
-        )
-
+    pressure_scale = np.power(
+        REFERENCE_PRESSURE_HPA / pressure_levels[:, None, None],
+        POTENTIAL_TEMPERATURE_KAPPA,
+        dtype=np.float32,
+    )
     return np.asarray(temperature * pressure_scale, dtype=np.float32)
 
 
@@ -274,28 +267,60 @@ def stride_spatial_axes(
     )
 
 
-def build_top_percent_mask(
+def select_pressure_window(
     field: np.ndarray,
-    top_percent: float,
-) -> tuple[np.ndarray, float]:
-    normalized_top_percent = float(top_percent)
-    if not np.isfinite(normalized_top_percent) or not 0.0 < normalized_top_percent <= 100.0:
+    pressure_levels_hpa: np.ndarray,
+    pressure_min_hpa: float,
+    pressure_max_hpa: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    lower = min(float(pressure_min_hpa), float(pressure_max_hpa))
+    upper = max(float(pressure_min_hpa), float(pressure_max_hpa))
+    keep = np.asarray(
+        (pressure_levels_hpa >= lower) & (pressure_levels_hpa <= upper),
+        dtype=bool,
+    )
+    if not keep.any():
         raise ValueError(
-            f"top_percent must be a finite value in (0, 100], got {top_percent}"
+            f"No pressure levels fall within [{lower}, {upper}] hPa."
         )
-
-    finite_mask = np.isfinite(field)
-    finite_values = np.asarray(field[finite_mask], dtype=np.float32)
-    if finite_values.size == 0:
-        raise ValueError("Cannot threshold dry potential temperature with no finite values.")
-
-    keep_quantile = 1.0 - normalized_top_percent / 100.0
-    threshold_value = float(np.quantile(finite_values, keep_quantile))
-    keep_mask = np.asarray(finite_mask & (field >= threshold_value), dtype=bool)
-    return keep_mask, threshold_value
+    return np.asarray(field[keep], dtype=np.float32), np.asarray(pressure_levels_hpa[keep], dtype=np.float32)
 
 
-def build_seam_merged_component_info(labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def build_standardized_coldness_sigma(
+    theta_field: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    zonal_mean = np.nanmean(theta_field, axis=2, keepdims=True)
+    anomaly = np.asarray(theta_field - zonal_mean, dtype=np.float32)
+    level_std = np.nanstd(anomaly, axis=(1, 2), keepdims=True)
+    safe_std = np.where(
+        np.isfinite(level_std) & (level_std > 1e-6),
+        level_std,
+        1.0,
+    ).astype(np.float32)
+    z_score = np.asarray(anomaly / safe_std, dtype=np.float32)
+    coldness_sigma = np.asarray(np.maximum(-z_score, 0.0), dtype=np.float32)
+    return z_score, coldness_sigma, safe_std[:, 0, 0]
+
+
+def build_cold_mask(
+    coldness_sigma: np.ndarray,
+    z_threshold_sigma: float,
+) -> np.ndarray:
+    normalized_threshold = float(z_threshold_sigma)
+    if not np.isfinite(normalized_threshold) or normalized_threshold <= 0.0:
+        raise ValueError(
+            f"z_threshold_sigma must be a finite value greater than 0, got {z_threshold_sigma}"
+        )
+    return np.asarray(
+        np.isfinite(coldness_sigma) & (coldness_sigma >= normalized_threshold),
+        dtype=bool,
+    )
+
+
+def build_seam_merged_component_info(
+    labels: np.ndarray,
+    seam_pairs: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     component_count = int(labels.max())
     if component_count <= 0:
         return np.zeros(1, dtype=np.int32), np.zeros(0, dtype=np.int32)
@@ -324,7 +349,6 @@ def build_seam_merged_component_info(labels: np.ndarray) -> tuple[np.ndarray, np
         else:
             parent[root_a] = root_b
 
-    seam_pairs = np.column_stack([labels[..., 0].reshape(-1), labels[..., -1].reshape(-1)])
     for first_label, duplicate_label in seam_pairs:
         union(int(first_label), int(duplicate_label))
 
@@ -335,18 +359,91 @@ def build_seam_merged_component_info(labels: np.ndarray) -> tuple[np.ndarray, np
     return root_map, np.unique(root_map[1:])
 
 
-def label_wrapped_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
+def filter_small_wrapped_level_components(
+    keep_mask: np.ndarray,
+    min_component_size: int,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    normalized_min_component_size = max(int(min_component_size), 0)
+    if normalized_min_component_size <= 0:
+        return np.asarray(keep_mask, dtype=bool), {
+            "minimum_component_size": 0,
+            "connectivity": "8-connected-within-level",
+            "wraps_longitude": True,
+            "component_count_before_filter": 0,
+            "component_count_after_filter": 0,
+            "removed_component_count": 0,
+            "removed_voxel_count": 0,
+        }
+
+    filtered_mask = np.zeros_like(keep_mask, dtype=bool)
+    component_count_before = 0
+    component_count_after = 0
+
+    for level_index in range(keep_mask.shape[0]):
+        layer_mask = np.asarray(keep_mask[level_index], dtype=bool)
+        if not layer_mask.any():
+            continue
+
+        longitude_count = layer_mask.shape[1]
+        extended = np.concatenate([layer_mask, layer_mask[:, :1]], axis=1)
+        labels, component_count = ndimage.label(extended, structure=LEVEL_COMPONENT_STRUCTURE)
+        if component_count <= 0:
+            continue
+
+        seam_pairs = np.column_stack([labels[:, 0].reshape(-1), labels[:, -1].reshape(-1)])
+        root_map, unique_root_ids = build_seam_merged_component_info(labels, seam_pairs)
+        component_count_before += int(unique_root_ids.size)
+
+        label_ids = np.arange(1, component_count + 1, dtype=np.int32)
+        extended_counts = np.asarray(
+            ndimage.sum(
+                np.ones_like(labels, dtype=np.int32),
+                labels=labels,
+                index=label_ids,
+            ),
+            dtype=np.int32,
+        )
+        root_counts = np.zeros(component_count + 1, dtype=np.int32)
+        np.add.at(root_counts, root_map[label_ids], extended_counts)
+
+        seam_duplicate_labels = labels[:, -1][layer_mask[:, 0]]
+        seam_duplicate_counts = np.zeros(component_count + 1, dtype=np.int32)
+        if seam_duplicate_labels.size:
+            np.add.at(seam_duplicate_counts, root_map[seam_duplicate_labels], 1)
+
+        unique_counts = root_counts - seam_duplicate_counts
+        kept_root_ids = unique_root_ids[
+            unique_counts[unique_root_ids] >= normalized_min_component_size
+        ]
+        filtered_layer = np.isin(root_map[labels[:, :longitude_count]], kept_root_ids)
+        filtered_mask[level_index] = filtered_layer
+        component_count_after += int(kept_root_ids.size)
+
+    removed_voxel_count = int(keep_mask.sum() - filtered_mask.sum())
+    return filtered_mask, {
+        "minimum_component_size": normalized_min_component_size,
+        "connectivity": "8-connected-within-level",
+        "wraps_longitude": True,
+        "component_count_before_filter": int(component_count_before),
+        "component_count_after_filter": int(component_count_after),
+        "removed_component_count": int(component_count_before - component_count_after),
+        "removed_voxel_count": removed_voxel_count,
+    }
+
+
+def label_wrapped_volume_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     occupied = np.asarray(mask, dtype=bool)
     if not occupied.any():
         return np.zeros_like(occupied, dtype=np.int32), 0
 
     longitude_count = occupied.shape[2]
     extended = np.concatenate([occupied, occupied[..., :1]], axis=2)
-    labels, component_count = ndimage.label(extended, structure=LABEL_STRUCTURE)
+    labels, component_count = ndimage.label(extended, structure=VOLUME_COMPONENT_STRUCTURE)
     if component_count <= 0:
         return np.zeros_like(occupied, dtype=np.int32), 0
 
-    root_map, unique_root_ids = build_seam_merged_component_info(labels)
+    seam_pairs = np.column_stack([labels[..., 0].reshape(-1), labels[..., -1].reshape(-1)])
+    root_map, unique_root_ids = build_seam_merged_component_info(labels, seam_pairs)
     if unique_root_ids.size == 0:
         return np.zeros_like(occupied, dtype=np.int32), 0
 
@@ -354,38 +451,6 @@ def label_wrapped_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     compact_root_ids[unique_root_ids] = np.arange(1, unique_root_ids.size + 1, dtype=np.int32)
     compact_labels = compact_root_ids[root_map[labels[..., :longitude_count]]]
     return compact_labels.astype(np.int32), int(unique_root_ids.size)
-
-
-def build_gradient_adjacency_mask(mask: np.ndarray, opposite_mask: np.ndarray) -> np.ndarray:
-    occupied = np.asarray(mask, dtype=bool)
-    opposite = np.asarray(opposite_mask, dtype=bool)
-    adjacency = np.zeros_like(occupied, dtype=bool)
-
-    adjacency[:-1, :, :] |= occupied[:-1, :, :] & opposite[1:, :, :]
-    adjacency[1:, :, :] |= occupied[1:, :, :] & opposite[:-1, :, :]
-    adjacency[:, :-1, :] |= occupied[:, :-1, :] & opposite[:, 1:, :]
-    adjacency[:, 1:, :] |= occupied[:, 1:, :] & opposite[:, :-1, :]
-    adjacency |= occupied & np.roll(opposite, 1, axis=2)
-    adjacency |= occupied & np.roll(opposite, -1, axis=2)
-    return adjacency
-
-
-def keep_components_touching_opposite(
-    mask: np.ndarray,
-    opposite_mask: np.ndarray,
-) -> tuple[np.ndarray, int, int]:
-    labels, component_count = label_wrapped_components(mask)
-    if component_count <= 0:
-        return np.zeros_like(mask, dtype=bool), 0, 0
-
-    touching_voxels = build_gradient_adjacency_mask(mask, opposite_mask)
-    touching_component_ids = np.unique(labels[touching_voxels])
-    touching_component_ids = touching_component_ids[touching_component_ids > 0]
-    if touching_component_ids.size == 0:
-        return np.zeros_like(mask, dtype=bool), component_count, 0
-
-    keep_mask = np.isin(labels, touching_component_ids)
-    return keep_mask.astype(bool), component_count, int(touching_component_ids.size)
 
 
 def lat_lon_to_xyz(lat_deg: float, lon_deg: float, radius: float) -> np.ndarray:
@@ -397,11 +462,13 @@ def lat_lon_to_xyz(lat_deg: float, lon_deg: float, radius: float) -> np.ndarray:
     return np.array([x, y, z], dtype=np.float32)
 
 
-def append_quad(
+def append_colored_quad(
     corners: list[tuple[int, int, int]],
+    voxel_coldness_sigma: float,
     *,
     vertex_lookup: dict[tuple[int, int, int], int],
     positions: list[float],
+    coldness_values: list[float],
     indices: list[int],
     radius_bounds: np.ndarray,
     latitude_bounds: np.ndarray,
@@ -419,7 +486,13 @@ def append_quad(
             )
             vertex_index = len(positions) // 3
             positions.extend(float(value) for value in vertex)
+            coldness_values.append(float(voxel_coldness_sigma))
             vertex_lookup[key] = vertex_index
+        else:
+            coldness_values[vertex_index] = max(
+                coldness_values[vertex_index],
+                float(voxel_coldness_sigma),
+            )
         quad_indices.append(vertex_index)
 
     indices.extend(
@@ -434,28 +507,22 @@ def append_quad(
     )
 
 
-def build_exposed_face_mesh_from_mask(
+def build_exposed_face_mesh_with_coldness(
     *,
-    source_mask: np.ndarray,
+    keep_mask: np.ndarray,
+    coldness_sigma: np.ndarray,
     pressure_levels_hpa: np.ndarray,
     latitudes_deg: np.ndarray,
     longitudes_deg: np.ndarray,
     base_radius: float,
     vertical_span: float,
-    occupancy_mask: np.ndarray | None = None,
-) -> VoxelSurfaceMesh:
-    emit_mask = np.asarray(source_mask, dtype=bool)
-    occupancy = emit_mask if occupancy_mask is None else np.asarray(occupancy_mask, dtype=bool)
-
-    if emit_mask.shape != occupancy.shape:
-        raise ValueError(
-            f"source_mask shape {emit_mask.shape} must match occupancy_mask shape {occupancy.shape}"
-        )
-
-    if not emit_mask.any():
-        return VoxelSurfaceMesh(
+) -> ColdShellMesh:
+    occupied = np.asarray(keep_mask, dtype=bool)
+    if not occupied.any():
+        return ColdShellMesh(
             positions=np.zeros(0, dtype=np.float32),
             indices=np.zeros(0, dtype=np.uint32),
+            coldness_sigma=np.zeros(0, dtype=np.float32),
             voxel_count=0,
         )
 
@@ -468,10 +535,11 @@ def build_exposed_face_mesh_from_mask(
     latitude_bounds = build_axis_bounds(latitudes_deg)
     longitude_bounds = build_axis_bounds(longitudes_deg)
 
-    level_count, latitude_count, longitude_count = emit_mask.shape
-    occupied_cells = np.argwhere(emit_mask)
+    level_count, latitude_count, longitude_count = occupied.shape
+    occupied_cells = np.argwhere(occupied)
     vertex_lookup: dict[tuple[int, int, int], int] = {}
     positions: list[float] = []
+    coldness_values: list[float] = []
     indices: list[int] = []
 
     for level_index, latitude_index, longitude_index in occupied_cells:
@@ -481,130 +549,160 @@ def build_exposed_face_mesh_from_mask(
         a1 = a0 + 1
         o0 = int(longitude_index)
         o1 = o0 + 1
+        voxel_coldness_sigma = float(coldness_sigma[r0, a0, o0])
 
         west_neighbor = (o0 - 1) % longitude_count
         east_neighbor = (o0 + 1) % longitude_count
 
-        if r0 == 0 or not occupancy[r0 - 1, a0, o0]:
-            append_quad(
+        if r0 == 0 or not occupied[r0 - 1, a0, o0]:
+            append_colored_quad(
                 corners=[(r0, a0, o0), (r0, a1, o0), (r0, a1, o1), (r0, a0, o1)],
+                voxel_coldness_sigma=voxel_coldness_sigma,
                 vertex_lookup=vertex_lookup,
                 positions=positions,
+                coldness_values=coldness_values,
                 indices=indices,
                 radius_bounds=radius_bounds,
                 latitude_bounds=latitude_bounds,
                 longitude_bounds=longitude_bounds,
             )
-        if r0 == level_count - 1 or not occupancy[r0 + 1, a0, o0]:
-            append_quad(
+        if r0 == level_count - 1 or not occupied[r0 + 1, a0, o0]:
+            append_colored_quad(
                 corners=[(r1, a0, o0), (r1, a0, o1), (r1, a1, o1), (r1, a1, o0)],
+                voxel_coldness_sigma=voxel_coldness_sigma,
                 vertex_lookup=vertex_lookup,
                 positions=positions,
+                coldness_values=coldness_values,
                 indices=indices,
                 radius_bounds=radius_bounds,
                 latitude_bounds=latitude_bounds,
                 longitude_bounds=longitude_bounds,
             )
-        if a0 == 0 or not occupancy[r0, a0 - 1, o0]:
-            append_quad(
+        if a0 == 0 or not occupied[r0, a0 - 1, o0]:
+            append_colored_quad(
                 corners=[(r0, a0, o0), (r0, a0, o1), (r1, a0, o1), (r1, a0, o0)],
+                voxel_coldness_sigma=voxel_coldness_sigma,
                 vertex_lookup=vertex_lookup,
                 positions=positions,
+                coldness_values=coldness_values,
                 indices=indices,
                 radius_bounds=radius_bounds,
                 latitude_bounds=latitude_bounds,
                 longitude_bounds=longitude_bounds,
             )
-        if a0 == latitude_count - 1 or not occupancy[r0, a0 + 1, o0]:
-            append_quad(
+        if a0 == latitude_count - 1 or not occupied[r0, a0 + 1, o0]:
+            append_colored_quad(
                 corners=[(r0, a1, o0), (r1, a1, o0), (r1, a1, o1), (r0, a1, o1)],
+                voxel_coldness_sigma=voxel_coldness_sigma,
                 vertex_lookup=vertex_lookup,
                 positions=positions,
+                coldness_values=coldness_values,
                 indices=indices,
                 radius_bounds=radius_bounds,
                 latitude_bounds=latitude_bounds,
                 longitude_bounds=longitude_bounds,
             )
-        if not occupancy[r0, a0, west_neighbor]:
-            append_quad(
+        if not occupied[r0, a0, west_neighbor]:
+            append_colored_quad(
                 corners=[(r0, a0, o0), (r1, a0, o0), (r1, a1, o0), (r0, a1, o0)],
+                voxel_coldness_sigma=voxel_coldness_sigma,
                 vertex_lookup=vertex_lookup,
                 positions=positions,
+                coldness_values=coldness_values,
                 indices=indices,
                 radius_bounds=radius_bounds,
                 latitude_bounds=latitude_bounds,
                 longitude_bounds=longitude_bounds,
             )
-        if not occupancy[r0, a0, east_neighbor]:
-            append_quad(
+        if not occupied[r0, a0, east_neighbor]:
+            append_colored_quad(
                 corners=[(r0, a0, o1), (r0, a1, o1), (r1, a1, o1), (r1, a0, o1)],
+                voxel_coldness_sigma=voxel_coldness_sigma,
                 vertex_lookup=vertex_lookup,
                 positions=positions,
+                coldness_values=coldness_values,
                 indices=indices,
                 radius_bounds=radius_bounds,
                 latitude_bounds=latitude_bounds,
                 longitude_bounds=longitude_bounds,
             )
 
-    return VoxelSurfaceMesh(
+    return ColdShellMesh(
         positions=np.asarray(positions, dtype=np.float32),
         indices=np.asarray(indices, dtype=np.uint32),
+        coldness_sigma=np.asarray(coldness_values, dtype=np.float32),
         voxel_count=int(occupied_cells.shape[0]),
     )
 
 
-def build_side_payload(
+def build_asset_payload(
     *,
-    keep_mask: np.ndarray,
+    timestamp: str,
     theta_field: np.ndarray,
+    coldness_sigma: np.ndarray,
+    keep_mask: np.ndarray,
     pressure_levels_hpa: np.ndarray,
     latitudes_deg: np.ndarray,
     longitudes_deg: np.ndarray,
+    z_threshold_sigma: float,
     base_radius: float,
     vertical_span: float,
-    component_count: int,
-    touching_component_count: int,
-    occupancy_mask: np.ndarray | None = None,
-) -> ThresholdSidePayload:
-    mesh = build_exposed_face_mesh_from_mask(
-        source_mask=keep_mask,
-        occupancy_mask=occupancy_mask,
+    selection_metadata: dict[str, Any],
+) -> ColdShellAssetPayload:
+    mesh = build_exposed_face_mesh_with_coldness(
+        keep_mask=keep_mask,
+        coldness_sigma=coldness_sigma,
         pressure_levels_hpa=pressure_levels_hpa,
         latitudes_deg=latitudes_deg,
         longitudes_deg=longitudes_deg,
         base_radius=base_radius,
         vertical_span=vertical_span,
     )
-
-    if not keep_mask.any():
-        return ThresholdSidePayload(
-            positions=mesh.positions,
-            indices=mesh.indices,
-            voxel_count=0,
-            component_count=int(component_count),
-            touching_component_count=int(touching_component_count),
-            theta_min=None,
-            theta_max=None,
-            theta_mean=None,
-            pressure_min_hpa=None,
-            pressure_max_hpa=None,
-        )
+    if mesh.voxel_count <= 0:
+        raise ValueError("No voxels survived the potential-temperature anomaly selection.")
 
     occupied_coords = np.argwhere(keep_mask)
     pressure_indices = occupied_coords[:, 0]
-    kept_values = np.asarray(theta_field[keep_mask], dtype=np.float32)
+    latitude_indices = occupied_coords[:, 1]
+    longitude_indices = occupied_coords[:, 2]
+    kept_theta = np.asarray(theta_field[keep_mask], dtype=np.float32)
+    kept_coldness = np.asarray(coldness_sigma[keep_mask], dtype=np.float32)
+    component_labels, component_count = label_wrapped_volume_components(keep_mask)
+    component_sizes = (
+        np.bincount(component_labels[component_labels > 0].ravel())
+        if component_count > 0
+        else np.zeros(0, dtype=np.int32)
+    )
 
-    return ThresholdSidePayload(
+    metadata = {
+        "component_count": int(component_count),
+        "largest_component_voxel_count": int(component_sizes.max()) if component_sizes.size else 0,
+        "thresholded_voxel_count": int(mesh.voxel_count),
+        "vertex_count": int(mesh.positions.size // 3),
+        "index_count": int(mesh.indices.size),
+        "theta_min": float(np.min(kept_theta)),
+        "theta_max": float(np.max(kept_theta)),
+        "theta_mean": float(np.mean(kept_theta)),
+        "coldness_sigma_min": float(np.min(kept_coldness)),
+        "coldness_sigma_max": float(np.max(kept_coldness)),
+        "coldness_sigma_mean": float(np.mean(kept_coldness)),
+        "pressure_min_hpa": float(np.min(pressure_levels_hpa[pressure_indices])),
+        "pressure_max_hpa": float(np.max(pressure_levels_hpa[pressure_indices])),
+        "latitude_min_deg": float(np.min(latitudes_deg[latitude_indices])),
+        "latitude_max_deg": float(np.max(latitudes_deg[latitude_indices])),
+        "longitude_min_deg": float(np.min(longitudes_deg[longitude_indices])),
+        "longitude_max_deg": float(np.max(longitudes_deg[longitude_indices])),
+        "selection": selection_metadata,
+        "z_threshold_sigma": float(z_threshold_sigma),
+    }
+
+    return ColdShellAssetPayload(
+        timestamp=timestamp,
         positions=mesh.positions,
         indices=mesh.indices,
-        voxel_count=int(keep_mask.sum()),
-        component_count=int(component_count),
-        touching_component_count=int(touching_component_count),
-        theta_min=float(np.min(kept_values)),
-        theta_max=float(np.max(kept_values)),
-        theta_mean=float(np.mean(kept_values)),
-        pressure_min_hpa=float(np.min(pressure_levels_hpa[pressure_indices])),
-        pressure_max_hpa=float(np.max(pressure_levels_hpa[pressure_indices])),
+        coldness_sigma=mesh.coldness_sigma,
+        voxel_count=int(mesh.voxel_count),
+        metadata=metadata,
     )
 
 
@@ -624,126 +722,41 @@ def clear_output_dir(output_dir: Path) -> None:
             child.unlink()
 
 
-def build_asset_payload(
-    *,
-    timestamp: str,
-    potential_temperature_field: np.ndarray,
-    pressure_levels_hpa: np.ndarray,
-    latitudes_deg: np.ndarray,
-    longitudes_deg: np.ndarray,
-    top_percent: float,
-    base_radius: float,
-    vertical_span: float,
-) -> PotentialTemperatureAssetPayload:
-    hot_mask, threshold_value = build_top_percent_mask(
-        potential_temperature_field,
-        top_percent=top_percent,
-    )
-    finite_mask = np.isfinite(potential_temperature_field)
-    cool_mask = np.asarray(finite_mask & ~hot_mask, dtype=bool)
-
-    hot_keep_mask, hot_component_count, hot_touching_component_count = (
-        keep_components_touching_opposite(hot_mask, cool_mask)
-    )
-    cool_keep_mask, cool_component_count, cool_touching_component_count = (
-        keep_components_touching_opposite(cool_mask, hot_mask)
-    )
-
-    hot_side = build_side_payload(
-        keep_mask=hot_keep_mask,
-        theta_field=potential_temperature_field,
-        pressure_levels_hpa=pressure_levels_hpa,
-        latitudes_deg=latitudes_deg,
-        longitudes_deg=longitudes_deg,
-        base_radius=base_radius,
-        vertical_span=vertical_span,
-        component_count=hot_component_count,
-        touching_component_count=hot_touching_component_count,
-        occupancy_mask=hot_keep_mask,
-    )
-    cool_side = build_side_payload(
-        keep_mask=cool_keep_mask,
-        theta_field=potential_temperature_field,
-        pressure_levels_hpa=pressure_levels_hpa,
-        latitudes_deg=latitudes_deg,
-        longitudes_deg=longitudes_deg,
-        base_radius=base_radius,
-        vertical_span=vertical_span,
-        component_count=cool_component_count,
-        touching_component_count=cool_touching_component_count,
-        occupancy_mask=np.asarray(hot_keep_mask | cool_keep_mask, dtype=bool),
-    )
-
-    return PotentialTemperatureAssetPayload(
-        timestamp=timestamp,
-        top_percent=float(top_percent),
-        threshold_value=float(threshold_value),
-        finite_voxel_count=int(finite_mask.sum()),
-        hot_side=hot_side,
-        cool_side=cool_side,
-    )
-
-
-def build_side_metadata(
-    output_dir: Path,
-    side_slug: str,
-    side_payload: ThresholdSidePayload,
-    frame_dir: Path,
-) -> dict[str, Any]:
-    positions_path = frame_dir / f"{side_slug}_positions.bin"
-    indices_path = frame_dir / f"{side_slug}_indices.bin"
-
-    side_payload.positions.astype("<f4").tofile(positions_path)
-    side_payload.indices.astype("<u4").tofile(indices_path)
-
-    return {
-        "voxel_count": side_payload.voxel_count,
-        "component_count": side_payload.component_count,
-        "touching_component_count": side_payload.touching_component_count,
-        "vertex_count": int(side_payload.positions.size // 3),
-        "index_count": int(side_payload.indices.size),
-        "theta_min": side_payload.theta_min,
-        "theta_max": side_payload.theta_max,
-        "theta_mean": side_payload.theta_mean,
-        "pressure_min_hpa": side_payload.pressure_min_hpa,
-        "pressure_max_hpa": side_payload.pressure_max_hpa,
-        "positions_file": str(positions_path.relative_to(output_dir)).replace("\\", "/"),
-        "indices_file": str(indices_path.relative_to(output_dir)).replace("\\", "/"),
-    }
-
-
 def write_frame(
     output_dir: Path,
-    payload: PotentialTemperatureAssetPayload,
+    payload: ColdShellAssetPayload,
 ) -> dict[str, Any]:
     slug = timestamp_to_slug(payload.timestamp)
     frame_dir = output_dir / slug
     frame_dir.mkdir(parents=True, exist_ok=True)
 
+    positions_path = frame_dir / "positions.bin"
+    indices_path = frame_dir / "indices.bin"
+    coldness_path = frame_dir / "coldness_sigma.bin"
     metadata_path = frame_dir / "metadata.json"
 
-    hot_side_metadata = build_side_metadata(output_dir, "hot", payload.hot_side, frame_dir)
-    cool_side_metadata = build_side_metadata(output_dir, "cool", payload.cool_side, frame_dir)
+    payload.positions.astype("<f4").tofile(positions_path)
+    payload.indices.astype("<u4").tofile(indices_path)
+    payload.coldness_sigma.astype("<f4").tofile(coldness_path)
 
     metadata = {
         "version": OUTPUT_VERSION,
         "timestamp": payload.timestamp,
-        "top_percent": payload.top_percent,
-        "threshold_value": payload.threshold_value,
-        "finite_voxel_count": payload.finite_voxel_count,
-        "hot_side": hot_side_metadata,
-        "cool_side": cool_side_metadata,
+        **payload.metadata,
+        "positions_file": str(positions_path.relative_to(output_dir)).replace("\\", "/"),
+        "indices_file": str(indices_path.relative_to(output_dir)).replace("\\", "/"),
+        "coldness_sigma_file": str(coldness_path.relative_to(output_dir)).replace("\\", "/"),
     }
     write_json(metadata_path, metadata)
 
     return {
         "timestamp": payload.timestamp,
         "metadata": str(metadata_path.relative_to(output_dir)).replace("\\", "/"),
-        "threshold_value": payload.threshold_value,
-        "hot_voxel_count": payload.hot_side.voxel_count,
-        "cool_voxel_count": payload.cool_side.voxel_count,
-        "hot_component_count": payload.hot_side.touching_component_count,
-        "cool_component_count": payload.cool_side.touching_component_count,
+        "positions": str(positions_path.relative_to(output_dir)).replace("\\", "/"),
+        "indices": str(indices_path.relative_to(output_dir)).replace("\\", "/"),
+        "coldness_sigma": str(coldness_path.relative_to(output_dir)).replace("\\", "/"),
+        "voxel_count": payload.voxel_count,
+        "component_count": int(payload.metadata["component_count"]),
     }
 
 
@@ -751,11 +764,15 @@ def build_manifest(
     *,
     contents: DatasetContents,
     entries: list[dict[str, Any]],
-    top_percent: float,
+    z_threshold_sigma: float,
+    min_level_component_size: int,
+    pressure_min_hpa: float,
+    pressure_max_hpa: float,
     latitude_stride: int,
     longitude_stride: int,
     latitudes_deg: np.ndarray,
     longitudes_deg: np.ndarray,
+    pressure_levels_hpa: np.ndarray,
     base_radius: float,
     vertical_span: float,
 ) -> dict[str, Any]:
@@ -770,24 +787,27 @@ def build_manifest(
             "reference_pressure_hpa": REFERENCE_PRESSURE_HPA,
             "kappa": POTENTIAL_TEMPERATURE_KAPPA,
         },
-        "structure_kind": "potential-temperature-threshold-shells",
+        "structure_kind": "potential-temperature-cold-zonal-anomaly-shell",
         "geometry_mode": "voxel-faces",
-        "threshold": {
-            "kind": "global_top_percent",
-            "top_percent": float(top_percent),
-            "quantile": float(1.0 - top_percent / 100.0),
-        },
         "selection": {
-            "connectivity": "26-connected",
+            "background": "per-level_zonal_mean",
+            "standardization": "per-level_stddev",
+            "keep_side": "cold_only",
+            "z_threshold_sigma": float(z_threshold_sigma),
+            "minimum_level_component_size": int(max(min_level_component_size, 0)),
+            "level_component_connectivity": "8-connected",
+            "volume_connectivity": "26-connected",
             "wraps_longitude": True,
-            "side_rule": "components_touching_opposite_threshold_side",
-            "hot_interface_faces_visible": True,
-            "cool_interface_faces_visible": False,
         },
         "sampling": {
             "latitude_stride": int(max(latitude_stride, 1)),
             "longitude_stride": int(max(longitude_stride, 1)),
             "method": "subsample_centers",
+        },
+        "pressure_window_hpa": {
+            "min": float(min(pressure_min_hpa, pressure_max_hpa)),
+            "max": float(max(pressure_min_hpa, pressure_max_hpa)),
+            "level_count": int(pressure_levels_hpa.size),
         },
         "globe": {
             "base_radius": base_radius,
@@ -795,7 +815,7 @@ def build_manifest(
             "reference_pressure_hpa": {"min": 1.0, "max": 1000.0},
         },
         "grid": {
-            "pressure_level_count": int(contents.pressure_levels_hpa.size),
+            "pressure_level_count": int(pressure_levels_hpa.size),
             "latitude_count": int(latitudes_deg.size),
             "longitude_count": int(longitudes_deg.size),
             "latitude_step_degrees": coordinate_step_degrees(latitudes_deg),
@@ -821,11 +841,13 @@ def main() -> None:
     clear_output_dir(output_dir)
 
     raw_dataset = netCDF4.Dataset(dataset_path)
-    strided_latitudes_deg = contents.latitudes_deg[:: max(int(args.latitude_stride), 1)]
-    strided_longitudes_deg = contents.longitudes_deg[:: max(int(args.longitude_stride), 1)]
     try:
         variable = raw_dataset.variables[TEMPERATURE_VARIABLE]
         entries: list[dict[str, Any]] = []
+        final_latitudes_deg: np.ndarray | None = None
+        final_longitudes_deg: np.ndarray | None = None
+        final_pressure_levels_hpa: np.ndarray | None = None
+
         for time_index, timestamp in enumerate(contents.timestamps):
             if timestamp not in target_timestamps:
                 continue
@@ -834,53 +856,91 @@ def main() -> None:
                 np.asarray(variable[time_index, :, :, :], dtype=np.float32),
                 contents.longitude_order,
             )
-            temperature_field, _, _ = stride_spatial_axes(
+            temperature_field, strided_latitudes_deg, strided_longitudes_deg = stride_spatial_axes(
                 temperature_field,
                 contents.latitudes_deg,
                 contents.longitudes_deg,
                 latitude_stride=args.latitude_stride,
                 longitude_stride=args.longitude_stride,
             )
-            potential_temperature_field = compute_dry_potential_temperature(
+            pressure_window_field, pressure_window_levels_hpa = select_pressure_window(
                 temperature_field,
                 contents.pressure_levels_hpa,
+                pressure_min_hpa=args.pressure_min_hpa,
+                pressure_max_hpa=args.pressure_max_hpa,
             )
+            theta_field = compute_dry_potential_temperature(
+                pressure_window_field,
+                pressure_window_levels_hpa,
+            )
+            _, coldness_sigma, _ = build_standardized_coldness_sigma(theta_field)
+            raw_keep_mask = build_cold_mask(
+                coldness_sigma,
+                z_threshold_sigma=args.z_threshold_sigma,
+            )
+            keep_mask, level_filter_metadata = filter_small_wrapped_level_components(
+                raw_keep_mask,
+                min_component_size=args.min_level_component_size,
+            )
+            if not keep_mask.any():
+                print(
+                    "Skipped potential temperature frame after postprocess:",
+                    timestamp,
+                    f"z_threshold_sigma={args.z_threshold_sigma}",
+                    f"minimum_level_component_size={max(args.min_level_component_size, 0)}",
+                )
+                continue
+
+            selection_metadata = {
+                "raw_voxel_count": int(raw_keep_mask.sum()),
+                "removed_voxel_count": int(raw_keep_mask.sum() - keep_mask.sum()),
+                "postprocess": level_filter_metadata,
+            }
             payload = build_asset_payload(
                 timestamp=timestamp,
-                potential_temperature_field=potential_temperature_field,
-                pressure_levels_hpa=contents.pressure_levels_hpa,
+                theta_field=theta_field,
+                coldness_sigma=coldness_sigma,
+                keep_mask=keep_mask,
+                pressure_levels_hpa=pressure_window_levels_hpa,
                 latitudes_deg=strided_latitudes_deg,
                 longitudes_deg=strided_longitudes_deg,
-                top_percent=args.top_percent,
+                z_threshold_sigma=args.z_threshold_sigma,
                 base_radius=args.base_radius,
                 vertical_span=args.vertical_span,
+                selection_metadata=selection_metadata,
             )
             entries.append(write_frame(output_dir=output_dir, payload=payload))
+            final_latitudes_deg = strided_latitudes_deg
+            final_longitudes_deg = strided_longitudes_deg
+            final_pressure_levels_hpa = pressure_window_levels_hpa
+
             print(
-                "Built potential temperature threshold shells:",
+                "Built cold potential temperature shell:",
                 timestamp,
-                f"threshold={payload.threshold_value:.3f}",
-                f"hot_voxels={payload.hot_side.voxel_count}",
-                f"cool_voxels={payload.cool_side.voxel_count}",
-                f"hot_components={payload.hot_side.touching_component_count}",
-                f"cool_components={payload.cool_side.touching_component_count}",
-                f"hot_triangles={payload.hot_side.indices.size // 3}",
-                f"cool_triangles={payload.cool_side.indices.size // 3}",
+                f"voxels={payload.voxel_count}",
+                f"components={payload.metadata['component_count']}",
+                f"removed_level_voxels={level_filter_metadata['removed_voxel_count']}",
+                f"coldness_sigma_max={payload.metadata['coldness_sigma_max']:.2f}",
+                f"triangles={payload.indices.size // 3}",
             )
     finally:
         raw_dataset.close()
 
-    if not entries:
+    if not entries or final_latitudes_deg is None or final_longitudes_deg is None or final_pressure_levels_hpa is None:
         raise ValueError("No potential-temperature frames were written.")
 
     manifest = build_manifest(
         contents=contents,
         entries=entries,
-        top_percent=args.top_percent,
+        z_threshold_sigma=args.z_threshold_sigma,
+        min_level_component_size=args.min_level_component_size,
+        pressure_min_hpa=args.pressure_min_hpa,
+        pressure_max_hpa=args.pressure_max_hpa,
         latitude_stride=args.latitude_stride,
         longitude_stride=args.longitude_stride,
-        latitudes_deg=strided_latitudes_deg,
-        longitudes_deg=strided_longitudes_deg,
+        latitudes_deg=final_latitudes_deg,
+        longitudes_deg=final_longitudes_deg,
+        pressure_levels_hpa=final_pressure_levels_hpa,
         base_radius=args.base_radius,
         vertical_span=args.vertical_span,
     )
