@@ -18,8 +18,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.simple_voxel_builder import (
-    build_axis_bounds,
-    build_radius_lookup_from_pressure_levels,
+    build_exposed_face_mesh_from_mask,
     coordinate_step_degrees,
     timestamp_to_slug,
 )
@@ -30,20 +29,19 @@ DERIVED_VARIABLE_NAME = "dry_potential_temperature"
 DERIVED_UNITS = "K"
 REFERENCE_PRESSURE_HPA = 1000.0
 POTENTIAL_TEMPERATURE_KAPPA = 287.05 / 1004.0
-LEVEL_COMPONENT_STRUCTURE = np.ones((3, 3), dtype=np.uint8)
 VOLUME_COMPONENT_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
-OUTPUT_VERSION = 6
+OUTPUT_VERSION = 7
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
 DEFAULT_OUTPUT_DIR = Path("public/potential-temperature-structures")
-DEFAULT_Z_THRESHOLD_SIGMA = 1.0
 DEFAULT_INCLUDE_TIMESTAMPS = ("2021-11-08T12:00",)
 DEFAULT_BASE_RADIUS = 100.0
 DEFAULT_VERTICAL_SPAN = 12.0
 DEFAULT_LATITUDE_STRIDE = 4
 DEFAULT_LONGITUDE_STRIDE = 4
-DEFAULT_MIN_LEVEL_COMPONENT_SIZE = 32
 DEFAULT_PRESSURE_MIN_HPA = 250.0
 DEFAULT_PRESSURE_MAX_HPA = 1000.0
+DEFAULT_ABSOLUTE_ANOMALY_PERCENTILE = 50.0
+DEFAULT_SMOOTHING_SIGMA_CELLS = 1.0
 
 
 @dataclass(frozen=True)
@@ -58,19 +56,21 @@ class DatasetContents:
 
 
 @dataclass(frozen=True)
-class ColdShellMesh:
+class SignedAnomalyShellMesh:
     positions: np.ndarray
     indices: np.ndarray
-    coldness_sigma: np.ndarray
+    anomaly_values: np.ndarray
+    theta_values: np.ndarray
     voxel_count: int
 
 
 @dataclass(frozen=True)
-class ColdShellAssetPayload:
+class SignedAnomalyShellAssetPayload:
     timestamp: str
-    positions: np.ndarray
-    indices: np.ndarray
-    coldness_sigma: np.ndarray
+    warm_positions: np.ndarray
+    warm_indices: np.ndarray
+    cold_positions: np.ndarray
+    cold_indices: np.ndarray
     voxel_count: int
     metadata: dict[str, Any]
 
@@ -78,12 +78,12 @@ class ColdShellAssetPayload:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build cold dry-potential-temperature anomaly voxel shells from ERA5 "
-            "pressure-level temperature. The builder derives dry potential "
-            "temperature, subtracts a per-level zonal mean background, "
-            "standardizes the anomaly by level, keeps only cold anomalies at "
-            "or below a sigma threshold, removes small 2D level components, "
-            "and exports one 3D voxel-face shell colored by coldness."
+            "Build sign-aware dry-potential-temperature anomaly voxel shells from "
+            "ERA5 pressure-level temperature. The builder derives dry potential "
+            "temperature, subtracts a per-level latitude-band mean, keeps the top "
+            "absolute-anomaly percentile on each pressure level, lightly smooths "
+            "that signed anomaly field, and exports warm/cold 3D voxel-face "
+            "structures with per-vertex anomaly magnitude and theta values."
         )
     )
     parser.add_argument(
@@ -99,18 +99,21 @@ def parse_args() -> argparse.Namespace:
         help="Directory where the generated potential-temperature assets will be written.",
     )
     parser.add_argument(
-        "--z-threshold-sigma",
+        "--absolute-anomaly-percentile",
         type=float,
-        default=DEFAULT_Z_THRESHOLD_SIGMA,
-        help="Keep voxels whose standardized cold anomaly is at or above this sigma value.",
+        default=DEFAULT_ABSOLUTE_ANOMALY_PERCENTILE,
+        help=(
+            "Keep voxels at or above this per-level percentile of absolute anomaly "
+            "before smoothing."
+        ),
     )
     parser.add_argument(
-        "--min-level-component-size",
-        type=int,
-        default=DEFAULT_MIN_LEVEL_COMPONENT_SIZE,
+        "--smoothing-sigma-cells",
+        type=float,
+        default=DEFAULT_SMOOTHING_SIGMA_CELLS,
         help=(
-            "Drop 2D connected components smaller than this many strided grid cells "
-            "on each pressure level before building the 3D shell."
+            "Horizontal Gaussian smoothing sigma, in strided grid cells, applied "
+            "after the per-level absolute-anomaly selection."
         ),
     )
     parser.add_argument(
@@ -280,41 +283,90 @@ def select_pressure_window(
         dtype=bool,
     )
     if not keep.any():
-        raise ValueError(
-            f"No pressure levels fall within [{lower}, {upper}] hPa."
-        )
-    return np.asarray(field[keep], dtype=np.float32), np.asarray(pressure_levels_hpa[keep], dtype=np.float32)
+        raise ValueError(f"No pressure levels fall within [{lower}, {upper}] hPa.")
+    return np.asarray(field[keep], dtype=np.float32), np.asarray(
+        pressure_levels_hpa[keep],
+        dtype=np.float32,
+    )
 
 
-def build_standardized_coldness_sigma(
-    theta_field: np.ndarray,
+def build_latitude_mean_anomaly(theta_field: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    latitude_band_mean = np.nanmean(theta_field, axis=2, keepdims=True)
+    anomaly = np.asarray(theta_field - latitude_band_mean, dtype=np.float32)
+    return anomaly, np.asarray(latitude_band_mean, dtype=np.float32)
+
+
+def build_percentile_selected_anomaly(
+    anomaly: np.ndarray,
+    absolute_anomaly_percentile: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    zonal_mean = np.nanmean(theta_field, axis=2, keepdims=True)
-    anomaly = np.asarray(theta_field - zonal_mean, dtype=np.float32)
-    level_std = np.nanstd(anomaly, axis=(1, 2), keepdims=True)
-    safe_std = np.where(
-        np.isfinite(level_std) & (level_std > 1e-6),
-        level_std,
-        1.0,
-    ).astype(np.float32)
-    z_score = np.asarray(anomaly / safe_std, dtype=np.float32)
-    coldness_sigma = np.asarray(np.maximum(-z_score, 0.0), dtype=np.float32)
-    return z_score, coldness_sigma, safe_std[:, 0, 0]
-
-
-def build_cold_mask(
-    coldness_sigma: np.ndarray,
-    z_threshold_sigma: float,
-) -> np.ndarray:
-    normalized_threshold = float(z_threshold_sigma)
-    if not np.isfinite(normalized_threshold) or normalized_threshold <= 0.0:
+    percentile = float(absolute_anomaly_percentile)
+    if not np.isfinite(percentile) or percentile < 0.0 or percentile > 100.0:
         raise ValueError(
-            f"z_threshold_sigma must be a finite value greater than 0, got {z_threshold_sigma}"
+            "absolute_anomaly_percentile must be a finite value between 0 and 100."
         )
-    return np.asarray(
-        np.isfinite(coldness_sigma) & (coldness_sigma >= normalized_threshold),
+
+    absolute_anomaly = np.asarray(np.abs(anomaly), dtype=np.float32)
+    thresholds = np.asarray(
+        np.percentile(absolute_anomaly, percentile, axis=(1, 2)),
+        dtype=np.float32,
+    )
+    keep_mask = np.asarray(
+        np.isfinite(anomaly) & (absolute_anomaly >= thresholds[:, None, None]),
         dtype=bool,
     )
+    selected_anomaly = np.where(keep_mask, anomaly, 0.0).astype(np.float32)
+    return selected_anomaly, keep_mask, thresholds
+
+
+def smooth_selected_sign_anomaly(
+    selected_anomaly: np.ndarray,
+    smoothing_sigma_cells: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    sigma = max(float(smoothing_sigma_cells), 0.0)
+    if sigma <= 0.0:
+        anomaly_values = np.asarray(selected_anomaly, dtype=np.float32)
+        sign_field = np.sign(anomaly_values).astype(np.int8)
+        return anomaly_values, sign_field
+
+    filter_sigma = (0.0, sigma, sigma)
+    filter_mode = ("nearest", "nearest", "wrap")
+    filter_kwargs = {"sigma": filter_sigma, "mode": filter_mode, "truncate": 2.0}
+
+    positive_presence = ndimage.gaussian_filter(
+        np.asarray(selected_anomaly > 0.0, dtype=np.float32),
+        **filter_kwargs,
+    )
+    negative_presence = ndimage.gaussian_filter(
+        np.asarray(selected_anomaly < 0.0, dtype=np.float32),
+        **filter_kwargs,
+    )
+    positive_magnitude = ndimage.gaussian_filter(
+        np.maximum(selected_anomaly, 0.0).astype(np.float32),
+        **filter_kwargs,
+    )
+    negative_magnitude = ndimage.gaussian_filter(
+        np.maximum(-selected_anomaly, 0.0).astype(np.float32),
+        **filter_kwargs,
+    )
+
+    positive_keep = np.asarray(
+        (positive_presence >= 0.5) & (positive_presence > negative_presence),
+        dtype=bool,
+    )
+    negative_keep = np.asarray(
+        (negative_presence >= 0.5) & (negative_presence > positive_presence),
+        dtype=bool,
+    )
+
+    sign_field = np.zeros_like(selected_anomaly, dtype=np.int8)
+    sign_field[positive_keep] = 1
+    sign_field[negative_keep] = -1
+
+    anomaly_values = np.zeros_like(selected_anomaly, dtype=np.float32)
+    anomaly_values[positive_keep] = positive_magnitude[positive_keep]
+    anomaly_values[negative_keep] = -negative_magnitude[negative_keep]
+    return anomaly_values, sign_field
 
 
 def build_seam_merged_component_info(
@@ -359,78 +411,6 @@ def build_seam_merged_component_info(
     return root_map, np.unique(root_map[1:])
 
 
-def filter_small_wrapped_level_components(
-    keep_mask: np.ndarray,
-    min_component_size: int,
-) -> tuple[np.ndarray, dict[str, Any]]:
-    normalized_min_component_size = max(int(min_component_size), 0)
-    if normalized_min_component_size <= 0:
-        return np.asarray(keep_mask, dtype=bool), {
-            "minimum_component_size": 0,
-            "connectivity": "8-connected-within-level",
-            "wraps_longitude": True,
-            "component_count_before_filter": 0,
-            "component_count_after_filter": 0,
-            "removed_component_count": 0,
-            "removed_voxel_count": 0,
-        }
-
-    filtered_mask = np.zeros_like(keep_mask, dtype=bool)
-    component_count_before = 0
-    component_count_after = 0
-
-    for level_index in range(keep_mask.shape[0]):
-        layer_mask = np.asarray(keep_mask[level_index], dtype=bool)
-        if not layer_mask.any():
-            continue
-
-        longitude_count = layer_mask.shape[1]
-        extended = np.concatenate([layer_mask, layer_mask[:, :1]], axis=1)
-        labels, component_count = ndimage.label(extended, structure=LEVEL_COMPONENT_STRUCTURE)
-        if component_count <= 0:
-            continue
-
-        seam_pairs = np.column_stack([labels[:, 0].reshape(-1), labels[:, -1].reshape(-1)])
-        root_map, unique_root_ids = build_seam_merged_component_info(labels, seam_pairs)
-        component_count_before += int(unique_root_ids.size)
-
-        label_ids = np.arange(1, component_count + 1, dtype=np.int32)
-        extended_counts = np.asarray(
-            ndimage.sum(
-                np.ones_like(labels, dtype=np.int32),
-                labels=labels,
-                index=label_ids,
-            ),
-            dtype=np.int32,
-        )
-        root_counts = np.zeros(component_count + 1, dtype=np.int32)
-        np.add.at(root_counts, root_map[label_ids], extended_counts)
-
-        seam_duplicate_labels = labels[:, -1][layer_mask[:, 0]]
-        seam_duplicate_counts = np.zeros(component_count + 1, dtype=np.int32)
-        if seam_duplicate_labels.size:
-            np.add.at(seam_duplicate_counts, root_map[seam_duplicate_labels], 1)
-
-        unique_counts = root_counts - seam_duplicate_counts
-        kept_root_ids = unique_root_ids[
-            unique_counts[unique_root_ids] >= normalized_min_component_size
-        ]
-        filtered_layer = np.isin(root_map[labels[:, :longitude_count]], kept_root_ids)
-        filtered_mask[level_index] = filtered_layer
-        component_count_after += int(kept_root_ids.size)
-
-    removed_voxel_count = int(keep_mask.sum() - filtered_mask.sum())
-    return filtered_mask, {
-        "minimum_component_size": normalized_min_component_size,
-        "connectivity": "8-connected-within-level",
-        "wraps_longitude": True,
-        "component_count_before_filter": int(component_count_before),
-        "component_count_after_filter": int(component_count_after),
-        "removed_component_count": int(component_count_before - component_count_after),
-        "removed_voxel_count": removed_voxel_count,
-    }
-
-
 def label_wrapped_volume_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     occupied = np.asarray(mask, dtype=bool)
     if not occupied.any():
@@ -453,255 +433,126 @@ def label_wrapped_volume_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     return compact_labels.astype(np.int32), int(unique_root_ids.size)
 
 
-def lat_lon_to_xyz(lat_deg: float, lon_deg: float, radius: float) -> np.ndarray:
-    lat = np.deg2rad(lat_deg)
-    lon = np.deg2rad(-(lon_deg + 270.0))
-    x = radius * np.cos(lat) * np.cos(lon)
-    y = radius * np.sin(lat)
-    z = radius * np.cos(lat) * np.sin(lon)
-    return np.array([x, y, z], dtype=np.float32)
+def summarize_signed_components(sign_field: np.ndarray) -> dict[str, Any]:
+    positive_labels, positive_component_count = label_wrapped_volume_components(sign_field > 0)
+    negative_labels, negative_component_count = label_wrapped_volume_components(sign_field < 0)
 
-
-def append_colored_quad(
-    corners: list[tuple[int, int, int]],
-    voxel_coldness_sigma: float,
-    *,
-    vertex_lookup: dict[tuple[int, int, int], int],
-    positions: list[float],
-    coldness_values: list[float],
-    indices: list[int],
-    radius_bounds: np.ndarray,
-    latitude_bounds: np.ndarray,
-    longitude_bounds: np.ndarray,
-) -> None:
-    quad_indices: list[int] = []
-    for key in corners:
-        vertex_index = vertex_lookup.get(key)
-        if vertex_index is None:
-            radius_index, latitude_index, longitude_index = key
-            vertex = lat_lon_to_xyz(
-                float(latitude_bounds[latitude_index]),
-                float(longitude_bounds[longitude_index]),
-                float(radius_bounds[radius_index]),
-            )
-            vertex_index = len(positions) // 3
-            positions.extend(float(value) for value in vertex)
-            coldness_values.append(float(voxel_coldness_sigma))
-            vertex_lookup[key] = vertex_index
-        else:
-            coldness_values[vertex_index] = max(
-                coldness_values[vertex_index],
-                float(voxel_coldness_sigma),
-            )
-        quad_indices.append(vertex_index)
-
-    indices.extend(
-        [
-            quad_indices[0],
-            quad_indices[1],
-            quad_indices[2],
-            quad_indices[0],
-            quad_indices[2],
-            quad_indices[3],
-        ]
+    positive_sizes = (
+        np.bincount(positive_labels[positive_labels > 0].ravel())
+        if positive_component_count > 0
+        else np.zeros(0, dtype=np.int32)
+    )
+    negative_sizes = (
+        np.bincount(negative_labels[negative_labels > 0].ravel())
+        if negative_component_count > 0
+        else np.zeros(0, dtype=np.int32)
     )
 
-
-def build_exposed_face_mesh_with_coldness(
-    *,
-    keep_mask: np.ndarray,
-    coldness_sigma: np.ndarray,
-    pressure_levels_hpa: np.ndarray,
-    latitudes_deg: np.ndarray,
-    longitudes_deg: np.ndarray,
-    base_radius: float,
-    vertical_span: float,
-) -> ColdShellMesh:
-    occupied = np.asarray(keep_mask, dtype=bool)
-    if not occupied.any():
-        return ColdShellMesh(
-            positions=np.zeros(0, dtype=np.float32),
-            indices=np.zeros(0, dtype=np.uint32),
-            coldness_sigma=np.zeros(0, dtype=np.float32),
-            voxel_count=0,
-        )
-
-    radius_values = build_radius_lookup_from_pressure_levels(
-        pressure_levels_hpa,
-        base_radius=base_radius,
-        vertical_span=vertical_span,
-    )
-    radius_bounds = build_axis_bounds(radius_values)
-    latitude_bounds = build_axis_bounds(latitudes_deg)
-    longitude_bounds = build_axis_bounds(longitudes_deg)
-
-    level_count, latitude_count, longitude_count = occupied.shape
-    occupied_cells = np.argwhere(occupied)
-    vertex_lookup: dict[tuple[int, int, int], int] = {}
-    positions: list[float] = []
-    coldness_values: list[float] = []
-    indices: list[int] = []
-
-    for level_index, latitude_index, longitude_index in occupied_cells:
-        r0 = int(level_index)
-        r1 = r0 + 1
-        a0 = int(latitude_index)
-        a1 = a0 + 1
-        o0 = int(longitude_index)
-        o1 = o0 + 1
-        voxel_coldness_sigma = float(coldness_sigma[r0, a0, o0])
-
-        west_neighbor = (o0 - 1) % longitude_count
-        east_neighbor = (o0 + 1) % longitude_count
-
-        if r0 == 0 or not occupied[r0 - 1, a0, o0]:
-            append_colored_quad(
-                corners=[(r0, a0, o0), (r0, a1, o0), (r0, a1, o1), (r0, a0, o1)],
-                voxel_coldness_sigma=voxel_coldness_sigma,
-                vertex_lookup=vertex_lookup,
-                positions=positions,
-                coldness_values=coldness_values,
-                indices=indices,
-                radius_bounds=radius_bounds,
-                latitude_bounds=latitude_bounds,
-                longitude_bounds=longitude_bounds,
-            )
-        if r0 == level_count - 1 or not occupied[r0 + 1, a0, o0]:
-            append_colored_quad(
-                corners=[(r1, a0, o0), (r1, a0, o1), (r1, a1, o1), (r1, a1, o0)],
-                voxel_coldness_sigma=voxel_coldness_sigma,
-                vertex_lookup=vertex_lookup,
-                positions=positions,
-                coldness_values=coldness_values,
-                indices=indices,
-                radius_bounds=radius_bounds,
-                latitude_bounds=latitude_bounds,
-                longitude_bounds=longitude_bounds,
-            )
-        if a0 == 0 or not occupied[r0, a0 - 1, o0]:
-            append_colored_quad(
-                corners=[(r0, a0, o0), (r0, a0, o1), (r1, a0, o1), (r1, a0, o0)],
-                voxel_coldness_sigma=voxel_coldness_sigma,
-                vertex_lookup=vertex_lookup,
-                positions=positions,
-                coldness_values=coldness_values,
-                indices=indices,
-                radius_bounds=radius_bounds,
-                latitude_bounds=latitude_bounds,
-                longitude_bounds=longitude_bounds,
-            )
-        if a0 == latitude_count - 1 or not occupied[r0, a0 + 1, o0]:
-            append_colored_quad(
-                corners=[(r0, a1, o0), (r1, a1, o0), (r1, a1, o1), (r0, a1, o1)],
-                voxel_coldness_sigma=voxel_coldness_sigma,
-                vertex_lookup=vertex_lookup,
-                positions=positions,
-                coldness_values=coldness_values,
-                indices=indices,
-                radius_bounds=radius_bounds,
-                latitude_bounds=latitude_bounds,
-                longitude_bounds=longitude_bounds,
-            )
-        if not occupied[r0, a0, west_neighbor]:
-            append_colored_quad(
-                corners=[(r0, a0, o0), (r1, a0, o0), (r1, a1, o0), (r0, a1, o0)],
-                voxel_coldness_sigma=voxel_coldness_sigma,
-                vertex_lookup=vertex_lookup,
-                positions=positions,
-                coldness_values=coldness_values,
-                indices=indices,
-                radius_bounds=radius_bounds,
-                latitude_bounds=latitude_bounds,
-                longitude_bounds=longitude_bounds,
-            )
-        if not occupied[r0, a0, east_neighbor]:
-            append_colored_quad(
-                corners=[(r0, a0, o1), (r0, a1, o1), (r1, a1, o1), (r1, a0, o1)],
-                voxel_coldness_sigma=voxel_coldness_sigma,
-                vertex_lookup=vertex_lookup,
-                positions=positions,
-                coldness_values=coldness_values,
-                indices=indices,
-                radius_bounds=radius_bounds,
-                latitude_bounds=latitude_bounds,
-                longitude_bounds=longitude_bounds,
-            )
-
-    return ColdShellMesh(
-        positions=np.asarray(positions, dtype=np.float32),
-        indices=np.asarray(indices, dtype=np.uint32),
-        coldness_sigma=np.asarray(coldness_values, dtype=np.float32),
-        voxel_count=int(occupied_cells.shape[0]),
-    )
+    positive_largest = int(positive_sizes.max()) if positive_sizes.size else 0
+    negative_largest = int(negative_sizes.max()) if negative_sizes.size else 0
+    return {
+        "component_count": int(positive_component_count + negative_component_count),
+        "positive_component_count": int(positive_component_count),
+        "negative_component_count": int(negative_component_count),
+        "largest_component_voxel_count": max(positive_largest, negative_largest),
+        "largest_positive_component_voxel_count": positive_largest,
+        "largest_negative_component_voxel_count": negative_largest,
+    }
 
 
 def build_asset_payload(
     *,
     timestamp: str,
     theta_field: np.ndarray,
-    coldness_sigma: np.ndarray,
-    keep_mask: np.ndarray,
+    selected_anomaly: np.ndarray,
+    smoothed_anomaly_values: np.ndarray,
+    sign_field: np.ndarray,
     pressure_levels_hpa: np.ndarray,
     latitudes_deg: np.ndarray,
     longitudes_deg: np.ndarray,
-    z_threshold_sigma: float,
+    absolute_anomaly_percentile: float,
+    smoothing_sigma_cells: float,
+    anomaly_thresholds_by_level: np.ndarray,
     base_radius: float,
     vertical_span: float,
-    selection_metadata: dict[str, Any],
-) -> ColdShellAssetPayload:
-    mesh = build_exposed_face_mesh_with_coldness(
-        keep_mask=keep_mask,
-        coldness_sigma=coldness_sigma,
+) -> SignedAnomalyShellAssetPayload:
+    warm_mask = np.asarray(sign_field > 0, dtype=bool)
+    cold_mask = np.asarray(sign_field < 0, dtype=bool)
+    warm_mesh = build_exposed_face_mesh_from_mask(
+        keep_mask=warm_mask,
         pressure_levels_hpa=pressure_levels_hpa,
         latitudes_deg=latitudes_deg,
         longitudes_deg=longitudes_deg,
-        base_radius=base_radius,
-        vertical_span=vertical_span,
     )
-    if mesh.voxel_count <= 0:
+    cold_mesh = build_exposed_face_mesh_from_mask(
+        keep_mask=cold_mask,
+        pressure_levels_hpa=pressure_levels_hpa,
+        latitudes_deg=latitudes_deg,
+        longitudes_deg=longitudes_deg,
+    )
+    total_voxel_count = int(np.count_nonzero(sign_field))
+    if total_voxel_count <= 0:
         raise ValueError("No voxels survived the potential-temperature anomaly selection.")
 
+    keep_mask = np.asarray(sign_field != 0, dtype=bool)
     occupied_coords = np.argwhere(keep_mask)
     pressure_indices = occupied_coords[:, 0]
     latitude_indices = occupied_coords[:, 1]
     longitude_indices = occupied_coords[:, 2]
     kept_theta = np.asarray(theta_field[keep_mask], dtype=np.float32)
-    kept_coldness = np.asarray(coldness_sigma[keep_mask], dtype=np.float32)
-    component_labels, component_count = label_wrapped_volume_components(keep_mask)
-    component_sizes = (
-        np.bincount(component_labels[component_labels > 0].ravel())
-        if component_count > 0
-        else np.zeros(0, dtype=np.int32)
-    )
+    kept_anomaly = np.asarray(smoothed_anomaly_values[keep_mask], dtype=np.float32)
+    component_summary = summarize_signed_components(sign_field)
 
     metadata = {
-        "component_count": int(component_count),
-        "largest_component_voxel_count": int(component_sizes.max()) if component_sizes.size else 0,
-        "thresholded_voxel_count": int(mesh.voxel_count),
-        "vertex_count": int(mesh.positions.size // 3),
-        "index_count": int(mesh.indices.size),
+        **component_summary,
+        "voxel_count": total_voxel_count,
+        "positive_voxel_count": int(np.count_nonzero(sign_field > 0)),
+        "negative_voxel_count": int(np.count_nonzero(sign_field < 0)),
+        "selected_voxel_count_before_smoothing": int(np.count_nonzero(selected_anomaly)),
+        "vertex_count": int((warm_mesh.positions.size + cold_mesh.positions.size) // 3),
+        "index_count": int(warm_mesh.indices.size + cold_mesh.indices.size),
+        "warm_vertex_count": int(warm_mesh.vertex_count),
+        "warm_index_count": int(warm_mesh.indices.size),
+        "cold_vertex_count": int(cold_mesh.vertex_count),
+        "cold_index_count": int(cold_mesh.indices.size),
         "theta_min": float(np.min(kept_theta)),
         "theta_max": float(np.max(kept_theta)),
         "theta_mean": float(np.mean(kept_theta)),
-        "coldness_sigma_min": float(np.min(kept_coldness)),
-        "coldness_sigma_max": float(np.max(kept_coldness)),
-        "coldness_sigma_mean": float(np.mean(kept_coldness)),
+        "anomaly_min": float(np.min(kept_anomaly)),
+        "anomaly_max": float(np.max(kept_anomaly)),
+        "anomaly_mean": float(np.mean(kept_anomaly)),
+        "anomaly_abs_max": float(np.max(np.abs(kept_anomaly))),
         "pressure_min_hpa": float(np.min(pressure_levels_hpa[pressure_indices])),
         "pressure_max_hpa": float(np.max(pressure_levels_hpa[pressure_indices])),
         "latitude_min_deg": float(np.min(latitudes_deg[latitude_indices])),
         "latitude_max_deg": float(np.max(latitudes_deg[latitude_indices])),
         "longitude_min_deg": float(np.min(longitudes_deg[longitude_indices])),
         "longitude_max_deg": float(np.max(longitudes_deg[longitude_indices])),
-        "selection": selection_metadata,
-        "z_threshold_sigma": float(z_threshold_sigma),
+        "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
+        "smoothing_sigma_cells": float(smoothing_sigma_cells),
+        "selection": {
+            "kept_signs": ["negative", "positive"],
+            "thresholds_by_pressure_level": [
+                {
+                    "pressure_hpa": float(pressure_hpa),
+                    "absolute_anomaly_threshold": float(threshold),
+                }
+                for pressure_hpa, threshold in zip(
+                    pressure_levels_hpa.tolist(),
+                    anomaly_thresholds_by_level.tolist(),
+                    strict=True,
+                )
+            ],
+        },
     }
 
-    return ColdShellAssetPayload(
+    return SignedAnomalyShellAssetPayload(
         timestamp=timestamp,
-        positions=mesh.positions,
-        indices=mesh.indices,
-        coldness_sigma=mesh.coldness_sigma,
-        voxel_count=int(mesh.voxel_count),
+        warm_positions=warm_mesh.positions,
+        warm_indices=warm_mesh.indices,
+        cold_positions=cold_mesh.positions,
+        cold_indices=cold_mesh.indices,
+        voxel_count=total_voxel_count,
         metadata=metadata,
     )
 
@@ -724,39 +575,45 @@ def clear_output_dir(output_dir: Path) -> None:
 
 def write_frame(
     output_dir: Path,
-    payload: ColdShellAssetPayload,
+    payload: SignedAnomalyShellAssetPayload,
 ) -> dict[str, Any]:
     slug = timestamp_to_slug(payload.timestamp)
     frame_dir = output_dir / slug
     frame_dir.mkdir(parents=True, exist_ok=True)
 
-    positions_path = frame_dir / "positions.bin"
-    indices_path = frame_dir / "indices.bin"
-    coldness_path = frame_dir / "coldness_sigma.bin"
+    warm_positions_path = frame_dir / "warm_positions.bin"
+    warm_indices_path = frame_dir / "warm_indices.bin"
+    cold_positions_path = frame_dir / "cold_positions.bin"
+    cold_indices_path = frame_dir / "cold_indices.bin"
     metadata_path = frame_dir / "metadata.json"
 
-    payload.positions.astype("<f4").tofile(positions_path)
-    payload.indices.astype("<u4").tofile(indices_path)
-    payload.coldness_sigma.astype("<f4").tofile(coldness_path)
+    payload.warm_positions.astype("<f4").tofile(warm_positions_path)
+    payload.warm_indices.astype("<u4").tofile(warm_indices_path)
+    payload.cold_positions.astype("<f4").tofile(cold_positions_path)
+    payload.cold_indices.astype("<u4").tofile(cold_indices_path)
 
     metadata = {
         "version": OUTPUT_VERSION,
         "timestamp": payload.timestamp,
         **payload.metadata,
-        "positions_file": str(positions_path.relative_to(output_dir)).replace("\\", "/"),
-        "indices_file": str(indices_path.relative_to(output_dir)).replace("\\", "/"),
-        "coldness_sigma_file": str(coldness_path.relative_to(output_dir)).replace("\\", "/"),
+        "warm_positions_file": str(warm_positions_path.relative_to(output_dir)).replace("\\", "/"),
+        "warm_indices_file": str(warm_indices_path.relative_to(output_dir)).replace("\\", "/"),
+        "cold_positions_file": str(cold_positions_path.relative_to(output_dir)).replace("\\", "/"),
+        "cold_indices_file": str(cold_indices_path.relative_to(output_dir)).replace("\\", "/"),
     }
     write_json(metadata_path, metadata)
 
     return {
         "timestamp": payload.timestamp,
         "metadata": str(metadata_path.relative_to(output_dir)).replace("\\", "/"),
-        "positions": str(positions_path.relative_to(output_dir)).replace("\\", "/"),
-        "indices": str(indices_path.relative_to(output_dir)).replace("\\", "/"),
-        "coldness_sigma": str(coldness_path.relative_to(output_dir)).replace("\\", "/"),
+        "warm_positions": str(warm_positions_path.relative_to(output_dir)).replace("\\", "/"),
+        "warm_indices": str(warm_indices_path.relative_to(output_dir)).replace("\\", "/"),
+        "cold_positions": str(cold_positions_path.relative_to(output_dir)).replace("\\", "/"),
+        "cold_indices": str(cold_indices_path.relative_to(output_dir)).replace("\\", "/"),
         "voxel_count": payload.voxel_count,
         "component_count": int(payload.metadata["component_count"]),
+        "positive_component_count": int(payload.metadata["positive_component_count"]),
+        "negative_component_count": int(payload.metadata["negative_component_count"]),
     }
 
 
@@ -764,8 +621,8 @@ def build_manifest(
     *,
     contents: DatasetContents,
     entries: list[dict[str, Any]],
-    z_threshold_sigma: float,
-    min_level_component_size: int,
+    absolute_anomaly_percentile: float,
+    smoothing_sigma_cells: float,
     pressure_min_hpa: float,
     pressure_max_hpa: float,
     latitude_stride: int,
@@ -787,16 +644,15 @@ def build_manifest(
             "reference_pressure_hpa": REFERENCE_PRESSURE_HPA,
             "kappa": POTENTIAL_TEMPERATURE_KAPPA,
         },
-        "structure_kind": "potential-temperature-cold-zonal-anomaly-shell",
+        "structure_kind": "potential-temperature-latitude-mean-anomaly-shell",
         "geometry_mode": "voxel-faces",
         "selection": {
-            "background": "per-level_zonal_mean",
-            "standardization": "per-level_stddev",
-            "keep_side": "cold_only",
-            "z_threshold_sigma": float(z_threshold_sigma),
-            "minimum_level_component_size": int(max(min_level_component_size, 0)),
-            "level_component_connectivity": "8-connected",
-            "volume_connectivity": "26-connected",
+            "background": "per-level_latitude-band_mean",
+            "threshold_basis": "per-level_absolute-anomaly_percentile",
+            "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
+            "smoothing_sigma_cells": float(smoothing_sigma_cells),
+            "keep_signs": ["negative", "positive"],
+            "volume_connectivity": "26-connected-same-sign",
             "wraps_longitude": True,
         },
         "sampling": {
@@ -873,41 +729,38 @@ def main() -> None:
                 pressure_window_field,
                 pressure_window_levels_hpa,
             )
-            _, coldness_sigma, _ = build_standardized_coldness_sigma(theta_field)
-            raw_keep_mask = build_cold_mask(
-                coldness_sigma,
-                z_threshold_sigma=args.z_threshold_sigma,
+            anomaly, _ = build_latitude_mean_anomaly(theta_field)
+            selected_anomaly, _, anomaly_thresholds_by_level = build_percentile_selected_anomaly(
+                anomaly,
+                absolute_anomaly_percentile=args.absolute_anomaly_percentile,
             )
-            keep_mask, level_filter_metadata = filter_small_wrapped_level_components(
-                raw_keep_mask,
-                min_component_size=args.min_level_component_size,
+            smoothed_anomaly_values, sign_field = smooth_selected_sign_anomaly(
+                selected_anomaly,
+                smoothing_sigma_cells=args.smoothing_sigma_cells,
             )
-            if not keep_mask.any():
+            if not np.any(sign_field):
                 print(
-                    "Skipped potential temperature frame after postprocess:",
+                    "Skipped potential temperature frame after smoothing:",
                     timestamp,
-                    f"z_threshold_sigma={args.z_threshold_sigma}",
-                    f"minimum_level_component_size={max(args.min_level_component_size, 0)}",
+                    f"absolute_anomaly_percentile={args.absolute_anomaly_percentile}",
+                    f"smoothing_sigma_cells={args.smoothing_sigma_cells}",
                 )
                 continue
 
-            selection_metadata = {
-                "raw_voxel_count": int(raw_keep_mask.sum()),
-                "removed_voxel_count": int(raw_keep_mask.sum() - keep_mask.sum()),
-                "postprocess": level_filter_metadata,
-            }
             payload = build_asset_payload(
                 timestamp=timestamp,
                 theta_field=theta_field,
-                coldness_sigma=coldness_sigma,
-                keep_mask=keep_mask,
+                selected_anomaly=selected_anomaly,
+                smoothed_anomaly_values=smoothed_anomaly_values,
+                sign_field=sign_field,
                 pressure_levels_hpa=pressure_window_levels_hpa,
                 latitudes_deg=strided_latitudes_deg,
                 longitudes_deg=strided_longitudes_deg,
-                z_threshold_sigma=args.z_threshold_sigma,
+                absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+                smoothing_sigma_cells=args.smoothing_sigma_cells,
+                anomaly_thresholds_by_level=anomaly_thresholds_by_level,
                 base_radius=args.base_radius,
                 vertical_span=args.vertical_span,
-                selection_metadata=selection_metadata,
             )
             entries.append(write_frame(output_dir=output_dir, payload=payload))
             final_latitudes_deg = strided_latitudes_deg
@@ -915,13 +768,15 @@ def main() -> None:
             final_pressure_levels_hpa = pressure_window_levels_hpa
 
             print(
-                "Built cold potential temperature shell:",
+                "Built potential temperature anomaly shell:",
                 timestamp,
                 f"voxels={payload.voxel_count}",
                 f"components={payload.metadata['component_count']}",
-                f"removed_level_voxels={level_filter_metadata['removed_voxel_count']}",
-                f"coldness_sigma_max={payload.metadata['coldness_sigma_max']:.2f}",
-                f"triangles={payload.indices.size // 3}",
+                f"positive_components={payload.metadata['positive_component_count']}",
+                f"negative_components={payload.metadata['negative_component_count']}",
+                f"anomaly_abs_max={payload.metadata['anomaly_abs_max']:.2f}",
+                f"warm_triangles={payload.warm_indices.size // 3}",
+                f"cold_triangles={payload.cold_indices.size // 3}",
             )
     finally:
         raw_dataset.close()
@@ -932,8 +787,8 @@ def main() -> None:
     manifest = build_manifest(
         contents=contents,
         entries=entries,
-        z_threshold_sigma=args.z_threshold_sigma,
-        min_level_component_size=args.min_level_component_size,
+        absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+        smoothing_sigma_cells=args.smoothing_sigma_cells,
         pressure_min_hpa=args.pressure_min_hpa,
         pressure_max_hpa=args.pressure_max_hpa,
         latitude_stride=args.latitude_stride,

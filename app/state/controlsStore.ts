@@ -617,7 +617,7 @@ type ControlsState = {
 export const useControls = create<ControlsState>()(
   subscribeWithSelector((set) => ({
     moistureStructureLayer: {
-      visible: true,
+      visible: false,
       opacity: 1,
       verticalExaggeration: 2.35,
       cameraCutawayEnabled: false,
@@ -644,7 +644,7 @@ export const useControls = create<ControlsState>()(
       opacity: 1,
     },
     potentialTemperatureLayer: {
-      visible: false,
+      visible: true,
       opacity: 1,
     },
     relativeHumidityLayer: {

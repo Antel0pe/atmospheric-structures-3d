@@ -38,6 +38,7 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(useControls.getState().moistureStructureLayer.legibilityExperiment).toBe(
       "bridgePruned"
     );
+    expect(useControls.getState().moistureStructureLayer.visible).toBe(false);
     expect(useControls.getState().relativeHumidityLayer.visible).toBe(false);
     expect(useControls.getState().relativeHumidityLayer.opacity).toBe(1);
     expect(useControls.getState().relativeHumidityLayer.colorMode).toBe(
@@ -47,7 +48,7 @@ describe("resolveMoistureStructureLayerState", () => {
       "baseline"
     );
     expect(useControls.getState().precipitationRadarLayer.visible).toBe(false);
-    expect(useControls.getState().potentialTemperatureLayer.visible).toBe(false);
+    expect(useControls.getState().potentialTemperatureLayer.visible).toBe(true);
     expect(useControls.getState().potentialTemperatureLayer.opacity).toBe(1);
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35

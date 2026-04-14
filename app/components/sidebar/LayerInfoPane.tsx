@@ -20,6 +20,7 @@ import type {
 
 type ActiveExampleId =
   | "moistureStructureLayer"
+  | "potentialTemperatureLayer"
   | "exampleShaderMeshLayer"
   | "exampleContoursLayer"
   | "exampleParticleLayer";
@@ -63,6 +64,27 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
         detail: "Projected outlines of selected or dominant components for macro context.",
         swatch:
           "linear-gradient(135deg, rgba(45, 198, 214, 0.96), rgba(255, 138, 99, 0.84))",
+      },
+    ],
+  },
+  potentialTemperatureLayer: {
+    title: "Potential Temperature Layer",
+    summary:
+      "A dry-potential-temperature compare layer that highlights warm and cold anomaly shells relative to a per-level latitude-band mean background.",
+    detail:
+      "The layer derives dry potential temperature from pressure-level temperature, subtracts a latitude-band mean at each pressure level, keeps the stronger positive and negative anomalies, lightly smooths them, and renders separate warm and cold voxel shells as solid 3D structures.",
+    legend: [
+      {
+        label: "Warm Anomaly Shell",
+        detail: "Positive dry-potential-temperature anomalies relative to the local latitude-band background, colored by pressure band.",
+        swatch:
+          "linear-gradient(135deg, rgba(255, 90, 54, 0.96), rgba(255, 211, 77, 0.9))",
+      },
+      {
+        label: "Cold Anomaly Shell",
+        detail: "Negative dry-potential-temperature anomalies relative to the same background, colored by pressure band with a cooler discrete palette.",
+        swatch:
+          "linear-gradient(135deg, rgba(27, 95, 214, 0.96), rgba(122, 213, 110, 0.9))",
       },
     ],
   },
@@ -318,6 +340,9 @@ export default function LayerInfoPane() {
   const setMoistureStructureLayer = useControls(
     (state) => state.setMoistureStructureLayer
   );
+  const potentialTemperatureLayer = useControls(
+    (state) => state.potentialTemperatureLayer
+  );
   const exampleShaderMeshLayer = useControls(
     (state) => state.exampleShaderMeshLayer
   );
@@ -384,6 +409,14 @@ export default function LayerInfoPane() {
             : "Off"
         }`,
         ...LAYER_INFO.moistureStructureLayer,
+      });
+    }
+
+    if (potentialTemperatureLayer.visible) {
+      entries.push({
+        id: "potentialTemperatureLayer",
+        tag: "Latitude-mean dry-theta anomaly shells",
+        ...LAYER_INFO.potentialTemperatureLayer,
       });
     }
 
