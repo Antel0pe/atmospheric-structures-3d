@@ -54,6 +54,27 @@ export const RELATIVE_HUMIDITY_VARIANT_OPTIONS = [
 export type RelativeHumidityVariant =
   (typeof RELATIVE_HUMIDITY_VARIANT_OPTIONS)[number]["value"];
 
+export const POTENTIAL_TEMPERATURE_VARIANT_OPTIONS = [
+  { value: "bridge-gap-1", label: "Bridge 1 Missing Level" },
+  { value: "bridge-gap-2", label: "Bridge Up To 2 Levels" },
+  { value: "fill-between-anchors", label: "Fill Between Anchors" },
+] as const;
+
+export type PotentialTemperatureVariant =
+  (typeof POTENTIAL_TEMPERATURE_VARIANT_OPTIONS)[number]["value"];
+
+export const POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS = [
+  { value: "pressureBands", label: "Current Default" },
+  {
+    value: "precipitableWaterProxy",
+    label: "Precipitable Water Proxy",
+  },
+  { value: "thermalContrast", label: "Hot/Cold Depth Ramp" },
+] as const;
+
+export type PotentialTemperatureColorMode =
+  (typeof POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS)[number]["value"];
+
 export const MOISTURE_VISUAL_PRESET_OPTIONS = [
   { value: "none", label: "None" },
   { value: "baseline", label: "Baseline" },
@@ -195,6 +216,8 @@ export type PrecipitableWaterLayerState = {
 export type PotentialTemperatureLayerState = {
   visible: boolean;
   opacity: number;
+  colorMode: PotentialTemperatureColorMode;
+  variant: PotentialTemperatureVariant;
 };
 
 export type RelativeHumidityLayerState = {
@@ -646,6 +669,8 @@ export const useControls = create<ControlsState>()(
     potentialTemperatureLayer: {
       visible: true,
       opacity: 1,
+      colorMode: "pressureBands",
+      variant: "bridge-gap-1",
     },
     relativeHumidityLayer: {
       visible: false,

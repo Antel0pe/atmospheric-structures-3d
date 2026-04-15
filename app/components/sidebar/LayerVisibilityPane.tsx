@@ -1,8 +1,12 @@
 "use client";
 
 import {
+  POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
+  POTENTIAL_TEMPERATURE_VARIANT_OPTIONS,
   RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS,
   RELATIVE_HUMIDITY_VARIANT_OPTIONS,
+  type PotentialTemperatureColorMode,
+  type PotentialTemperatureVariant,
   type RelativeHumidityColorMode,
   type RelativeHumidityVariant,
   useControls,
@@ -123,8 +127,12 @@ export default function LayerVisibilityPane() {
           onChange={(checked) => setRelativeHumidityLayer({ visible: checked })}
         />
 
-        {relativeHumidityLayer.visible ? (
-          <>
+        <div
+          style={{
+            display: relativeHumidityLayer.visible ? "grid" : "none",
+            gap: 12,
+          }}
+        >
             <label style={{ display: "grid", gap: 8 }}>
               <div
                 style={{
@@ -182,8 +190,7 @@ export default function LayerVisibilityPane() {
                 ))}
               </select>
             </label>
-          </>
-        ) : null}
+        </div>
 
         <CheckboxRow
           label="Precipitable Water Proxy"
@@ -199,6 +206,72 @@ export default function LayerVisibilityPane() {
           onChange={(checked) => setPotentialTemperatureLayer({ visible: checked })}
         />
 
+        <div
+          style={{
+            display: potentialTemperatureLayer.visible ? "grid" : "none",
+            gap: 12,
+          }}
+        >
+            <label style={{ display: "grid", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontWeight: 600,
+                }}
+              >
+                <span>Vertical Connection</span>
+                <span style={{ opacity: 0.68 }}>Top 10% fixed</span>
+              </div>
+              <select
+                value={potentialTemperatureLayer.variant}
+                onChange={(event) =>
+                  setPotentialTemperatureLayer({
+                    variant: event.currentTarget.value as PotentialTemperatureVariant,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {POTENTIAL_TEMPERATURE_VARIANT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontWeight: 600,
+                }}
+              >
+                <span>Color Mode</span>
+                <span style={{ opacity: 0.68 }}>Warm/cold shell</span>
+              </div>
+              <select
+                value={potentialTemperatureLayer.colorMode}
+                onChange={(event) =>
+                  setPotentialTemperatureLayer({
+                    colorMode:
+                      event.currentTarget.value as PotentialTemperatureColorMode,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+        </div>
+
         <CheckboxRow
           label="Precipitation Radar"
           checked={precipitationLayer.visible}
@@ -213,10 +286,11 @@ export default function LayerVisibilityPane() {
           Relative humidity uses the selected shell variant nearest to the active
           timestamp. The precipitable water proxy keeps only 500-1000 hPa voxels
           that pass the top-40%-q, RH, and 3-level depth gates. Potential
-          temperature now derives dry potential temperature in 3D, finds the
-          global top-20% threshold, keeps hot-side and cool-side components that
-          touch that boundary, and renders both as opaque voxel shells. The
-          precipitation layer uses static radar textures.
+          temperature derives dry potential temperature in 3D, subtracts a
+          per-pressure-level latitude-band mean background, keeps the top 10%
+          of anomalies on each level, lightly smooths that signed field,
+          and renders separate warm and cold voxel shells with switchable color
+          ramps. The precipitation layer uses static radar textures.
         </div>
       </div>
     </section>

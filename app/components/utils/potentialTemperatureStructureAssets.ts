@@ -1,5 +1,6 @@
 import { fetchBlobOrThrow, fetchJsonOrThrow } from "./dataFetchErrors";
 import { snapTimestampToAvailable } from "./ApiResponses";
+import type { PotentialTemperatureVariant } from "../../state/controlsStore";
 
 export type PotentialTemperatureManifestTimestamp = {
   timestamp: string;
@@ -19,6 +20,7 @@ export type PotentialTemperatureStructureManifest = {
   dataset: string;
   variable: string;
   units: string;
+  variant?: string;
   derived_variable: {
     name: "dry_potential_temperature";
     units: string;
@@ -29,9 +31,14 @@ export type PotentialTemperatureStructureManifest = {
   geometry_mode: "voxel-faces";
   selection: {
     background: "per-level_latitude-band_mean";
-    threshold_basis: "per-level_absolute-anomaly_percentile";
+    threshold_basis:
+      | "per-level_absolute-anomaly_top-percent"
+      | "per-level_absolute-anomaly_percentile";
+    keep_top_percent?: number;
     absolute_anomaly_percentile: number;
     smoothing_sigma_cells: number;
+    vertical_connection_mode?: string;
+    vertical_connection_label?: string;
     keep_signs: ["negative", "positive"];
     volume_connectivity: string;
     wraps_longitude: true;
@@ -76,6 +83,8 @@ export type PotentialTemperatureStructureMetadata = {
   voxel_count: number;
   positive_voxel_count: number;
   negative_voxel_count: number;
+  selected_voxel_count_before_connection_fill?: number;
+  connection_fill_voxel_count?: number;
   selected_voxel_count_before_smoothing: number;
   vertex_count: number;
   index_count: number;
@@ -96,10 +105,16 @@ export type PotentialTemperatureStructureMetadata = {
   latitude_max_deg: number;
   longitude_min_deg: number;
   longitude_max_deg: number;
+  keep_top_percent?: number;
   absolute_anomaly_percentile: number;
   smoothing_sigma_cells: number;
+  connection_mode?: string;
   selection: {
     kept_signs: ["negative", "positive"];
+    keep_top_percent?: number;
+    absolute_anomaly_percentile?: number;
+    vertical_connection_mode?: string;
+    vertical_connection_label?: string;
     thresholds_by_pressure_level: Array<{
       pressure_hpa: number;
       absolute_anomaly_threshold: number;
@@ -123,47 +138,74 @@ export type PotentialTemperatureStructureFrame = {
 
 let potentialTemperatureManifestPromise: Promise<PotentialTemperatureStructureManifest> | null =
   null;
+const potentialTemperatureManifestPromiseCache = new Map<
+  PotentialTemperatureVariant,
+  Promise<PotentialTemperatureStructureManifest>
+>();
 
-function buildPotentialTemperatureStructureUrl(...segments: string[]) {
-  return `/potential-temperature-structures/${segments.join("/")}`;
+function potentialTemperatureStructureBaseSegments(
+  variant: PotentialTemperatureVariant
+) {
+  return ["potential-temperature-structures", "variants", variant];
+}
+
+function buildPotentialTemperatureStructureUrl(
+  variant: PotentialTemperatureVariant,
+  ...segments: string[]
+) {
+  return `/${[...potentialTemperatureStructureBaseSegments(variant), ...segments].join("/")}`;
 }
 
 export async function fetchPotentialTemperatureStructureManifest(opts?: {
+  variant?: PotentialTemperatureVariant;
   refresh?: boolean;
   notifyOnError?: boolean;
 }) {
+  const variant = opts?.variant ?? "bridge-gap-1";
   const refresh = opts?.refresh ?? false;
   const notifyOnError = opts?.notifyOnError ?? true;
 
-  if (!refresh && potentialTemperatureManifestPromise) {
-    return potentialTemperatureManifestPromise;
+  if (!refresh) {
+    const cachedPromise = potentialTemperatureManifestPromiseCache.get(variant);
+    if (cachedPromise) {
+      return cachedPromise;
+    }
   }
 
-  potentialTemperatureManifestPromise =
-    fetchJsonOrThrow<PotentialTemperatureStructureManifest>(
-      buildPotentialTemperatureStructureUrl("index.json"),
-      "Failed to load potential temperature structure manifest.",
-      {
-        cache: "no-store",
-        layerLabel: "Potential temperature structures",
-        notifyOnError,
-      }
-    ).catch((error) => {
+  const manifestPromise = fetchJsonOrThrow<PotentialTemperatureStructureManifest>(
+    buildPotentialTemperatureStructureUrl(variant, "index.json"),
+    "Failed to load potential temperature structure manifest.",
+    {
+      cache: "no-store",
+      layerLabel: "Potential temperature structures",
+      notifyOnError,
+    }
+  ).catch((error) => {
+    potentialTemperatureManifestPromiseCache.delete(variant);
+    if (potentialTemperatureManifestPromise === manifestPromise) {
       potentialTemperatureManifestPromise = null;
-      throw error;
-    });
+    }
+    throw error;
+  });
 
-  return potentialTemperatureManifestPromise;
+  potentialTemperatureManifestPromise = manifestPromise;
+  potentialTemperatureManifestPromiseCache.set(variant, manifestPromise);
+  return manifestPromise;
 }
 
 export async function fetchPotentialTemperatureStructureFrame(
   datehour: string,
-  opts?: { notifyOnError?: boolean }
+  opts?: {
+    notifyOnError?: boolean;
+    variant?: PotentialTemperatureVariant;
+  }
 ): Promise<PotentialTemperatureStructureFrame> {
   const notifyOnError = opts?.notifyOnError ?? true;
+  const variant = opts?.variant ?? "bridge-gap-1";
   const manifest = await fetchPotentialTemperatureStructureManifest({
     notifyOnError,
     refresh: true,
+    variant,
   });
   const availableValues = manifest.timestamps.map((item) => item.timestamp);
   const resolvedTimestamp = snapTimestampToAvailable(datehour, availableValues);
@@ -178,7 +220,7 @@ export async function fetchPotentialTemperatureStructureFrame(
   const [metadata, warmPositionsBlob, warmIndicesBlob, coldPositionsBlob, coldIndicesBlob] =
     await Promise.all([
       fetchJsonOrThrow<PotentialTemperatureStructureMetadata>(
-        buildPotentialTemperatureStructureUrl(entry.metadata),
+        buildPotentialTemperatureStructureUrl(variant, entry.metadata),
         "Failed to load potential temperature structure metadata.",
         {
           layerLabel: "Potential temperature structures",
@@ -186,7 +228,7 @@ export async function fetchPotentialTemperatureStructureFrame(
         }
       ),
       fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(entry.warm_positions),
+        buildPotentialTemperatureStructureUrl(variant, entry.warm_positions),
         "Failed to load potential temperature warm structure positions.",
         {
           layerLabel: "Potential temperature structures",
@@ -194,7 +236,7 @@ export async function fetchPotentialTemperatureStructureFrame(
         }
       ),
       fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(entry.warm_indices),
+        buildPotentialTemperatureStructureUrl(variant, entry.warm_indices),
         "Failed to load potential temperature warm structure indices.",
         {
           layerLabel: "Potential temperature structures",
@@ -202,7 +244,7 @@ export async function fetchPotentialTemperatureStructureFrame(
         }
       ),
       fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(entry.cold_positions),
+        buildPotentialTemperatureStructureUrl(variant, entry.cold_positions),
         "Failed to load potential temperature cold structure positions.",
         {
           layerLabel: "Potential temperature structures",
@@ -210,7 +252,7 @@ export async function fetchPotentialTemperatureStructureFrame(
         }
       ),
       fetchBlobOrThrow(
-        buildPotentialTemperatureStructureUrl(entry.cold_indices),
+        buildPotentialTemperatureStructureUrl(variant, entry.cold_indices),
         "Failed to load potential temperature cold structure indices.",
         {
           layerLabel: "Potential temperature structures",

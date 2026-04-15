@@ -70,21 +70,27 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
   potentialTemperatureLayer: {
     title: "Potential Temperature Layer",
     summary:
-      "A dry-potential-temperature compare layer that highlights warm and cold anomaly shells relative to a per-level latitude-band mean background.",
+      "A dry-potential-temperature compare layer that highlights warm and cold anomaly shells relative to a per-level latitude-band mean background, using a fixed top-10% selection, selectable vertical connection recipes, and switchable color ramps.",
     detail:
-      "The layer derives dry potential temperature from pressure-level temperature, subtracts a latitude-band mean at each pressure level, keeps the stronger positive and negative anomalies, lightly smooths them, and renders separate warm and cold voxel shells as solid 3D structures.",
+      "The layer derives dry potential temperature from pressure-level temperature, subtracts a latitude-band mean at each pressure level, keeps the top 10% of absolute anomalies on each level, optionally bridges same-sign gaps between pressure levels before smoothing, and renders separate warm and cold voxel shells as solid 3D structures.",
     legend: [
       {
-        label: "Warm Anomaly Shell",
-        detail: "Positive dry-potential-temperature anomalies relative to the local latitude-band background, colored by pressure band.",
+        label: "Default Pressure Bands",
+        detail: "Separate warm and cold palettes keyed by pressure band for reading anomaly sign and depth together.",
         swatch:
           "linear-gradient(135deg, rgba(255, 90, 54, 0.96), rgba(255, 211, 77, 0.9))",
       },
       {
-        label: "Cold Anomaly Shell",
-        detail: "Negative dry-potential-temperature anomalies relative to the same background, colored by pressure band with a cooler discrete palette.",
+        label: "Proxy Ramp",
+        detail: "The precipitable-water-proxy ramp applied to potential temperature so layer shapes can be compared with matching depth colors.",
         swatch:
-          "linear-gradient(135deg, rgba(27, 95, 214, 0.96), rgba(122, 213, 110, 0.9))",
+          "linear-gradient(135deg, rgba(255, 138, 99, 0.96), rgba(185, 92, 255, 0.9))",
+      },
+      {
+        label: "Hot/Cold Depth Ramp",
+        detail: "Thermal red-for-warm and blue-for-cold shading that darkens toward the lower atmosphere.",
+        swatch:
+          "linear-gradient(135deg, rgba(110, 14, 24, 0.96), rgba(33, 86, 191, 0.9))",
       },
     ],
   },
