@@ -50,6 +50,12 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(useControls.getState().precipitationRadarLayer.visible).toBe(false);
     expect(useControls.getState().potentialTemperatureLayer.visible).toBe(true);
     expect(useControls.getState().potentialTemperatureLayer.opacity).toBe(1);
+    expect(useControls.getState().potentialTemperatureLayer.colorMode).toBe(
+      "pressureBands"
+    );
+    expect(useControls.getState().potentialTemperatureLayer.variant).toBe(
+      "bridge-gap-1"
+    );
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35
     );

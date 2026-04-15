@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useEarthLayer } from "./EarthBase";
-import { useControls } from "../../state/controlsStore";
+import {
+  useControls,
+  type PotentialTemperatureColorMode,
+} from "../../state/controlsStore";
 import {
   fetchPotentialTemperatureStructureFrame,
   type PotentialTemperatureStructureFrame,
@@ -29,6 +32,32 @@ const COLD_PRESSURE_COLOR_BANDS = [
   { minHpa: 70, color: new THREE.Color("#4fcb8f") },
   { minHpa: 0, color: new THREE.Color("#7ad56e") },
 ] as const;
+const PRECIPITABLE_WATER_PROXY_COLOR_STOPS = [
+  new THREE.Color("#ff8a63"),
+  new THREE.Color("#2dc6d6"),
+  new THREE.Color("#5e86ff"),
+  new THREE.Color("#b95cff"),
+] as const;
+const WARM_THERMAL_COLOR_BANDS = [
+  { minHpa: 850, color: new THREE.Color("#7a1018") },
+  { minHpa: 700, color: new THREE.Color("#972023") },
+  { minHpa: 500, color: new THREE.Color("#bc3528") },
+  { minHpa: 350, color: new THREE.Color("#dd5332") },
+  { minHpa: 250, color: new THREE.Color("#f67b4b") },
+  { minHpa: 150, color: new THREE.Color("#ffab78") },
+  { minHpa: 70, color: new THREE.Color("#ffd0b0") },
+  { minHpa: 0, color: new THREE.Color("#ffe9da") },
+] as const;
+const COLD_THERMAL_COLOR_BANDS = [
+  { minHpa: 850, color: new THREE.Color("#0f245f") },
+  { minHpa: 700, color: new THREE.Color("#17398a") },
+  { minHpa: 500, color: new THREE.Color("#2254b5") },
+  { minHpa: 350, color: new THREE.Color("#3378da") },
+  { minHpa: 250, color: new THREE.Color("#57a2f0") },
+  { minHpa: 150, color: new THREE.Color("#84c2ff") },
+  { minHpa: 70, color: new THREE.Color("#b6ddff") },
+  { minHpa: 0, color: new THREE.Color("#dff0ff") },
+] as const;
 
 type ShellKind = "warm" | "cold";
 
@@ -40,6 +69,26 @@ function pressureToStandardAtmosphereHeightM(pressureHpa: number) {
 function standardAtmosphereHeightMToPressure(heightM: number) {
   const normalized = THREE.MathUtils.clamp(1.0 - heightM / 44330.0, 1e-6, 1);
   return 1013.25 * normalized ** (1 / 0.1903);
+}
+
+function pressureToRadius(
+  frame: PotentialTemperatureStructureFrame,
+  pressureHpa: number
+) {
+  const {
+    base_radius: baseRadius,
+    vertical_span: verticalSpan,
+    reference_pressure_hpa: { min: minPressure, max: maxPressure },
+  } = frame.manifest.globe;
+
+  const minHeight = pressureToStandardAtmosphereHeightM(maxPressure);
+  const maxHeight = pressureToStandardAtmosphereHeightM(minPressure);
+  const scale = verticalSpan / Math.max(maxHeight - minHeight, 1e-9);
+
+  return (
+    baseRadius +
+    (pressureToStandardAtmosphereHeightM(pressureHpa) - minHeight) * scale
+  );
 }
 
 function radiusToPressureHpa(frame: PotentialTemperatureStructureFrame, radius: number) {
@@ -56,9 +105,27 @@ function radiusToPressureHpa(frame: PotentialTemperatureStructureFrame, radius: 
   return standardAtmosphereHeightMToPressure(heightM);
 }
 
-function colorForPressureBand(pressureHpa: number, kind: ShellKind) {
+function colorAtStopPosition(t: number, stops: readonly THREE.Color[]) {
+  const scaled = THREE.MathUtils.clamp(t, 0, 1) * (stops.length - 1);
+  const startIndex = Math.floor(scaled);
+  const endIndex = Math.min(startIndex + 1, stops.length - 1);
+  const mix = scaled - startIndex;
+  return stops[startIndex].clone().lerp(stops[endIndex], mix);
+}
+
+function colorForPressureBand(
+  pressureHpa: number,
+  colorMode: PotentialTemperatureColorMode,
+  kind: ShellKind
+) {
   const bands =
-    kind === "warm" ? WARM_PRESSURE_COLOR_BANDS : COLD_PRESSURE_COLOR_BANDS;
+    colorMode === "thermalContrast"
+      ? kind === "warm"
+        ? WARM_THERMAL_COLOR_BANDS
+        : COLD_THERMAL_COLOR_BANDS
+      : kind === "warm"
+        ? WARM_PRESSURE_COLOR_BANDS
+        : COLD_PRESSURE_COLOR_BANDS;
   for (const band of bands) {
     if (pressureHpa >= band.minHpa) {
       return band.color;
@@ -67,11 +134,54 @@ function colorForPressureBand(pressureHpa: number, kind: ShellKind) {
   return bands[bands.length - 1].color;
 }
 
+function buildBandScale(
+  frame: PotentialTemperatureStructureFrame,
+  colorMode: PotentialTemperatureColorMode,
+  kind: ShellKind
+) {
+  const thresholds = frame.metadata.selection.thresholds_by_pressure_level;
+  const radii = thresholds.map((entry) => pressureToRadius(frame, entry.pressure_hpa));
+  const boundaryRadii = radii
+    .slice(0, -1)
+    .map((radius, index) => (radius + radii[index + 1]) / 2);
+  const levelColors =
+    colorMode === "precipitableWaterProxy"
+      ? radii.map((_, index) =>
+          colorAtStopPosition(
+            index / Math.max(radii.length - 1, 1),
+            PRECIPITABLE_WATER_PROXY_COLOR_STOPS
+          )
+        )
+      : thresholds.map((entry) =>
+          colorForPressureBand(entry.pressure_hpa, colorMode, kind)
+        );
+
+  return { boundaryRadii, levelColors };
+}
+
+function levelIndexForRadius(radius: number, boundaryRadii: number[]) {
+  let low = 0;
+  let high = boundaryRadii.length;
+
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (radius > boundaryRadii[mid]) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+
+  return low;
+}
+
 function buildGeometry(
   frame: PotentialTemperatureStructureFrame,
   verticalExaggeration: number,
-  kind: ShellKind
+  kind: ShellKind,
+  colorMode: PotentialTemperatureColorMode
 ) {
+  const bandScale = buildBandScale(frame, colorMode, kind);
   const positions =
     kind === "warm" ? frame.warmPositions.slice() : frame.coldPositions.slice();
   const indices =
@@ -95,8 +205,11 @@ function buildGeometry(
     positions[i + 1] *= scale;
     positions[i + 2] *= scale;
 
+    const levelIndex = levelIndexForRadius(radius, bandScale.boundaryRadii);
     const pressureHpa = radiusToPressureHpa(frame, radius);
-    const color = colorForPressureBand(pressureHpa, kind);
+    const color =
+      bandScale.levelColors[levelIndex] ??
+      colorForPressureBand(pressureHpa, colorMode, kind);
     colors[i] = color.r;
     colors[i + 1] = color.g;
     colors[i + 2] = color.b;
@@ -137,7 +250,12 @@ export default function PotentialTemperatureStructuresLayer() {
     coldMeshRef.current?.removeFromParent();
     coldMeshRef.current?.geometry.dispose();
 
-    const warmGeometry = buildGeometry(frame, verticalExaggeration, "warm");
+    const warmGeometry = buildGeometry(
+      frame,
+      verticalExaggeration,
+      "warm",
+      layerState.colorMode
+    );
     const warmMesh = new THREE.Mesh(warmGeometry, material);
     warmMesh.name = "potential-temperature-warm-shell";
     warmMesh.renderOrder = LAYER_RENDER_ORDER;
@@ -145,14 +263,19 @@ export default function PotentialTemperatureStructuresLayer() {
     root.add(warmMesh);
     warmMeshRef.current = warmMesh;
 
-    const coldGeometry = buildGeometry(frame, verticalExaggeration, "cold");
+    const coldGeometry = buildGeometry(
+      frame,
+      verticalExaggeration,
+      "cold",
+      layerState.colorMode
+    );
     const coldMesh = new THREE.Mesh(coldGeometry, material);
     coldMesh.name = "potential-temperature-cold-shell";
     coldMesh.renderOrder = LAYER_RENDER_ORDER;
     coldMesh.frustumCulled = false;
     root.add(coldMesh);
     coldMeshRef.current = coldMesh;
-  }, [verticalExaggeration]);
+  }, [layerState.colorMode, verticalExaggeration]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -223,7 +346,9 @@ export default function PotentialTemperatureStructuresLayer() {
 
     root.visible = true;
 
-    void fetchPotentialTemperatureStructureFrame(timestamp)
+    void fetchPotentialTemperatureStructureFrame(timestamp, {
+      variant: layerState.variant,
+    })
       .then((frame) => {
         if (isCancelled()) return;
         frameRef.current = frame;
@@ -239,7 +364,14 @@ export default function PotentialTemperatureStructuresLayer() {
     return () => {
       cancelled = true;
     };
-  }, [engineReady, layerState.visible, rebuildMesh, signalReady, timestamp]);
+  }, [
+    engineReady,
+    layerState.variant,
+    layerState.visible,
+    rebuildMesh,
+    signalReady,
+    timestamp,
+  ]);
 
   return null;
 }

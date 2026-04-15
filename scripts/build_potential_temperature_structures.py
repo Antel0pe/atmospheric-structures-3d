@@ -30,18 +30,24 @@ DERIVED_UNITS = "K"
 REFERENCE_PRESSURE_HPA = 1000.0
 POTENTIAL_TEMPERATURE_KAPPA = 287.05 / 1004.0
 VOLUME_COMPONENT_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
-OUTPUT_VERSION = 7
+OUTPUT_VERSION = 8
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
 DEFAULT_OUTPUT_DIR = Path("public/potential-temperature-structures")
 DEFAULT_INCLUDE_TIMESTAMPS = ("2021-11-08T12:00",)
 DEFAULT_BASE_RADIUS = 100.0
-DEFAULT_VERTICAL_SPAN = 12.0
+DEFAULT_VERTICAL_SPAN = 18.0
 DEFAULT_LATITUDE_STRIDE = 4
 DEFAULT_LONGITUDE_STRIDE = 4
 DEFAULT_PRESSURE_MIN_HPA = 250.0
 DEFAULT_PRESSURE_MAX_HPA = 1000.0
-DEFAULT_ABSOLUTE_ANOMALY_PERCENTILE = 50.0
+DEFAULT_KEEP_TOP_PERCENT = 50.0
 DEFAULT_SMOOTHING_SIGMA_CELLS = 1.0
+DEFAULT_CONNECTION_MODE = "bridge-gap-1"
+CONNECTION_MODE_CHOICES = (
+    "bridge-gap-1",
+    "bridge-gap-2",
+    "fill-between-anchors",
+)
 
 
 @dataclass(frozen=True)
@@ -81,7 +87,7 @@ def parse_args() -> argparse.Namespace:
             "Build sign-aware dry-potential-temperature anomaly voxel shells from "
             "ERA5 pressure-level temperature. The builder derives dry potential "
             "temperature, subtracts a per-level latitude-band mean, keeps the top "
-            "absolute-anomaly percentile on each pressure level, lightly smooths "
+            "share of absolute anomalies on each pressure level, lightly smooths "
             "that signed anomaly field, and exports warm/cold 3D voxel-face "
             "structures with per-vertex anomaly magnitude and theta values."
         )
@@ -99,12 +105,23 @@ def parse_args() -> argparse.Namespace:
         help="Directory where the generated potential-temperature assets will be written.",
     )
     parser.add_argument(
+        "--keep-top-percent",
+        type=float,
+        default=DEFAULT_KEEP_TOP_PERCENT,
+        help=(
+            "Keep the top N percent of absolute anomaly values at each pressure "
+            "level before smoothing. The default 50 means: keep the stronger half "
+            "of anomalies on each level. A value of 100 keeps every finite anomaly."
+        ),
+    )
+    parser.add_argument(
         "--absolute-anomaly-percentile",
         type=float,
-        default=DEFAULT_ABSOLUTE_ANOMALY_PERCENTILE,
+        default=None,
         help=(
-            "Keep voxels at or above this per-level percentile of absolute anomaly "
-            "before smoothing."
+            "Deprecated compatibility alias for the percentile cutoff. "
+            "For example, 50 here is equivalent to --keep-top-percent 50, while "
+            "0 is equivalent to --keep-top-percent 100."
         ),
     )
     parser.add_argument(
@@ -114,6 +131,17 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Horizontal Gaussian smoothing sigma, in strided grid cells, applied "
             "after the per-level absolute-anomaly selection."
+        ),
+    )
+    parser.add_argument(
+        "--connection-mode",
+        type=str,
+        choices=CONNECTION_MODE_CHOICES,
+        default=DEFAULT_CONNECTION_MODE,
+        help=(
+            "Vertical connection recipe applied after the per-level top-percent "
+            "selection and before smoothing. The fill is sign-aware and only "
+            "bridges levels whose raw anomaly keeps the same sign."
         ),
     )
     parser.add_argument(
@@ -296,19 +324,42 @@ def build_latitude_mean_anomaly(theta_field: np.ndarray) -> tuple[np.ndarray, np
     return anomaly, np.asarray(latitude_band_mean, dtype=np.float32)
 
 
-def build_percentile_selected_anomaly(
+def resolve_keep_top_percent(
+    keep_top_percent: float,
+    absolute_anomaly_percentile: float | None,
+) -> tuple[float, float]:
+    if absolute_anomaly_percentile is not None:
+        percentile = float(absolute_anomaly_percentile)
+        if not np.isfinite(percentile) or percentile < 0.0 or percentile > 100.0:
+            raise ValueError(
+                "absolute_anomaly_percentile must be a finite value between 0 and 100."
+            )
+        resolved_keep_top_percent = 100.0 - percentile
+    else:
+        resolved_keep_top_percent = float(keep_top_percent)
+
+    if (
+        not np.isfinite(resolved_keep_top_percent)
+        or resolved_keep_top_percent < 0.0
+        or resolved_keep_top_percent > 100.0
+    ):
+        raise ValueError("keep_top_percent must be a finite value between 0 and 100.")
+
+    return resolved_keep_top_percent, 100.0 - resolved_keep_top_percent
+
+
+def build_top_percent_selected_anomaly(
     anomaly: np.ndarray,
-    absolute_anomaly_percentile: float,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    percentile = float(absolute_anomaly_percentile)
-    if not np.isfinite(percentile) or percentile < 0.0 or percentile > 100.0:
-        raise ValueError(
-            "absolute_anomaly_percentile must be a finite value between 0 and 100."
-        )
+    keep_top_percent: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    resolved_keep_top_percent, absolute_anomaly_percentile = resolve_keep_top_percent(
+        keep_top_percent=keep_top_percent,
+        absolute_anomaly_percentile=None,
+    )
 
     absolute_anomaly = np.asarray(np.abs(anomaly), dtype=np.float32)
     thresholds = np.asarray(
-        np.percentile(absolute_anomaly, percentile, axis=(1, 2)),
+        np.percentile(absolute_anomaly, absolute_anomaly_percentile, axis=(1, 2)),
         dtype=np.float32,
     )
     keep_mask = np.asarray(
@@ -316,7 +367,84 @@ def build_percentile_selected_anomaly(
         dtype=bool,
     )
     selected_anomaly = np.where(keep_mask, anomaly, 0.0).astype(np.float32)
-    return selected_anomaly, keep_mask, thresholds
+    return selected_anomaly, keep_mask, thresholds, resolved_keep_top_percent
+
+
+def vertical_connection_mode_label(connection_mode: str) -> str:
+    labels = {
+        "bridge-gap-1": "bridge_one_missing_level",
+        "bridge-gap-2": "bridge_up_to_two_missing_levels",
+        "fill-between-anchors": "fill_between_same_sign_anchors",
+    }
+    return labels.get(connection_mode, connection_mode)
+
+
+def apply_vertical_connection_mode(
+    anomaly: np.ndarray,
+    selected_anomaly: np.ndarray,
+    connection_mode: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    if connection_mode not in CONNECTION_MODE_CHOICES:
+        raise ValueError(f"Unsupported connection mode: {connection_mode}")
+
+    if connection_mode == "bridge-gap-1":
+        max_gap: int | None = 1
+    elif connection_mode == "bridge-gap-2":
+        max_gap = 2
+    else:
+        max_gap = None
+
+    filled = np.asarray(selected_anomaly, dtype=np.float32).copy()
+    original_mask = np.asarray(np.abs(selected_anomaly) > 0.0, dtype=bool)
+    filled_mask = original_mask.copy()
+    original_sign = np.sign(selected_anomaly).astype(np.int8)
+    raw_sign = np.sign(anomaly).astype(np.int8)
+
+    _, latitude_count, longitude_count = anomaly.shape
+    for latitude_index in range(latitude_count):
+        for longitude_index in range(longitude_count):
+            for sign_value in (-1, 1):
+                anchor_levels = np.flatnonzero(
+                    original_sign[:, latitude_index, longitude_index] == sign_value
+                )
+                if anchor_levels.size < 2:
+                    continue
+
+                for start_level, end_level in zip(
+                    anchor_levels[:-1],
+                    anchor_levels[1:],
+                    strict=True,
+                ):
+                    gap_size = int(end_level - start_level - 1)
+                    if gap_size <= 0:
+                        continue
+                    if max_gap is not None and gap_size > max_gap:
+                        continue
+
+                    gap_slice = slice(start_level + 1, end_level)
+                    gap_signs = raw_sign[gap_slice, latitude_index, longitude_index]
+                    if gap_signs.size == 0:
+                        continue
+                    if np.any(
+                        original_sign[gap_slice, latitude_index, longitude_index]
+                        == -sign_value
+                    ):
+                        continue
+                    if not np.all(gap_signs == sign_value):
+                        continue
+
+                    gap_mask = ~filled_mask[gap_slice, latitude_index, longitude_index]
+                    if not np.any(gap_mask):
+                        continue
+
+                    filled_values = anomaly[gap_slice, latitude_index, longitude_index]
+                    filled_segment = filled[gap_slice, latitude_index, longitude_index]
+                    filled_segment[gap_mask] = filled_values[gap_mask]
+                    filled[gap_slice, latitude_index, longitude_index] = filled_segment
+                    filled_mask[gap_slice, latitude_index, longitude_index] |= gap_mask
+
+    added_mask = np.asarray(filled_mask & ~original_mask, dtype=bool)
+    return filled.astype(np.float32), added_mask
 
 
 def smooth_selected_sign_anomaly(
@@ -367,6 +495,46 @@ def smooth_selected_sign_anomaly(
     anomaly_values[positive_keep] = positive_magnitude[positive_keep]
     anomaly_values[negative_keep] = -negative_magnitude[negative_keep]
     return anomaly_values, sign_field
+
+
+def remove_single_level_components(
+    smoothed_anomaly_values: np.ndarray,
+    sign_field: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, dict[str, int]]:
+    filtered_anomaly_values = np.asarray(smoothed_anomaly_values, dtype=np.float32).copy()
+    filtered_sign_field = np.asarray(sign_field, dtype=np.int8).copy()
+    summary = {
+        "removed_component_count": 0,
+        "removed_positive_component_count": 0,
+        "removed_negative_component_count": 0,
+        "removed_voxel_count": 0,
+        "removed_positive_voxel_count": 0,
+        "removed_negative_voxel_count": 0,
+    }
+
+    for sign_value, component_key, voxel_key in (
+        (1, "removed_positive_component_count", "removed_positive_voxel_count"),
+        (-1, "removed_negative_component_count", "removed_negative_voxel_count"),
+    ):
+        labels, component_count = label_wrapped_volume_components(filtered_sign_field == sign_value)
+        for label_id in range(1, component_count + 1):
+            component_mask = labels == label_id
+            if not np.any(component_mask):
+                continue
+
+            pressure_span_levels = np.unique(np.argwhere(component_mask)[:, 0]).size
+            if pressure_span_levels > 1:
+                continue
+
+            removed_voxels = int(np.count_nonzero(component_mask))
+            filtered_anomaly_values[component_mask] = 0.0
+            filtered_sign_field[component_mask] = 0
+            summary["removed_component_count"] += 1
+            summary[component_key] += 1
+            summary["removed_voxel_count"] += removed_voxels
+            summary[voxel_key] += removed_voxels
+
+    return filtered_anomaly_values, filtered_sign_field, summary
 
 
 def build_seam_merged_component_info(
@@ -465,16 +633,21 @@ def build_asset_payload(
     timestamp: str,
     theta_field: np.ndarray,
     selected_anomaly: np.ndarray,
+    selected_voxel_count_before_connection_fill: int,
     smoothed_anomaly_values: np.ndarray,
     sign_field: np.ndarray,
     pressure_levels_hpa: np.ndarray,
     latitudes_deg: np.ndarray,
     longitudes_deg: np.ndarray,
+    keep_top_percent: float,
     absolute_anomaly_percentile: float,
     smoothing_sigma_cells: float,
+    connection_mode: str,
     anomaly_thresholds_by_level: np.ndarray,
     base_radius: float,
     vertical_span: float,
+    connection_fill_mask: np.ndarray,
+    single_level_removal_summary: dict[str, int],
 ) -> SignedAnomalyShellAssetPayload:
     warm_mask = np.asarray(sign_field > 0, dtype=bool)
     cold_mask = np.asarray(sign_field < 0, dtype=bool)
@@ -508,7 +681,16 @@ def build_asset_payload(
         "voxel_count": total_voxel_count,
         "positive_voxel_count": int(np.count_nonzero(sign_field > 0)),
         "negative_voxel_count": int(np.count_nonzero(sign_field < 0)),
-        "selected_voxel_count_before_smoothing": int(np.count_nonzero(selected_anomaly)),
+        "selected_voxel_count_before_connection_fill": int(
+            selected_voxel_count_before_connection_fill
+        ),
+        "connection_fill_voxel_count": int(np.count_nonzero(connection_fill_mask)),
+        "selected_voxel_count_before_smoothing": int(
+            selected_voxel_count_before_connection_fill
+            + np.count_nonzero(connection_fill_mask)
+        ),
+        "single_level_component_min_span_levels": 2,
+        **single_level_removal_summary,
         "vertex_count": int((warm_mesh.positions.size + cold_mesh.positions.size) // 3),
         "index_count": int(warm_mesh.indices.size + cold_mesh.indices.size),
         "warm_vertex_count": int(warm_mesh.vertex_count),
@@ -528,10 +710,17 @@ def build_asset_payload(
         "latitude_max_deg": float(np.max(latitudes_deg[latitude_indices])),
         "longitude_min_deg": float(np.min(longitudes_deg[longitude_indices])),
         "longitude_max_deg": float(np.max(longitudes_deg[longitude_indices])),
+        "keep_top_percent": float(keep_top_percent),
         "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
         "smoothing_sigma_cells": float(smoothing_sigma_cells),
+        "connection_mode": connection_mode,
         "selection": {
             "kept_signs": ["negative", "positive"],
+            "keep_top_percent": float(keep_top_percent),
+            "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
+            "vertical_connection_mode": connection_mode,
+            "vertical_connection_label": vertical_connection_mode_label(connection_mode),
+            "min_component_pressure_span_levels": 2,
             "thresholds_by_pressure_level": [
                 {
                     "pressure_hpa": float(pressure_hpa),
@@ -549,12 +738,24 @@ def build_asset_payload(
     return SignedAnomalyShellAssetPayload(
         timestamp=timestamp,
         warm_positions=warm_mesh.positions,
-        warm_indices=warm_mesh.indices,
+        warm_indices=maybe_flip_triangle_winding(warm_mesh.indices),
         cold_positions=cold_mesh.positions,
-        cold_indices=cold_mesh.indices,
+        cold_indices=maybe_flip_triangle_winding(cold_mesh.indices),
         voxel_count=total_voxel_count,
         metadata=metadata,
     )
+
+
+def maybe_flip_triangle_winding(indices: np.ndarray) -> np.ndarray:
+    normalized = np.asarray(indices, dtype=np.uint32).copy()
+    if OUTPUT_VERSION < 8:
+        return normalized
+
+    for index in range(0, normalized.size, 3):
+        second = int(normalized[index + 1])
+        normalized[index + 1] = normalized[index + 2]
+        normalized[index + 2] = second
+    return normalized
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -621,8 +822,10 @@ def build_manifest(
     *,
     contents: DatasetContents,
     entries: list[dict[str, Any]],
+    keep_top_percent: float,
     absolute_anomaly_percentile: float,
     smoothing_sigma_cells: float,
+    connection_mode: str,
     pressure_min_hpa: float,
     pressure_max_hpa: float,
     latitude_stride: int,
@@ -638,6 +841,7 @@ def build_manifest(
         "dataset": contents.dataset_path.name,
         "variable": TEMPERATURE_VARIABLE,
         "units": contents.units,
+        "variant": connection_mode,
         "derived_variable": {
             "name": DERIVED_VARIABLE_NAME,
             "units": DERIVED_UNITS,
@@ -648,9 +852,13 @@ def build_manifest(
         "geometry_mode": "voxel-faces",
         "selection": {
             "background": "per-level_latitude-band_mean",
-            "threshold_basis": "per-level_absolute-anomaly_percentile",
+            "threshold_basis": "per-level_absolute-anomaly_top-percent",
+            "keep_top_percent": float(keep_top_percent),
             "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
             "smoothing_sigma_cells": float(smoothing_sigma_cells),
+            "vertical_connection_mode": connection_mode,
+            "vertical_connection_label": vertical_connection_mode_label(connection_mode),
+            "min_component_pressure_span_levels": 2,
             "keep_signs": ["negative", "positive"],
             "volume_connectivity": "26-connected-same-sign",
             "wraps_longitude": True,
@@ -683,6 +891,10 @@ def build_manifest(
 
 def main() -> None:
     args = parse_args()
+    keep_top_percent, absolute_anomaly_percentile = resolve_keep_top_percent(
+        keep_top_percent=args.keep_top_percent,
+        absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+    )
     dataset_path = resolve_dataset_path(args.dataset)
     contents = load_dataset_contents(dataset_path)
     target_timestamps = resolve_target_timestamps(
@@ -730,19 +942,38 @@ def main() -> None:
                 pressure_window_levels_hpa,
             )
             anomaly, _ = build_latitude_mean_anomaly(theta_field)
-            selected_anomaly, _, anomaly_thresholds_by_level = build_percentile_selected_anomaly(
+            (
+                selected_top_percent_anomaly,
+                _,
+                anomaly_thresholds_by_level,
+                resolved_keep_top_percent,
+            ) = build_top_percent_selected_anomaly(
                 anomaly,
-                absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+                keep_top_percent=keep_top_percent,
+            )
+            selected_anomaly, connection_fill_mask = apply_vertical_connection_mode(
+                anomaly,
+                selected_top_percent_anomaly,
+                connection_mode=args.connection_mode,
             )
             smoothed_anomaly_values, sign_field = smooth_selected_sign_anomaly(
                 selected_anomaly,
                 smoothing_sigma_cells=args.smoothing_sigma_cells,
             )
+            (
+                smoothed_anomaly_values,
+                sign_field,
+                single_level_removal_summary,
+            ) = remove_single_level_components(
+                smoothed_anomaly_values,
+                sign_field,
+            )
             if not np.any(sign_field):
                 print(
                     "Skipped potential temperature frame after smoothing:",
                     timestamp,
-                    f"absolute_anomaly_percentile={args.absolute_anomaly_percentile}",
+                    f"keep_top_percent={resolved_keep_top_percent}",
+                    f"absolute_anomaly_percentile={absolute_anomaly_percentile}",
                     f"smoothing_sigma_cells={args.smoothing_sigma_cells}",
                 )
                 continue
@@ -751,16 +982,23 @@ def main() -> None:
                 timestamp=timestamp,
                 theta_field=theta_field,
                 selected_anomaly=selected_anomaly,
+                selected_voxel_count_before_connection_fill=int(
+                    np.count_nonzero(np.abs(selected_top_percent_anomaly) > 0.0)
+                ),
                 smoothed_anomaly_values=smoothed_anomaly_values,
                 sign_field=sign_field,
                 pressure_levels_hpa=pressure_window_levels_hpa,
                 latitudes_deg=strided_latitudes_deg,
                 longitudes_deg=strided_longitudes_deg,
-                absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+                keep_top_percent=resolved_keep_top_percent,
+                absolute_anomaly_percentile=absolute_anomaly_percentile,
                 smoothing_sigma_cells=args.smoothing_sigma_cells,
+                connection_mode=args.connection_mode,
                 anomaly_thresholds_by_level=anomaly_thresholds_by_level,
                 base_radius=args.base_radius,
                 vertical_span=args.vertical_span,
+                connection_fill_mask=connection_fill_mask,
+                single_level_removal_summary=single_level_removal_summary,
             )
             entries.append(write_frame(output_dir=output_dir, payload=payload))
             final_latitudes_deg = strided_latitudes_deg
@@ -774,6 +1012,9 @@ def main() -> None:
                 f"components={payload.metadata['component_count']}",
                 f"positive_components={payload.metadata['positive_component_count']}",
                 f"negative_components={payload.metadata['negative_component_count']}",
+                f"connection_mode={args.connection_mode}",
+                f"filled={payload.metadata['connection_fill_voxel_count']}",
+                f"removed_single_level={payload.metadata['removed_component_count']}",
                 f"anomaly_abs_max={payload.metadata['anomaly_abs_max']:.2f}",
                 f"warm_triangles={payload.warm_indices.size // 3}",
                 f"cold_triangles={payload.cold_indices.size // 3}",
@@ -787,8 +1028,10 @@ def main() -> None:
     manifest = build_manifest(
         contents=contents,
         entries=entries,
-        absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+        keep_top_percent=keep_top_percent,
+        absolute_anomaly_percentile=absolute_anomaly_percentile,
         smoothing_sigma_cells=args.smoothing_sigma_cells,
+        connection_mode=args.connection_mode,
         pressure_min_hpa=args.pressure_min_hpa,
         pressure_max_hpa=args.pressure_max_hpa,
         latitude_stride=args.latitude_stride,
