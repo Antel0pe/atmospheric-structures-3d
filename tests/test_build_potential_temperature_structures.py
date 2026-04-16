@@ -8,8 +8,10 @@ import numpy as np
 from scripts.build_potential_temperature_structures import (
     DatasetContents,
     apply_vertical_connection_mode,
+    build_climatology_mean_anomaly,
     build_latitude_mean_anomaly,
     build_manifest,
+    build_sign_tail_selected_anomaly,
     build_top_percent_selected_anomaly,
     compute_dry_potential_temperature,
     label_wrapped_volume_components,
@@ -71,6 +73,41 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
         np.testing.assert_allclose(latitude_band_mean, expected_mean)
         np.testing.assert_allclose(anomaly, expected_anomaly)
 
+    def test_build_climatology_mean_anomaly_subtracts_matched_theta_mean(self) -> None:
+        theta_field = np.array(
+            [
+                [
+                    [300.0, 304.0],
+                    [290.0, 292.0],
+                ]
+            ],
+            dtype=np.float32,
+        )
+        climatology_theta_mean = np.array(
+            [
+                [
+                    [296.0, 301.0],
+                    [291.0, 289.0],
+                ]
+            ],
+            dtype=np.float32,
+        )
+
+        anomaly = build_climatology_mean_anomaly(theta_field, climatology_theta_mean)
+
+        np.testing.assert_allclose(
+            anomaly,
+            np.array(
+                [
+                    [
+                        [4.0, 3.0],
+                        [-1.0, 3.0],
+                    ]
+                ],
+                dtype=np.float32,
+            ),
+        )
+
     def test_resolve_keep_top_percent_treats_percentile_alias_as_inverse(self) -> None:
         keep_top_percent, percentile = resolve_keep_top_percent(
             keep_top_percent=50.0,
@@ -129,6 +166,37 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
         self.assertEqual(float(thresholds_100[0]), 1.0)
         np.testing.assert_array_equal(keep_mask_100, np.ones_like(keep_mask_100, dtype=bool))
         np.testing.assert_array_equal(selected_100, anomaly)
+
+    def test_build_sign_tail_selected_anomaly_keeps_each_sign_tail_separately(self) -> None:
+        anomaly = np.array(
+            [
+                [
+                    [-8.0, -6.0, -2.0, 1.0, 3.0, 9.0],
+                ]
+            ],
+            dtype=np.float32,
+        )
+
+        (
+            selected,
+            keep_mask,
+            hot_thresholds,
+            cold_thresholds,
+            _,
+            keep_top_percent,
+        ) = build_sign_tail_selected_anomaly(anomaly, keep_top_percent=50.0)
+
+        self.assertEqual(keep_top_percent, 50.0)
+        self.assertEqual(float(hot_thresholds[0]), 3.0)
+        self.assertEqual(float(cold_thresholds[0]), -6.0)
+        np.testing.assert_array_equal(
+            keep_mask,
+            np.array([[[True, True, False, False, True, True]]], dtype=bool),
+        )
+        np.testing.assert_array_equal(
+            selected,
+            np.array([[[-8.0, -6.0, 0.0, 0.0, 3.0, 9.0]]], dtype=np.float32),
+        )
 
     def test_maybe_flip_triangle_winding_swaps_each_triangle_tail(self) -> None:
         indices = np.array([0, 1, 2, 2, 3, 0], dtype=np.uint32)
@@ -285,6 +353,7 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
 
         manifest = build_manifest(
             contents=contents,
+            climatology_dataset_name="climatology.nc",
             entries=[
                 {
                     "timestamp": "2021-11-08T12:00",
@@ -316,7 +385,7 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
 
         self.assertEqual(
             manifest["selection"]["threshold_basis"],
-            "per-level_absolute-anomaly_top-percent",
+            "per-level_sign-tail_top-percent",
         )
         self.assertEqual(manifest["variant"], "bridge-gap-1")
         self.assertEqual(manifest["selection"]["keep_top_percent"], 50.0)

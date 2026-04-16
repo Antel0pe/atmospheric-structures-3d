@@ -18,6 +18,7 @@ export type PotentialTemperatureManifestTimestamp = {
 export type PotentialTemperatureStructureManifest = {
   version: number;
   dataset: string;
+  climatology_dataset?: string;
   variable: string;
   units: string;
   variant?: string;
@@ -27,11 +28,16 @@ export type PotentialTemperatureStructureManifest = {
     reference_pressure_hpa: number;
     kappa: number;
   };
-  structure_kind: "potential-temperature-latitude-mean-anomaly-shell";
+  structure_kind:
+    | "potential-temperature-latitude-mean-anomaly-shell"
+    | "potential-temperature-climatology-anomaly-shell";
   geometry_mode: "voxel-faces";
   selection: {
-    background: "per-level_latitude-band_mean";
+    background:
+      | "per-level_latitude-band_mean"
+      | "matched_gridpoint_climatological_theta_mean";
     threshold_basis:
+      | "per-level_sign-tail_top-percent"
       | "per-level_absolute-anomaly_top-percent"
       | "per-level_absolute-anomaly_percentile";
     keep_top_percent?: number;
@@ -117,7 +123,9 @@ export type PotentialTemperatureStructureMetadata = {
     vertical_connection_label?: string;
     thresholds_by_pressure_level: Array<{
       pressure_hpa: number;
-      absolute_anomaly_threshold: number;
+      absolute_anomaly_threshold?: number;
+      hot_anomaly_threshold?: number;
+      cold_anomaly_threshold?: number;
     }>;
   };
   warm_positions_file: string;

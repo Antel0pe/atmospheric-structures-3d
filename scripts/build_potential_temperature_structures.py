@@ -32,6 +32,9 @@ POTENTIAL_TEMPERATURE_KAPPA = 287.05 / 1004.0
 VOLUME_COMPONENT_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
 OUTPUT_VERSION = 8
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
+DEFAULT_CLIMATOLOGY_PATH = Path(
+    "data/era5_dry-potential-temperature-climatology_1990-2020_11-08_12.nc"
+)
 DEFAULT_OUTPUT_DIR = Path("public/potential-temperature-structures")
 DEFAULT_INCLUDE_TIMESTAMPS = ("2021-11-08T12:00",)
 DEFAULT_BASE_RADIUS = 100.0
@@ -40,7 +43,7 @@ DEFAULT_LATITUDE_STRIDE = 4
 DEFAULT_LONGITUDE_STRIDE = 4
 DEFAULT_PRESSURE_MIN_HPA = 250.0
 DEFAULT_PRESSURE_MAX_HPA = 1000.0
-DEFAULT_KEEP_TOP_PERCENT = 50.0
+DEFAULT_KEEP_TOP_PERCENT = 5.0
 DEFAULT_SMOOTHING_SIGMA_CELLS = 1.0
 DEFAULT_CONNECTION_MODE = "bridge-gap-1"
 CONNECTION_MODE_CHOICES = (
@@ -86,10 +89,11 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Build sign-aware dry-potential-temperature anomaly voxel shells from "
             "ERA5 pressure-level temperature. The builder derives dry potential "
-            "temperature, subtracts a per-level latitude-band mean, keeps the top "
-            "share of absolute anomalies on each pressure level, lightly smooths "
-            "that signed anomaly field, and exports warm/cold 3D voxel-face "
-            "structures with per-vertex anomaly magnitude and theta values."
+            "temperature, subtracts a matched climatological dry-potential-"
+            "temperature mean field, keeps the hottest and coldest sign-specific "
+            "tails on each pressure level, lightly smooths that signed anomaly "
+            "field, and exports warm/cold 3D voxel-face structures with "
+            "per-vertex anomaly magnitude and theta values."
         )
     )
     parser.add_argument(
@@ -97,6 +101,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_DATASET_PATH,
         help="Path to the ERA5 pressure-level temperature NetCDF file.",
+    )
+    parser.add_argument(
+        "--climatology",
+        type=Path,
+        default=DEFAULT_CLIMATOLOGY_PATH,
+        help="Path to the dry-potential-temperature climatology NetCDF file.",
     )
     parser.add_argument(
         "--output-dir",
@@ -109,9 +119,10 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=DEFAULT_KEEP_TOP_PERCENT,
         help=(
-            "Keep the top N percent of absolute anomaly values at each pressure "
-            "level before smoothing. The default 50 means: keep the stronger half "
-            "of anomalies on each level. A value of 100 keeps every finite anomaly."
+            "Keep the hottest N percent of positive anomalies and the coldest N "
+            "percent of negative anomalies at each pressure level before "
+            "smoothing. The default 5 means: keep the strongest 5 percent on "
+            "each sign tail per level."
         ),
     )
     parser.add_argument(
@@ -324,6 +335,40 @@ def build_latitude_mean_anomaly(theta_field: np.ndarray) -> tuple[np.ndarray, np
     return anomaly, np.asarray(latitude_band_mean, dtype=np.float32)
 
 
+def load_climatology_theta_mean(
+    climatology_path: Path,
+    longitude_order: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    dataset = xr.open_dataset(climatology_path)
+    try:
+        theta_mean = reorder_longitude_axis(
+            np.asarray(dataset["theta_climatology_mean"].values, dtype=np.float32),
+            longitude_order,
+        )
+        pressure_levels_hpa = np.asarray(
+            dataset.coords["pressure_level"].values,
+            dtype=np.float32,
+        )
+        latitudes_deg = np.asarray(dataset.coords["latitude"].values, dtype=np.float32)
+        longitudes_deg = np.asarray(
+            dataset.coords["longitude"].values,
+            dtype=np.float32,
+        )
+        return theta_mean, pressure_levels_hpa, latitudes_deg, reorder_longitude_axis(
+            longitudes_deg[None, None, :],
+            longitude_order,
+        ).reshape(-1)
+    finally:
+        dataset.close()
+
+
+def build_climatology_mean_anomaly(
+    theta_field: np.ndarray,
+    climatology_theta_mean: np.ndarray,
+) -> np.ndarray:
+    return np.asarray(theta_field - climatology_theta_mean, dtype=np.float32)
+
+
 def resolve_keep_top_percent(
     keep_top_percent: float,
     absolute_anomaly_percentile: float | None,
@@ -368,6 +413,52 @@ def build_top_percent_selected_anomaly(
     )
     selected_anomaly = np.where(keep_mask, anomaly, 0.0).astype(np.float32)
     return selected_anomaly, keep_mask, thresholds, resolved_keep_top_percent
+
+
+def build_sign_tail_selected_anomaly(
+    anomaly: np.ndarray,
+    keep_top_percent: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
+    resolved_keep_top_percent, _ = resolve_keep_top_percent(
+        keep_top_percent=keep_top_percent,
+        absolute_anomaly_percentile=None,
+    )
+    upper_percentile = 100.0 - resolved_keep_top_percent
+    hot_thresholds = np.full(anomaly.shape[0], np.nan, dtype=np.float32)
+    cold_thresholds = np.full(anomaly.shape[0], np.nan, dtype=np.float32)
+    hot_keep_mask = np.zeros_like(anomaly, dtype=bool)
+    cold_keep_mask = np.zeros_like(anomaly, dtype=bool)
+
+    for level_index in range(anomaly.shape[0]):
+        level_values = np.asarray(anomaly[level_index], dtype=np.float32)
+        finite_mask = np.isfinite(level_values)
+
+        positive_values = level_values[finite_mask & (level_values > 0.0)]
+        if positive_values.size > 0:
+            hot_threshold = float(np.percentile(positive_values, upper_percentile))
+            hot_thresholds[level_index] = hot_threshold
+            hot_keep_mask[level_index] = (
+                finite_mask & (level_values > 0.0) & (level_values >= hot_threshold)
+            )
+
+        negative_values = level_values[finite_mask & (level_values < 0.0)]
+        if negative_values.size > 0:
+            cold_threshold = float(np.percentile(negative_values, resolved_keep_top_percent))
+            cold_thresholds[level_index] = cold_threshold
+            cold_keep_mask[level_index] = (
+                finite_mask & (level_values < 0.0) & (level_values <= cold_threshold)
+            )
+
+    keep_mask = np.asarray(hot_keep_mask | cold_keep_mask, dtype=bool)
+    selected_anomaly = np.where(keep_mask, anomaly, 0.0).astype(np.float32)
+    return (
+        selected_anomaly,
+        keep_mask,
+        hot_thresholds,
+        cold_thresholds,
+        np.asarray(np.fmax(np.abs(hot_thresholds), np.abs(cold_thresholds)), dtype=np.float32),
+        resolved_keep_top_percent,
+    )
 
 
 def vertical_connection_mode_label(connection_mode: str) -> str:
@@ -643,7 +734,8 @@ def build_asset_payload(
     absolute_anomaly_percentile: float,
     smoothing_sigma_cells: float,
     connection_mode: str,
-    anomaly_thresholds_by_level: np.ndarray,
+    hot_anomaly_thresholds_by_level: np.ndarray,
+    cold_anomaly_thresholds_by_level: np.ndarray,
     base_radius: float,
     vertical_span: float,
     connection_fill_mask: np.ndarray,
@@ -724,11 +816,13 @@ def build_asset_payload(
             "thresholds_by_pressure_level": [
                 {
                     "pressure_hpa": float(pressure_hpa),
-                    "absolute_anomaly_threshold": float(threshold),
+                    "hot_anomaly_threshold": float(hot_threshold),
+                    "cold_anomaly_threshold": float(cold_threshold),
                 }
-                for pressure_hpa, threshold in zip(
+                for pressure_hpa, hot_threshold, cold_threshold in zip(
                     pressure_levels_hpa.tolist(),
-                    anomaly_thresholds_by_level.tolist(),
+                    hot_anomaly_thresholds_by_level.tolist(),
+                    cold_anomaly_thresholds_by_level.tolist(),
                     strict=True,
                 )
             ],
@@ -821,6 +915,7 @@ def write_frame(
 def build_manifest(
     *,
     contents: DatasetContents,
+    climatology_dataset_name: str,
     entries: list[dict[str, Any]],
     keep_top_percent: float,
     absolute_anomaly_percentile: float,
@@ -839,6 +934,7 @@ def build_manifest(
     return {
         "version": OUTPUT_VERSION,
         "dataset": contents.dataset_path.name,
+        "climatology_dataset": climatology_dataset_name,
         "variable": TEMPERATURE_VARIABLE,
         "units": contents.units,
         "variant": connection_mode,
@@ -848,11 +944,11 @@ def build_manifest(
             "reference_pressure_hpa": REFERENCE_PRESSURE_HPA,
             "kappa": POTENTIAL_TEMPERATURE_KAPPA,
         },
-        "structure_kind": "potential-temperature-latitude-mean-anomaly-shell",
+        "structure_kind": "potential-temperature-climatology-anomaly-shell",
         "geometry_mode": "voxel-faces",
         "selection": {
-            "background": "per-level_latitude-band_mean",
-            "threshold_basis": "per-level_absolute-anomaly_top-percent",
+            "background": "matched_gridpoint_climatological_theta_mean",
+            "threshold_basis": "per-level_sign-tail_top-percent",
             "keep_top_percent": float(keep_top_percent),
             "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
             "smoothing_sigma_cells": float(smoothing_sigma_cells),
@@ -896,7 +992,29 @@ def main() -> None:
         absolute_anomaly_percentile=args.absolute_anomaly_percentile,
     )
     dataset_path = resolve_dataset_path(args.dataset)
+    climatology_path = resolve_dataset_path(args.climatology)
     contents = load_dataset_contents(dataset_path)
+    (
+        climatology_theta_mean,
+        climatology_pressure_levels_hpa,
+        climatology_latitudes_deg,
+        climatology_longitudes_deg,
+    ) = load_climatology_theta_mean(
+        climatology_path,
+        contents.longitude_order,
+    )
+    if not np.array_equal(climatology_pressure_levels_hpa, contents.pressure_levels_hpa):
+        raise ValueError(
+            "Climatology pressure levels do not match the source temperature dataset."
+        )
+    if not np.array_equal(climatology_latitudes_deg, contents.latitudes_deg):
+        raise ValueError(
+            "Climatology latitudes do not match the source temperature dataset."
+        )
+    if not np.array_equal(climatology_longitudes_deg, contents.longitudes_deg):
+        raise ValueError(
+            "Climatology longitudes do not match the source temperature dataset."
+        )
     target_timestamps = resolve_target_timestamps(
         contents.timestamps,
         args.include_timestamps,
@@ -941,13 +1059,24 @@ def main() -> None:
                 pressure_window_field,
                 pressure_window_levels_hpa,
             )
-            anomaly, _ = build_latitude_mean_anomaly(theta_field)
+            climatology_pressure_window, _ = select_pressure_window(
+                climatology_theta_mean,
+                contents.pressure_levels_hpa,
+                pressure_min_hpa=args.pressure_min_hpa,
+                pressure_max_hpa=args.pressure_max_hpa,
+            )
+            anomaly = build_climatology_mean_anomaly(
+                theta_field,
+                climatology_pressure_window[:, :: max(int(args.latitude_stride), 1), :: max(int(args.longitude_stride), 1)],
+            )
             (
                 selected_top_percent_anomaly,
                 _,
-                anomaly_thresholds_by_level,
+                hot_anomaly_thresholds_by_level,
+                cold_anomaly_thresholds_by_level,
+                _,
                 resolved_keep_top_percent,
-            ) = build_top_percent_selected_anomaly(
+            ) = build_sign_tail_selected_anomaly(
                 anomaly,
                 keep_top_percent=keep_top_percent,
             )
@@ -994,7 +1123,8 @@ def main() -> None:
                 absolute_anomaly_percentile=absolute_anomaly_percentile,
                 smoothing_sigma_cells=args.smoothing_sigma_cells,
                 connection_mode=args.connection_mode,
-                anomaly_thresholds_by_level=anomaly_thresholds_by_level,
+                hot_anomaly_thresholds_by_level=hot_anomaly_thresholds_by_level,
+                cold_anomaly_thresholds_by_level=cold_anomaly_thresholds_by_level,
                 base_radius=args.base_radius,
                 vertical_span=args.vertical_span,
                 connection_fill_mask=connection_fill_mask,
@@ -1027,6 +1157,7 @@ def main() -> None:
 
     manifest = build_manifest(
         contents=contents,
+        climatology_dataset_name=climatology_path.name,
         entries=entries,
         keep_top_percent=keep_top_percent,
         absolute_anomaly_percentile=absolute_anomaly_percentile,
