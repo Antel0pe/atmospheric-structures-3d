@@ -4,6 +4,8 @@ data/
 tmp/
 /saved-views/
 notes/
+skills/structure-of-data/logs/
+skills/structure-probe/logs/
 # dependencies
 /node_modules
 /.pnp
