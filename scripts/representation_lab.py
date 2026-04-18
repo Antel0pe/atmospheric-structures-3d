@@ -26,6 +26,7 @@ import xarray as xr
 
 from scripts.build_potential_temperature_structures import (
     apply_vertical_connection_mode,
+    build_seam_merged_component_info,
     build_climatology_mean_anomaly,
     build_latitude_mean_anomaly,
     compute_dry_potential_temperature,
@@ -43,10 +44,18 @@ DEFAULT_THETA_CLIMATOLOGY = Path(
 )
 FIELD_REPORT_TOP_SHARES = (5.0, 10.0, 20.0)
 FIELD_REPORT_REFERENCE_TOP_SHARE = 10.0
+RELATIVE_DEPARTURE_THRESHOLDS_PERCENT = (1.0, 2.0, 5.0, 10.0)
+STANDARDIZED_DEPARTURE_THRESHOLDS_SIGMA = (1.0, 2.0, 3.0)
+ABS_LATITUDE_BANDS_DEG = ((0.0, 15.0), (15.0, 30.0), (30.0, 45.0), (45.0, 60.0), (60.0, 90.0))
 REPRESENTATIVE_PROFILE_PRESSURES = (1000.0, 925.0, 850.0, 700.0, 500.0, 300.0, 250.0)
 STRUCTURE_COMPONENT_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
+SLICE_COMPONENT_STRUCTURE = np.ones((3, 3), dtype=np.uint8)
 COARSE_LATITUDE_STRIDE = 4
 COARSE_LONGITUDE_STRIDE = 4
+QUICK_COMPONENT_TOP_SHARE_PERCENT = 10.0
+QUICK_COMPONENT_SWEEP_TOP_SHARES = (1.0, 5.0, 10.0, 15.0, 20.0, 25.0)
+QUICK_COMPONENT_MIN_CELLS = 64
+QUICK_COMPONENT_MIN_LEVEL_FRACTION = 0.001
 
 FIELD_ALIASES = {
     "q": {
@@ -126,7 +135,11 @@ def format_display_path(path: Path) -> str:
         try:
             return f"~/{resolved.relative_to(home).as_posix()}"
         except ValueError:
-            return resolved.name or "<external-path>"
+            tmp_root = Path('/tmp')
+            try:
+                return f"tmp/{resolved.relative_to(tmp_root).as_posix()}"
+            except ValueError:
+                return resolved.name or "<external-path>"
 
 
 def repo_relative_path(path: Path) -> str:
@@ -503,6 +516,23 @@ def safe_percentile(values: np.ndarray, percentile: float) -> float | None:
     return float(np.percentile(finite_values, percentile))
 
 
+def estimate_mode(values: np.ndarray) -> float | None:
+    finite_values = np.asarray(values[np.isfinite(values)], dtype=np.float64)
+    if finite_values.size == 0:
+        return None
+    minimum = float(np.min(finite_values))
+    maximum = float(np.max(finite_values))
+    if abs(maximum - minimum) <= 1e-12:
+        return minimum
+
+    bin_count = max(24, min(80, int(round(math.sqrt(finite_values.size)))))
+    counts, edges = np.histogram(finite_values, bins=bin_count)
+    if counts.size == 0:
+        return None
+    index = int(np.argmax(counts))
+    return float(0.5 * (edges[index] + edges[index + 1]))
+
+
 def summarize_profile_direction(
     level_means: np.ndarray,
     pressure_levels_hpa: np.ndarray,
@@ -612,6 +642,403 @@ def compute_abs_latitude_thresholds(
         key = f"{int(round(target * 100.0))}_percent"
         results[key] = float(ordered_abs_latitudes[int(indices[0])]) if indices.size else None
     return results
+
+
+def compute_abs_latitude_band_shares(
+    latitudes_deg: np.ndarray,
+    zonal_signal_fraction: np.ndarray,
+    area_weights_by_lat: np.ndarray,
+    *,
+    bands_deg: tuple[tuple[float, float], ...] = ABS_LATITUDE_BANDS_DEG,
+) -> list[dict[str, float]]:
+    latitudes = np.asarray(latitudes_deg, dtype=np.float64)
+    signal_fraction = np.asarray(zonal_signal_fraction, dtype=np.float64)
+    area_weights = np.asarray(area_weights_by_lat, dtype=np.float64)
+    abs_latitudes = np.abs(latitudes)
+    total_area = float(area_weights.sum())
+    rows: list[dict[str, float]] = []
+    for lower, upper in bands_deg:
+        if upper >= 90.0:
+            mask = (abs_latitudes >= lower) & (abs_latitudes <= upper)
+        else:
+            mask = (abs_latitudes >= lower) & (abs_latitudes < upper)
+        rows.append(
+            {
+                "lower_deg": float(lower),
+                "upper_deg": float(upper),
+                "signal_fraction": float(signal_fraction[mask].sum()),
+                "area_fraction": float(area_weights[mask].sum() / max(total_area, 1e-12)),
+            }
+        )
+    return rows
+
+
+def load_climatology_reference_for_cube(cube: FieldCube) -> dict[str, np.ndarray] | None:
+    anomaly = str(cube.transform.get("anomaly") or "none").strip().lower()
+    if anomaly != "climatology" or cube.canonical_field != "dry_potential_temperature":
+        return None
+
+    climatology_path = Path(
+        str(cube.transform.get("climatology_path") or format_display_path(DEFAULT_THETA_CLIMATOLOGY))
+    ).expanduser()
+    if not climatology_path.is_absolute():
+        climatology_path = (REPO_ROOT / climatology_path).resolve()
+
+    dataset = xr.open_dataset(climatology_path)
+    try:
+        longitudes_deg, longitude_order = normalize_longitudes_with_order(
+            np.asarray(dataset.coords["longitude"].values, dtype=np.float32)
+        )
+        theta_mean = reorder_longitude_axis(
+            np.asarray(dataset["theta_climatology_mean"].values, dtype=np.float32),
+            longitude_order,
+        )
+        theta_std = reorder_longitude_axis(
+            np.asarray(dataset["theta_climatology_std"].values, dtype=np.float32),
+            longitude_order,
+        )
+        theta_count = reorder_longitude_axis(
+            np.asarray(dataset["theta_sample_count"].values, dtype=np.float32),
+            longitude_order,
+        )
+        pressures = np.asarray(dataset.coords["pressure_level"].values, dtype=np.float32)
+        latitudes_deg = np.asarray(dataset.coords["latitude"].values, dtype=np.float32)
+    finally:
+        dataset.close()
+
+    selected_levels = [float(value) for value in np.asarray(cube.pressure_levels_hpa, dtype=np.float32)]
+    theta_mean, matched_pressures = select_pressure_levels(theta_mean, pressures, selected_levels)
+    theta_std, _ = select_pressure_levels(theta_std, pressures, selected_levels)
+    theta_count, _ = select_pressure_levels(theta_count, pressures, selected_levels)
+    if not np.allclose(matched_pressures, cube.pressure_levels_hpa):
+        raise ValueError("Climatology pressure levels do not match the selected field cube.")
+
+    latitude_stride = max(int(cube.transform.get("latitude_stride") or 1), 1)
+    longitude_stride = max(int(cube.transform.get("longitude_stride") or 1), 1)
+    theta_mean, strided_latitudes, strided_longitudes = stride_spatial_axes(
+        theta_mean,
+        latitudes_deg,
+        longitudes_deg,
+        latitude_stride=latitude_stride,
+        longitude_stride=longitude_stride,
+    )
+    theta_std, _, _ = stride_spatial_axes(
+        theta_std,
+        latitudes_deg,
+        longitudes_deg,
+        latitude_stride=latitude_stride,
+        longitude_stride=longitude_stride,
+    )
+    theta_count, _, _ = stride_spatial_axes(
+        theta_count,
+        latitudes_deg,
+        longitudes_deg,
+        latitude_stride=latitude_stride,
+        longitude_stride=longitude_stride,
+    )
+
+    if theta_mean.shape != cube.values.shape:
+        raise ValueError("Climatology reference does not match the transformed cube shape.")
+    if not np.allclose(strided_latitudes, cube.latitudes_deg):
+        raise ValueError("Climatology latitudes do not match the transformed cube.")
+    if not np.allclose(strided_longitudes, cube.longitudes_deg):
+        raise ValueError("Climatology longitudes do not match the transformed cube.")
+
+    return {
+        "mean": np.asarray(theta_mean, dtype=np.float32),
+        "std": np.asarray(theta_std, dtype=np.float32),
+        "sample_count": np.asarray(theta_count, dtype=np.float32),
+    }
+
+
+def label_wrapped_slice_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
+    occupied = np.asarray(mask, dtype=bool)
+    if not occupied.any():
+        return np.zeros_like(occupied, dtype=np.int32), 0
+
+    longitude_count = occupied.shape[1]
+    extended = np.concatenate([occupied, occupied[:, :1]], axis=1)
+    labels, component_count = ndimage.label(extended, structure=SLICE_COMPONENT_STRUCTURE)
+    if component_count <= 0:
+        return np.zeros_like(occupied, dtype=np.int32), 0
+
+    seam_pairs = np.column_stack([labels[:, 0].reshape(-1), labels[:, -1].reshape(-1)])
+    root_map, unique_root_ids = build_seam_merged_component_info(labels, seam_pairs)
+    if unique_root_ids.size == 0:
+        return np.zeros_like(occupied, dtype=np.int32), 0
+
+    compact_root_ids = np.zeros(component_count + 1, dtype=np.int32)
+    compact_root_ids[unique_root_ids] = np.arange(1, unique_root_ids.size + 1, dtype=np.int32)
+    compact_labels = compact_root_ids[root_map[labels[:, :longitude_count]]]
+    return compact_labels.astype(np.int32), int(unique_root_ids.size)
+
+
+def summarize_slice_component_counts(
+    selected_mask: np.ndarray,
+    level_values: np.ndarray,
+    valid_cell_count: int,
+    minimum_big_component_cells: int,
+) -> dict[str, float | int]:
+    def count_components(mask: np.ndarray) -> tuple[int, int, float]:
+        labels, component_count = label_wrapped_slice_components(mask)
+        component_sizes = (
+            np.bincount(labels[labels > 0].ravel(), minlength=component_count + 1)[1:]
+            if component_count > 0
+            else np.zeros(0, dtype=np.int32)
+        )
+        big_component_sizes = component_sizes[component_sizes >= minimum_big_component_cells]
+        largest_component_fraction = (
+            float(component_sizes.max() / max(valid_cell_count, 1))
+            if component_sizes.size
+            else 0.0
+        )
+        return int(component_count), int(big_component_sizes.size), largest_component_fraction
+
+    component_count, big_component_count, largest_component_fraction = count_components(selected_mask)
+    warm_component_count, warm_big_component_count, _ = count_components(selected_mask & (level_values > 0.0))
+    cold_component_count, cold_big_component_count, _ = count_components(selected_mask & (level_values < 0.0))
+    return {
+        "component_count": component_count,
+        "big_component_count": big_component_count,
+        "warm_component_count": warm_component_count,
+        "warm_big_component_count": warm_big_component_count,
+        "cold_component_count": cold_component_count,
+        "cold_big_component_count": cold_big_component_count,
+        "largest_component_fraction": largest_component_fraction,
+    }
+
+
+def build_quick_top_share_component_metrics(
+    cube: FieldCube,
+    anomaly_values: np.ndarray,
+    finite_mask: np.ndarray,
+) -> dict[str, Any]:
+    per_level: list[dict[str, Any]] = []
+
+    for level_index, pressure_hpa in enumerate(cube.pressure_levels_hpa):
+        level_values = np.asarray(anomaly_values[level_index], dtype=np.float32)
+        level_valid_mask = finite_mask[level_index] & np.isfinite(level_values)
+        valid_cell_count = int(np.count_nonzero(level_valid_mask))
+        level_mask, threshold_value = compute_top_share_mask(
+            np.where(level_valid_mask, level_values, np.nan),
+            QUICK_COMPONENT_TOP_SHARE_PERCENT,
+            tail="absolute",
+        )
+        level_mask &= level_valid_mask
+        exceed_cell_count = int(np.count_nonzero(level_mask))
+
+        cleaned_mask = np.asarray(level_mask, dtype=bool)
+
+        minimum_big_component_cells = max(
+            QUICK_COMPONENT_MIN_CELLS,
+            int(math.ceil(valid_cell_count * QUICK_COMPONENT_MIN_LEVEL_FRACTION)),
+        )
+        counts = summarize_slice_component_counts(
+            cleaned_mask,
+            level_values,
+            valid_cell_count,
+            minimum_big_component_cells,
+        )
+
+        per_level.append(
+            {
+                "pressure_hpa": float(pressure_hpa),
+                "valid_cell_count": valid_cell_count,
+                "threshold_value": float(threshold_value) if threshold_value is not None else None,
+                "exceed_cell_count": exceed_cell_count,
+                "cleaned_cell_count": int(np.count_nonzero(cleaned_mask)),
+                **counts,
+                "minimum_big_component_cells": int(minimum_big_component_cells),
+            }
+        )
+
+    big_count_levels = [row for row in per_level if row["big_component_count"] > 0]
+    ranked_by_big_count = sorted(
+        per_level,
+        key=lambda row: (row["big_component_count"], row["component_count"], row["cleaned_cell_count"]),
+        reverse=True,
+    )
+
+    return {
+        "top_share_percent": QUICK_COMPONENT_TOP_SHARE_PERCENT,
+        "minimum_big_component_cells_floor": QUICK_COMPONENT_MIN_CELLS,
+        "minimum_big_component_fraction_of_level": QUICK_COMPONENT_MIN_LEVEL_FRACTION,
+        "per_level": per_level,
+        "levels_with_any_big_components": int(len(big_count_levels)),
+        "max_big_component_count": int(max((row["big_component_count"] for row in per_level), default=0)),
+        "peak_big_component_levels": [
+            {
+                "pressure_hpa": float(row["pressure_hpa"]),
+                "big_component_count": int(row["big_component_count"]),
+                "component_count": int(row["component_count"]),
+            }
+            for row in ranked_by_big_count[:3]
+            if row["big_component_count"] > 0
+        ],
+    }
+
+
+def build_quick_top_share_sweep_metrics(
+    cube: FieldCube,
+    anomaly_values: np.ndarray,
+    finite_mask: np.ndarray,
+) -> dict[str, Any]:
+    per_level: list[dict[str, Any]] = []
+
+    for level_index, pressure_hpa in enumerate(cube.pressure_levels_hpa):
+        level_values = np.asarray(anomaly_values[level_index], dtype=np.float32)
+        level_valid_mask = finite_mask[level_index] & np.isfinite(level_values)
+        valid_cell_count = int(np.count_nonzero(level_valid_mask))
+        minimum_big_component_cells = max(
+            QUICK_COMPONENT_MIN_CELLS,
+            int(math.ceil(valid_cell_count * QUICK_COMPONENT_MIN_LEVEL_FRACTION)),
+        )
+        share_rows: list[dict[str, Any]] = []
+
+        for top_share_percent in QUICK_COMPONENT_SWEEP_TOP_SHARES:
+            level_mask, threshold_value = compute_top_share_mask(
+                np.where(level_valid_mask, level_values, np.nan),
+                top_share_percent,
+                tail="absolute",
+            )
+            level_mask &= level_valid_mask
+            share_rows.append(
+                {
+                    "top_share_percent": float(top_share_percent),
+                    "threshold_value": float(threshold_value) if threshold_value is not None else None,
+                    "selected_cell_count": int(np.count_nonzero(level_mask)),
+                    **summarize_slice_component_counts(
+                        level_mask,
+                        level_values,
+                        valid_cell_count,
+                        minimum_big_component_cells,
+                    ),
+                }
+            )
+
+        per_level.append(
+            {
+                "pressure_hpa": float(pressure_hpa),
+                "valid_cell_count": valid_cell_count,
+                "minimum_big_component_cells": int(minimum_big_component_cells),
+                "shares": share_rows,
+            }
+        )
+
+    return {
+        "top_share_percents": [float(value) for value in QUICK_COMPONENT_SWEEP_TOP_SHARES],
+        "minimum_big_component_cells_floor": QUICK_COMPONENT_MIN_CELLS,
+        "minimum_big_component_fraction_of_level": QUICK_COMPONENT_MIN_LEVEL_FRACTION,
+        "per_level": per_level,
+    }
+
+
+def build_climatology_anomaly_metrics(cube: FieldCube) -> dict[str, Any] | None:
+    reference = load_climatology_reference_for_cube(cube)
+    if reference is None:
+        return None
+
+    values = np.asarray(cube.values, dtype=np.float32)
+    abs_values = np.abs(values)
+    finite_mask = np.isfinite(values)
+    area_weights_2d = area_weights_for_latitudes(cube.latitudes_deg)[:, None].astype(np.float64)
+    area_weights_3d = np.broadcast_to(area_weights_2d[None, :, :], values.shape)
+
+    climatology_mean = np.asarray(reference["mean"], dtype=np.float32)
+    climatology_std = np.asarray(reference["std"], dtype=np.float32)
+    safe_mean = np.where(np.abs(climatology_mean) > 1e-6, np.abs(climatology_mean), np.nan)
+    safe_std = np.where(climatology_std > 1e-6, climatology_std, np.nan)
+
+    relative_departure_percent = 100.0 * np.divide(
+        abs_values,
+        safe_mean,
+        out=np.full_like(abs_values, np.nan, dtype=np.float32),
+        where=np.isfinite(safe_mean),
+    )
+    standardized_departure = np.divide(
+        abs_values,
+        safe_std,
+        out=np.full_like(abs_values, np.nan, dtype=np.float32),
+        where=np.isfinite(safe_std),
+    )
+
+    def build_threshold_summary(
+        scaled_values: np.ndarray,
+        thresholds: tuple[float, ...],
+        unit_label: str,
+    ) -> dict[str, Any]:
+        valid_mask = finite_mask & np.isfinite(scaled_values)
+        valid_weights = np.where(valid_mask, area_weights_3d, 0.0).astype(np.float64)
+        total_weight = float(valid_weights.sum())
+        total_voxels = int(np.count_nonzero(valid_mask))
+        overall_area_fraction: list[float] = []
+        overall_voxel_fraction: list[float] = []
+        per_level: list[dict[str, Any]] = []
+
+        for threshold in thresholds:
+            exceed = valid_mask & (scaled_values >= threshold)
+            overall_area_fraction.append(
+                float(np.where(exceed, area_weights_3d, 0.0).sum() / max(total_weight, 1e-12))
+            )
+            overall_voxel_fraction.append(float(np.count_nonzero(exceed) / max(total_voxels, 1)))
+
+        for level_index, pressure in enumerate(cube.pressure_levels_hpa):
+            level_valid = valid_mask[level_index]
+            level_total_voxels = int(np.count_nonzero(level_valid))
+            level_weights = np.where(level_valid, area_weights_2d, 0.0).astype(np.float64)
+            level_total_weight = float(level_weights.sum())
+            area_fraction_by_threshold: list[float] = []
+            voxel_fraction_by_threshold: list[float] = []
+            for threshold in thresholds:
+                exceed = level_valid & (scaled_values[level_index] >= threshold)
+                area_fraction_by_threshold.append(
+                    float(np.where(exceed, area_weights_2d, 0.0).sum() / max(level_total_weight, 1e-12))
+                )
+                voxel_fraction_by_threshold.append(
+                    float(np.count_nonzero(exceed) / max(level_total_voxels, 1))
+                )
+            per_level.append(
+                {
+                    "pressure_hpa": float(pressure),
+                    "area_fraction_by_threshold": area_fraction_by_threshold,
+                    "voxel_fraction_by_threshold": voxel_fraction_by_threshold,
+                }
+            )
+
+        return {
+            "unit_label": unit_label,
+            "thresholds": [float(value) for value in thresholds],
+            "overall_area_fraction": overall_area_fraction,
+            "overall_voxel_fraction": overall_voxel_fraction,
+            "per_level": per_level,
+        }
+
+    return {
+        "reference_sample_count_range": {
+            "min": float(np.nanmin(reference["sample_count"])),
+            "max": float(np.nanmax(reference["sample_count"])),
+        },
+        "relative_departure_percent": build_threshold_summary(
+            relative_departure_percent,
+            RELATIVE_DEPARTURE_THRESHOLDS_PERCENT,
+            "%",
+        ),
+        "standardized_departure": build_threshold_summary(
+            standardized_departure,
+            STANDARDIZED_DEPARTURE_THRESHOLDS_SIGMA,
+            "sigma",
+        ),
+        "quick_top_share_components": build_quick_top_share_component_metrics(
+            cube,
+            values,
+            finite_mask,
+        ),
+        "quick_top_share_sweep": build_quick_top_share_sweep_metrics(
+            cube,
+            values,
+            finite_mask,
+        ),
+    }
 
 
 def cumulative_abs_latitude_curve(
@@ -980,12 +1407,13 @@ def choose_sample_columns(field_mass: np.ndarray, latitudes_deg: np.ndarray, lon
 
 def render_profile_panel(
     *,
+    values: np.ndarray,
     pressure_levels_hpa: np.ndarray,
     metrics: dict[str, Any],
     quantity_label: str,
     output_path: Path,
 ) -> None:
-    figure, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+    figure, axes = plt.subplots(3, 2, figsize=(14, 14), constrained_layout=True)
     level_stats = metrics["vertical_structure"]["level_statistics"]
     pressures = np.asarray([row["pressure_hpa"] for row in level_stats], dtype=np.float32)
     weighted_means = np.asarray([row["weighted_mean"] for row in level_stats], dtype=np.float32)
@@ -1014,27 +1442,132 @@ def render_profile_panel(
     axes[0, 1].set_title(f"{quantity_label.capitalize()} share by pressure level")
     axes[0, 1].legend(fontsize=8)
 
+    finite_values = np.asarray(values[np.isfinite(values)], dtype=np.float64)
+    if finite_values.size:
+        bin_count = max(24, min(72, int(round(math.sqrt(finite_values.size)))))
+        counts, edges = np.histogram(finite_values, bins=bin_count)
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        axes[1, 0].bar(centers, counts, width=np.diff(edges), color="#94d2bd", edgecolor="#0a9396", linewidth=0.4)
+        for percentile, color, label in (
+            (metrics["distribution"]["p05"], "#ae2012", "p05"),
+            (metrics["distribution"]["p50"], "#005f73", "median"),
+            (metrics["distribution"]["p95"], "#bb3e03", "p95"),
+        ):
+            if percentile is not None:
+                axes[1, 0].axvline(percentile, color=color, linewidth=1.3, linestyle="--", label=label)
+        if metrics["distribution"].get("mode_estimate") is not None:
+            axes[1, 0].axvline(
+                metrics["distribution"]["mode_estimate"],
+                color="#3a0ca3",
+                linewidth=1.5,
+                label="mode estimate",
+            )
+        if np.nanmin(finite_values) < 0.0 < np.nanmax(finite_values):
+            axes[1, 0].axvline(0.0, color="#6c757d", linewidth=1.0, linestyle=":")
+        axes[1, 0].set_xlabel("Value")
+        axes[1, 0].set_ylabel("Voxel count")
+        axes[1, 0].set_title("Global value distribution")
+        axes[1, 0].legend(fontsize=8)
+
     lat_curve = metrics["horizontal_structure"]["abs_latitude_curve"]
     abs_lat = np.asarray(lat_curve["abs_latitude_deg"], dtype=np.float32)
     cum_signal = np.asarray(lat_curve["cumulative_signal_fraction"], dtype=np.float32)
     cum_area = np.asarray(lat_curve["cumulative_area_fraction"], dtype=np.float32)
-    axes[1, 0].plot(abs_lat, 100.0 * cum_signal, color="#005f73", linewidth=2.0, label=f"{quantity_label} within ±lat")
-    axes[1, 0].plot(abs_lat, 100.0 * cum_area, color="#bb3e03", linewidth=1.6, linestyle="--", label="area within ±lat")
-    axes[1, 0].set_xlabel("Absolute latitude (deg)")
-    axes[1, 0].set_ylabel("Cumulative share (%)")
-    axes[1, 0].set_title("Equator-to-pole concentration")
-    axes[1, 0].legend(fontsize=8)
+    axes[1, 1].plot(abs_lat, 100.0 * cum_signal, color="#005f73", linewidth=2.0, label=f"{quantity_label} within ±lat")
+    axes[1, 1].plot(abs_lat, 100.0 * cum_area, color="#bb3e03", linewidth=1.6, linestyle="--", label="area within ±lat")
+    axes[1, 1].set_xlabel("Absolute latitude (deg)")
+    axes[1, 1].set_ylabel("Cumulative share (%)")
+    axes[1, 1].set_title("Equator-to-pole concentration")
+    axes[1, 1].legend(fontsize=8)
 
     concentration_curve = metrics["horizontal_structure"]["column_concentration_curve"]
     column_fraction = np.asarray(concentration_curve["column_fraction"], dtype=np.float32)
     cumulative_signal_fraction = np.asarray(concentration_curve["cumulative_signal_fraction"], dtype=np.float32)
-    axes[1, 1].plot(100.0 * column_fraction, 100.0 * cumulative_signal_fraction, color="#7b2cbf", linewidth=2.0, label=f"{quantity_label} concentration")
-    axes[1, 1].plot([0.0, 100.0], [0.0, 100.0], color="#6c757d", linestyle="--", linewidth=1.3, label="even baseline")
-    axes[1, 1].set_xlabel("Top columns retained (%)")
-    axes[1, 1].set_ylabel(f"Cumulative {quantity_label} captured (%)")
-    axes[1, 1].set_title(f"Horizontal {quantity_label} concentration")
-    axes[1, 1].legend(fontsize=8)
+    axes[2, 0].plot(100.0 * column_fraction, 100.0 * cumulative_signal_fraction, color="#7b2cbf", linewidth=2.0, label=f"{quantity_label} concentration")
+    axes[2, 0].plot([0.0, 100.0], [0.0, 100.0], color="#6c757d", linestyle="--", linewidth=1.3, label="even baseline")
+    axes[2, 0].set_xlabel("Top columns retained (%)")
+    axes[2, 0].set_ylabel(f"Cumulative {quantity_label} captured (%)")
+    axes[2, 0].set_title(f"Horizontal {quantity_label} concentration")
+    axes[2, 0].legend(fontsize=8)
 
+    anomaly_structure = metrics.get("anomaly_structure")
+    if anomaly_structure and anomaly_structure.get("relative_departure_percent"):
+        threshold_summary = anomaly_structure["relative_departure_percent"]
+        fractions = np.asarray(
+            [row["area_fraction_by_threshold"] for row in threshold_summary["per_level"]],
+            dtype=np.float32,
+        )
+        image = axes[2, 1].imshow(
+            100.0 * fractions,
+            aspect="auto",
+            cmap="magma",
+            origin="upper",
+        )
+        axes[2, 1].set_xticks(range(len(threshold_summary["thresholds"])))
+        axes[2, 1].set_xticklabels([f"{threshold:.0f}%" for threshold in threshold_summary["thresholds"]])
+        tick_indices = np.linspace(0, len(pressures) - 1, min(6, len(pressures)), dtype=int)
+        axes[2, 1].set_yticks(tick_indices)
+        axes[2, 1].set_yticklabels([f"{pressures[index]:.0f}" for index in tick_indices])
+        axes[2, 1].set_xlabel("Relative anomaly threshold")
+        axes[2, 1].set_ylabel("Pressure (hPa)")
+        axes[2, 1].set_title("Area above climatology-departure thresholds")
+        colorbar = figure.colorbar(image, ax=axes[2, 1], fraction=0.046, pad=0.04)
+        colorbar.set_label("Area fraction (%)")
+    else:
+        latitude_bands = metrics["horizontal_structure"].get("abs_latitude_band_shares", [])
+        labels = [f"{int(row['lower_deg'])}-{int(row['upper_deg'])}°" for row in latitude_bands]
+        signal_share = [100.0 * row["signal_fraction"] for row in latitude_bands]
+        area_share = [100.0 * row["area_fraction"] for row in latitude_bands]
+        y_positions = np.arange(len(labels), dtype=np.float32)
+        axes[2, 1].barh(y_positions + 0.17, signal_share, height=0.32, color="#219ebc", label="signal")
+        axes[2, 1].barh(y_positions - 0.17, area_share, height=0.32, color="#adb5bd", label="area")
+        axes[2, 1].set_yticks(y_positions)
+        axes[2, 1].set_yticklabels(labels)
+        axes[2, 1].set_xlabel("Share (%)")
+        axes[2, 1].set_ylabel("Absolute latitude band")
+        axes[2, 1].set_title("Absolute-latitude concentration by band")
+        axes[2, 1].legend(fontsize=8)
+
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def render_component_threshold_sweep_panel(
+    *,
+    sweep_metrics: dict[str, Any],
+    output_path: Path,
+) -> None:
+    figure, axes = plt.subplots(1, 3, figsize=(18, 6), constrained_layout=True, sharex=True)
+    level_rows = sweep_metrics["per_level"]
+    top_shares = np.asarray(sweep_metrics["top_share_percents"], dtype=np.float32)
+    pressures = np.asarray([row["pressure_hpa"] for row in level_rows], dtype=np.float32)
+    norm = matplotlib.colors.LogNorm(vmin=max(1.0, float(np.min(pressures))), vmax=float(np.max(pressures)))
+    cmap = matplotlib.cm.viridis_r
+
+    panels = [
+        ("component_count", "Total Components"),
+        ("warm_component_count", "Warm Components"),
+        ("cold_component_count", "Cold Components"),
+    ]
+    for axis, (metric_key, title) in zip(axes, panels, strict=True):
+        for row, pressure_hpa in zip(level_rows, pressures, strict=True):
+            values = np.asarray([entry[metric_key] for entry in row["shares"]], dtype=np.float32)
+            axis.plot(
+                top_shares,
+                values,
+                color=cmap(norm(float(pressure_hpa))),
+                linewidth=1.1,
+                alpha=0.95,
+            )
+        axis.set_title(title)
+        axis.set_xlabel("Top-share threshold kept (%)")
+        axis.set_ylabel("Component count")
+        axis.grid(True, alpha=0.22, linewidth=0.6)
+
+    scalar_mappable = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+    scalar_mappable.set_array([])
+    colorbar = figure.colorbar(scalar_mappable, ax=axes, fraction=0.03, pad=0.02)
+    colorbar.set_label("Pressure (hPa)")
     figure.savefig(output_path, dpi=150)
     plt.close(figure)
 
@@ -1063,6 +1596,7 @@ def build_structure_of_data_metrics(cube: FieldCube) -> dict[str, Any]:
     q75 = safe_percentile(values, 75.0)
     q95 = safe_percentile(values, 95.0)
     q99 = safe_percentile(values, 99.0)
+    mode_estimate = estimate_mode(values)
     iqr = None if q25 is None or q75 is None else q75 - q25
     central_90_span = None if q05 is None or q95 is None else q95 - q05
     tail_to_core_ratio = None
@@ -1173,6 +1707,11 @@ def build_structure_of_data_metrics(cube: FieldCube) -> dict[str, Any]:
         zonal_signal_fraction,
         area_weights_for_latitudes(cube.latitudes_deg),
     )
+    abs_latitude_band_shares = compute_abs_latitude_band_shares(
+        cube.latitudes_deg,
+        zonal_signal_fraction,
+        area_weights_for_latitudes(cube.latitudes_deg),
+    )
     peak_column_index = int(np.argmax(column_signal)) if column_signal.size else 0
     peak_lat_index, peak_lon_index = np.unravel_index(peak_column_index, column_signal.shape)
     positive_columns = np.sort(np.asarray(column_signal.ravel(), dtype=np.float64))[::-1]
@@ -1229,6 +1768,7 @@ def build_structure_of_data_metrics(cube: FieldCube) -> dict[str, Any]:
         }
         for index in dominant_level_indices
     ]
+    anomaly_structure = build_climatology_anomaly_metrics(cube)
 
     return {
         "sign_mode": detect_sign_mode(values),
@@ -1246,6 +1786,7 @@ def build_structure_of_data_metrics(cube: FieldCube) -> dict[str, Any]:
             "p75": q75,
             "p95": q95,
             "p99": q99,
+            "mode_estimate": mode_estimate,
             "iqr": iqr,
             "central_90_span": central_90_span,
             "tail_to_core_ratio": tail_to_core_ratio,
@@ -1311,6 +1852,7 @@ def build_structure_of_data_metrics(cube: FieldCube) -> dict[str, Any]:
             "abs_latitude_curve": {
                 key: value.tolist() for key, value in abs_latitude_curve.items()
             },
+            "abs_latitude_band_shares": abs_latitude_band_shares,
             "north_hemisphere_signal_share": float(column_signal[north_mask].sum() / max(total_signal, 1e-12)),
             "south_hemisphere_signal_share": float(column_signal[south_mask].sum() / max(total_signal, 1e-12)),
             "spatial_entropy": entropy,
@@ -1328,6 +1870,7 @@ def build_structure_of_data_metrics(cube: FieldCube) -> dict[str, Any]:
             "representative_levels": representative_levels,
             "representative_span_ratio": representative_span_ratio,
         },
+        "anomaly_structure": anomaly_structure,
     }
 
 
@@ -1338,6 +1881,7 @@ def build_structure_of_data_interpretation(metrics: dict[str, Any], cube: FieldC
     vertical = metrics["vertical_structure"]
     horizontal = metrics["horizontal_structure"]
     scale = metrics["cross_level_scale"]
+    anomaly_structure = metrics.get("anomaly_structure")
     within20 = horizontal["latitudinal_signal_share"]["within_20"]
     tropics_excess = within20["signal_fraction"] - within20["area_fraction"]
     entropy = horizontal["spatial_entropy"]
@@ -1490,6 +2034,23 @@ def build_structure_of_data_interpretation(metrics: dict[str, Any], cube: FieldC
         meteorological_interpretation.append(
             "Because this is a climatology-relative anomaly field, the important structure is where departures from the seasonal background concentrate, not the raw background profile itself."
         )
+        if anomaly_structure:
+            relative = anomaly_structure["relative_departure_percent"]
+            sigma = anomaly_structure["standardized_departure"]
+            threshold_lookup = {
+                float(threshold): index for index, threshold in enumerate(relative["thresholds"])
+            }
+            sigma_lookup = {
+                float(threshold): index for index, threshold in enumerate(sigma["thresholds"])
+            }
+            rel_5 = relative["overall_area_fraction"][threshold_lookup[5.0]]
+            rel_10 = relative["overall_area_fraction"][threshold_lookup[10.0]]
+            sig_2 = sigma["overall_area_fraction"][sigma_lookup[2.0]]
+            meteorological_interpretation.append(
+                "Large climatology departures are spatially selective: "
+                f"about {100.0 * rel_5:.1f}% of the area-weighted cube exceeds a 5% departure, "
+                f"about {100.0 * rel_10:.1f}% exceeds 10%, and about {100.0 * sig_2:.1f}% exceeds 2σ."
+            )
     if cube.transform.get("anomaly") == "lat_mean":
         meteorological_interpretation.append(
             "Because this is a latitude-mean anomaly field, zonally symmetric background structure has already been removed; what remains emphasizes regional departures."
@@ -1611,12 +2172,14 @@ def build_structure_of_data_chat_report(
     cube: FieldCube,
     metrics: dict[str, Any],
     interpretation: dict[str, Any],
+    artifact_paths: dict[str, str] | None = None,
 ) -> str:
     terms = structure_quantity_terms(cube)
     distribution = metrics["distribution"]
     vertical = metrics["vertical_structure"]
     horizontal = metrics["horizontal_structure"]
     scale = metrics["cross_level_scale"]
+    anomaly_structure = metrics.get("anomaly_structure")
     within20 = horizontal["latitudinal_signal_share"]["within_20"]
     within40 = horizontal["latitudinal_signal_share"]["within_40"]
     within60 = horizontal["latitudinal_signal_share"]["within_60"]
@@ -1630,6 +2193,20 @@ def build_structure_of_data_chat_report(
         f"{row['pressure_hpa']:.0f} hPa ({100.0 * row['signal_fraction']:.0f}%)"
         for row in vertical["dominant_levels"]
     )
+    mode_text = (
+        f"`{distribution['mode_estimate']:.3g}`"
+        if distribution.get("mode_estimate") is not None
+        else "not resolved"
+    )
+    latitude_band_rows = sorted(
+        horizontal.get("abs_latitude_band_shares", []),
+        key=lambda row: row["signal_fraction"],
+        reverse=True,
+    )[:3]
+    latitude_band_text = ", ".join(
+        f"{int(row['lower_deg'])}-{int(row['upper_deg'])}°: {100.0 * row['signal_fraction']:.0f}% signal vs {100.0 * row['area_fraction']:.0f}% area"
+        for row in latitude_band_rows
+    ) or "not resolved"
 
     summary_lines = "\n".join(f"- {item}" for item in interpretation["executive_summary"])
     physics_lines = "\n".join(f"- {item}" for item in interpretation["meteorological_interpretation"])
@@ -1637,9 +2214,11 @@ def build_structure_of_data_chat_report(
     recommendation_lines = "\n".join(
         f"- {item}" for item in interpretation["structure_probe_readiness"]["recommendations"]
     )
+
     horizontal_lines = [
         f"- {terms['share_noun_short'].capitalize()} within ±20° / ±40° / ±60°: `{100.0 * within20['signal_fraction']:.0f}% / {100.0 * within40['signal_fraction']:.0f}% / {100.0 * within60['signal_fraction']:.0f}%`",
         f"- Area within ±20° / ±40° / ±60°: `{100.0 * within20['area_fraction']:.0f}% / {100.0 * within40['area_fraction']:.0f}% / {100.0 * within60['area_fraction']:.0f}%`",
+        f"- Strongest absolute-latitude bands: {latitude_band_text}",
     ]
     if abs_lat_thresholds["50_percent"] is not None and abs_lat_thresholds["80_percent"] is not None:
         horizontal_lines.append(
@@ -1654,6 +2233,7 @@ def build_structure_of_data_chat_report(
         ]
     )
     horizontal_section = "\n".join(horizontal_lines)
+
     vertical_lines = [
         f"- Quantity summarized here: `{terms['share_noun']}`",
         f"- Area-weighted level-mean range: `{vertical['level_mean_range']:.3g}`",
@@ -1689,15 +2269,92 @@ def build_structure_of_data_chat_report(
     )
     vertical_section = "\n".join(vertical_lines)
 
+    anomaly_section = ""
+    if anomaly_structure:
+        relative = anomaly_structure["relative_departure_percent"]
+        sigma = anomaly_structure["standardized_departure"]
+        quick_components = anomaly_structure.get("quick_top_share_components")
+        rel_lookup = {float(threshold): index for index, threshold in enumerate(relative["thresholds"])}
+        sigma_lookup = {float(threshold): index for index, threshold in enumerate(sigma["thresholds"])}
+        rel_5_idx = rel_lookup[5.0]
+        rel_10_idx = rel_lookup[10.0]
+        sigma_2_idx = sigma_lookup[2.0]
+        strongest_rel5 = sorted(
+            relative["per_level"],
+            key=lambda row: row["area_fraction_by_threshold"][rel_5_idx],
+            reverse=True,
+        )[:3]
+        strongest_sigma2 = sorted(
+            sigma["per_level"],
+            key=lambda row: row["area_fraction_by_threshold"][sigma_2_idx],
+            reverse=True,
+        )[:3]
+        strongest_rel5_text = ", ".join(
+            f"{row['pressure_hpa']:.0f} hPa ({100.0 * row['area_fraction_by_threshold'][rel_5_idx]:.1f}%)"
+            for row in strongest_rel5
+        )
+        strongest_sigma2_text = ", ".join(
+            f"{row['pressure_hpa']:.0f} hPa ({100.0 * row['area_fraction_by_threshold'][sigma_2_idx]:.1f}%)"
+            for row in strongest_sigma2
+        )
+        quick_component_lines = ""
+        if quick_components:
+            per_level_quick = quick_components["per_level"]
+            count_series = ", ".join(
+                (
+                    f"{row['pressure_hpa']:.0f}:"
+                    f"T{row['component_count']}/{row['big_component_count']}"
+                    f" W{row['warm_component_count']}/{row['warm_big_component_count']}"
+                    f" C{row['cold_component_count']}/{row['cold_big_component_count']}"
+                )
+                for row in per_level_quick
+            )
+            peak_big_levels = quick_components.get("peak_big_component_levels", [])
+            peak_big_text = (
+                ", ".join(
+                    f"{row['pressure_hpa']:.0f} hPa ({row['big_component_count']} big; {row['component_count']} total)"
+                    for row in peak_big_levels
+                )
+                if peak_big_levels
+                else "no levels produced big components"
+            )
+            quick_component_lines = (
+                f"- Quick component read uses the per-level top `{quick_components['top_share_percent']:.0f}%` of cells by `abs(climatology anomaly)` with no smoothing or morphology.\n"
+                f"- Component counts by level (`T=total/big, W=warm/big, C=cold/big`): `{count_series}`\n"
+                f"- Big means at least `max({quick_components['minimum_big_component_cells_floor']} cells, {100.0 * quick_components['minimum_big_component_fraction_of_level']:.1f}% of a level)`; peak levels: `{peak_big_text}`\n"
+                f"- Levels with any big components: `{quick_components['levels_with_any_big_components']}` / `{len(per_level_quick)}`\n"
+            )
+        anomaly_section = (
+            "## Anomaly Checks\n"
+            f"- Area above 1 / 2 / 5 / 10% climatology departure: `{100.0 * relative['overall_area_fraction'][rel_lookup[1.0]]:.1f}% / {100.0 * relative['overall_area_fraction'][rel_lookup[2.0]]:.1f}% / {100.0 * relative['overall_area_fraction'][rel_5_idx]:.1f}% / {100.0 * relative['overall_area_fraction'][rel_10_idx]:.1f}%`\n"
+            f"- Area above 1σ / 2σ / 3σ: `{100.0 * sigma['overall_area_fraction'][sigma_lookup[1.0]]:.1f}% / {100.0 * sigma['overall_area_fraction'][sigma_2_idx]:.1f}% / {100.0 * sigma['overall_area_fraction'][sigma_lookup[3.0]]:.1f}%`\n"
+            f"- Levels with the largest 5% departures: `{strongest_rel5_text}`\n"
+            f"- Levels with the largest 2σ departures: `{strongest_sigma2_text}`\n\n"
+            f"{quick_component_lines}\n"
+        )
+
+    plots_section = ""
+    if artifact_paths:
+        lines = []
+        if artifact_paths.get("maps"):
+            lines.append(f"- Sample maps: `{artifact_paths['maps']}`")
+        if artifact_paths.get("profiles"):
+            lines.append(f"- Diagnostic panels: `{artifact_paths['profiles']}`")
+        if artifact_paths.get("component_thresholds"):
+            lines.append(f"- Component threshold sweep: `{artifact_paths['component_thresholds']}`")
+        if lines:
+            plots_section = "## Plots\n" + "\n".join(lines) + "\n"
+
     return (
         f"# structure_of_data: {cube.canonical_field}\n\n"
         f"Field: `{cube.canonical_field}` from `{format_display_path(cube.dataset_path)}` at `{cube.timestamp}`.\n"
         f"Transform: derived=`{cube.transform.get('derived') or 'none'}`, anomaly=`{cube.transform.get('anomaly')}`, smoothing=`{cube.transform.get('smoothing')}`.\n\n"
-        "## Main Takeaways\n"
+        "## What Stands Out\n"
         f"{summary_lines}\n\n"
-        "## Value Distribution\n"
+        "## Distribution\n"
         f"- Global range: `{distribution['min']:.3g}` to `{distribution['max']:.3g}`\n"
         f"- Area-weighted mean ± std: `{distribution['weighted_mean']:.3g}` ± `{distribution['weighted_std']:.3g}`\n"
+        f"- Mode estimate: {mode_text}\n"
         f"- Middle 90% of values: `{distribution['p05']:.3g}` to `{distribution['p95']:.3g}`\n"
         f"- Tail/core ratio: `{distribution['tail_to_core_ratio']:.2f}`\n"
         f"- Fraction beyond 3σ: `{100.0 * distribution['outlier_fraction_above_3sigma']:.2f}%`\n\n"
@@ -1705,6 +2362,7 @@ def build_structure_of_data_chat_report(
         f"{vertical_section}\n\n"
         "## Horizontal Structure\n"
         f"{horizontal_section}\n\n"
+        f"{anomaly_section}"
         "## Cross-Level Comparability\n"
         f"- Representative per-level spread ratio: `{scale['representative_span_ratio']:.2f}x`\n\n"
         "## Meteorological Read\n"
@@ -1713,7 +2371,8 @@ def build_structure_of_data_chat_report(
         f"{implication_lines}\n\n"
         "## Structure Probe Readiness\n"
         f"- Verdict: `{interpretation['structure_probe_readiness']['verdict']}`\n"
-        f"{recommendation_lines}\n"
+        f"{recommendation_lines}\n\n"
+        f"{plots_section}"
     )
 
 
@@ -1728,12 +2387,18 @@ def structure_of_data_markdown(
         cube=cube,
         metrics=metrics,
         interpretation=interpretation,
+        artifact_paths=artifact_paths,
     )
     return (
         f"{chat_report}\n\n"
         "## Artifacts\n"
         f"- Level panels: `{artifact_paths['maps']}`\n"
         f"- Profile panels: `{artifact_paths['profiles']}`\n"
+        + (
+            f"- Component threshold sweep: `{artifact_paths['component_thresholds']}`\n"
+            if artifact_paths.get("component_thresholds")
+            else ""
+        )
     )
 
 
@@ -1751,6 +2416,9 @@ def run_structure_of_data(
     climatology_path: Path | None = None,
     latitude_stride: int = 2,
     longitude_stride: int = 2,
+    artifact_dir: Path | None = None,
+    make_plots: bool = True,
+    save_summary: bool = False,
 ) -> dict[str, Any]:
     cube = load_field_cube(
         field=field,
@@ -1772,52 +2440,60 @@ def run_structure_of_data(
     now = datetime.now().strftime("%Y-%m-%dT%H-%M-%S-%f")
     label = f"{cube.canonical_field}-{cube.timestamp}"
     run_id = f"{now}__{slugify(label)}"
-    run_dir = skill_root / "logs" / "runs" / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = artifact_dir.expanduser().resolve() if artifact_dir else (CACHE_ROOT / "structure-of-data" / run_id)
 
-    signal_field, _ = signal_basis(cube.values)
-    quantity_terms = structure_quantity_terms(cube)
-    reference_mask, _ = compute_top_share_mask(
-        signal_field,
-        FIELD_REPORT_REFERENCE_TOP_SHARE,
-        tail="high",
-    )
-    maps_path = run_dir / "maps.png"
-    profiles_path = run_dir / "profiles.png"
-    render_map_panels(
-        values=cube.values,
-        threshold_mask=reference_mask,
-        pressure_levels_hpa=cube.pressure_levels_hpa,
-        latitudes_deg=cube.latitudes_deg,
-        longitudes_deg=cube.longitudes_deg,
-        output_path=maps_path,
-        title_prefix=cube.canonical_field,
-    )
-    render_profile_panel(
-        pressure_levels_hpa=cube.pressure_levels_hpa,
-        metrics=metrics,
-        quantity_label=quantity_terms["chart_label"],
-        output_path=profiles_path,
-    )
+    artifact_paths: dict[str, str] = {}
+    if make_plots or save_summary:
+        run_dir.mkdir(parents=True, exist_ok=True)
 
-    artifact_paths = {
-        "maps": repo_relative_path(maps_path),
-        "profiles": repo_relative_path(profiles_path),
-    }
+    if make_plots:
+        signal_field, _ = signal_basis(cube.values)
+        quantity_terms = structure_quantity_terms(cube)
+        anomaly_structure = metrics.get("anomaly_structure")
+        reference_mask, _ = compute_top_share_mask(
+            signal_field,
+            FIELD_REPORT_REFERENCE_TOP_SHARE,
+            tail="high",
+        )
+        maps_path = run_dir / "maps.png"
+        profiles_path = run_dir / "profiles.png"
+        component_thresholds_path = run_dir / "component-thresholds.png"
+        render_map_panels(
+            values=cube.values,
+            threshold_mask=reference_mask,
+            pressure_levels_hpa=cube.pressure_levels_hpa,
+            latitudes_deg=cube.latitudes_deg,
+            longitudes_deg=cube.longitudes_deg,
+            output_path=maps_path,
+            title_prefix=cube.canonical_field,
+        )
+        render_profile_panel(
+            values=cube.values,
+            pressure_levels_hpa=cube.pressure_levels_hpa,
+            metrics=metrics,
+            quantity_label=quantity_terms["chart_label"],
+            output_path=profiles_path,
+        )
+        if anomaly_structure and anomaly_structure.get("quick_top_share_sweep"):
+            render_component_threshold_sweep_panel(
+                sweep_metrics=anomaly_structure["quick_top_share_sweep"],
+                output_path=component_thresholds_path,
+            )
+        artifact_paths.update(
+            {
+                "maps": repo_relative_path(maps_path),
+                "profiles": repo_relative_path(profiles_path),
+            }
+        )
+        if anomaly_structure and anomaly_structure.get("quick_top_share_sweep"):
+            artifact_paths["component_thresholds"] = repo_relative_path(component_thresholds_path)
+
     chat_report = build_structure_of_data_chat_report(
         cube=cube,
         metrics=metrics,
         interpretation=interpretation,
+        artifact_paths=artifact_paths or None,
     )
-    report_text = structure_of_data_markdown(
-        cube=cube,
-        metrics=metrics,
-        interpretation=interpretation,
-        artifact_paths=artifact_paths,
-    )
-    report_path = run_dir / "summary.md"
-    report_path.write_text(report_text, encoding="utf-8")
-
     summary = {
         "skill": "structure_of_data",
         "run_id": run_id,
@@ -1836,27 +2512,27 @@ def run_structure_of_data(
         "metrics": metrics,
         "interpretation": interpretation,
         "chat_report": chat_report,
-        "artifacts": {
-            **artifact_paths,
-            "summary_markdown": repo_relative_path(report_path),
-        },
+        "artifacts": artifact_paths,
     }
-    summary_path = run_dir / "summary.json"
-    write_json(summary_path, summary)
 
-    headline = interpretation["executive_summary"][0]
-    update_log_index(
-        skill_root=skill_root,
-        run_id=run_id,
-        summary_title=f"structure_of_data {cube.canonical_field}",
-        field_label=cube.canonical_field,
-        timestamp=cube.timestamp,
-        decision=interpretation["structure_probe_readiness"]["verdict"],
-        report_filename=report_path.name,
-        json_filename=summary_path.name,
-        headline=headline,
-        image_filenames=[maps_path.name, profiles_path.name],
-    )
+    if save_summary:
+        report_text = structure_of_data_markdown(
+            cube=cube,
+            metrics=metrics,
+            interpretation=interpretation,
+            artifact_paths=artifact_paths,
+        )
+        report_path = run_dir / "summary.md"
+        report_path.write_text(report_text, encoding="utf-8")
+        summary_path = run_dir / "summary.json"
+        summary["artifacts"].update(
+            {
+                "summary_markdown": repo_relative_path(report_path),
+                "summary_json": repo_relative_path(summary_path),
+            }
+        )
+        write_json(summary_path, summary)
+
     return summary
 
 

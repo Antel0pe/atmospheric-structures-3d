@@ -57,6 +57,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--latitude-stride", type=int, default=2, help="Spatial stride for latitude.")
     parser.add_argument("--longitude-stride", type=int, default=2, help="Spatial stride for longitude.")
     parser.add_argument(
+        "--artifact-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for plots and any explicitly saved summary files.",
+    )
+    parser.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Skip plot generation and return a text-only chat summary.",
+    )
+    parser.add_argument(
+        "--save-summary",
+        action="store_true",
+        help="Also write summary.md and summary.json into the artifact directory or cache run directory.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Print the full summary JSON instead of the chat-style report.",
@@ -86,6 +102,9 @@ def main() -> int:
         climatology_path=args.climatology,
         latitude_stride=args.latitude_stride,
         longitude_stride=args.longitude_stride,
+        artifact_dir=args.artifact_dir,
+        make_plots=not args.no_plots,
+        save_summary=args.save_summary,
     )
     if args.json:
         print(json.dumps(summary, indent=2))

@@ -33,12 +33,12 @@ conda run -n atmospheric-structures-3d \
   --threshold-percent 10
 ```
 
-Probe a seed-grow variant on a structure_of_data configuration:
+Probe a seed-grow variant from an explicitly saved `structure_of_data` summary:
 
 ```bash
 conda run -n atmospheric-structures-3d \
   python skills/structure_probe/scripts/run_structure_probe.py \
-  --structure-of-data skills/structure-of-data/logs/runs/<run-id>/summary.json \
+  --structure-of-data /tmp/structure-of-data-q/summary.json \
   --method seed_grow \
   --threshold-percent 10 \
   --grow-rule same-sign-relaxed-half \

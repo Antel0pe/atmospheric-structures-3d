@@ -1,44 +1,42 @@
 ---
 name: structure-of-data
-description: Meteorological structural diagnosis for understanding how a field is organized in value, height, latitude/longitude, and imbalance before any 3D extraction.
+description: Fast meteorological diagnostics for understanding how a field is distributed in value, height, and geography before any 3D extraction.
 ---
 
 # structure_of_data
 
-Use this skill before building a new 3D extraction rule.
+Use this skill before building or revising a 3D representation idea.
 
-This skill exists to answer:
+This skill exists to answer, quickly and with data:
 
-- What is the underlying structure of this field?
-- How vertically stratified is it?
-- How concentrated is it by latitude, longitude, or region?
-- How uneven is it across pressure levels?
-- Is the value distribution tight, broad, or dominated by tails and extremes?
-- What would a world-class meteorologist say about the field before any visualization work begins?
+- What does this field mostly consist of?
+- Where is it concentrated vertically?
+- Where is it concentrated geographically?
+- Are the values broad, tight, heavy-tailed, or dominated by a narrow background?
+- If this is an anomaly field, where are the meaningful departures and how rare are they?
+- What would matter before trying to threshold or mesh this field in 3D?
 
-This is not mainly a threshold triage skill. It is a structural diagnosis skill.
+This is a fast structural diagnosis skill, not a polished report writer.
 
-## Principles
+## Operating Rules
 
-- Prioritize meteorological truth over extraction convenience.
-- Describe the field in physically meaningful language.
-- Make vertical and horizontal imbalances explicit.
-- Surface whether the field is dominated by background stratification, regional hotspots, or broad diffuse structure.
-- Always produce a readable in-chat report; logs are supporting material.
+- The chat summary is the deliverable.
+- Do not treat saved logs as part of the workflow.
+- Run quick code against the data and report only what the diagnostics support.
+- Keep the summary plain-English and meteorologist-useful.
+- Include plots when they answer a concrete question.
+- Avoid filler. Every statistic or chart should earn its place.
 
-## Chat Summary Requirement
+## What Good Output Looks Like
 
-After running this skill, always give the user the chat-style report directly.
+A good run should tell the user things like:
 
-Assume the user may never open the generated files. The logs exist for follow-up inspection, not as the primary deliverable.
-
-The report should explain:
-
-- the main structural takeaways in plain language
-- vertical structure and whether the field is strongly height-stratified
-- horizontal structure and whether the field is equatorward, hemispherically asymmetric, or regionally localized
-- value distribution and whether the field is tight, broad, or heavy-tailed
-- what these imbalances imply for any future thresholding, normalization, or pressure-window choices
+- most of the specific-humidity signal is confined to the lower troposphere
+- the field is broad by longitude but concentrated within specific latitude belts
+- raw temperature is mostly background stratification, not a clean object field
+- dry-theta climatology departures are strongest on these pressure levels
+- only a small fraction of the sampled area exceeds 5% or 10% climatology departure
+- a single raw threshold is or is not comparable across levels
 
 ## Default Data Conventions
 
@@ -49,7 +47,7 @@ The report should explain:
 
 ## Commands
 
-Analyze the structure of specific humidity:
+Analyze specific humidity with the default fast plots:
 
 ```bash
 conda run -n atmospheric-structures-3d \
@@ -58,7 +56,7 @@ conda run -n atmospheric-structures-3d \
   --timestamp 2021-11-08T12:00
 ```
 
-Analyze latitude-mean dry-theta anomalies:
+Analyze dry potential temperature as a latitude-mean anomaly:
 
 ```bash
 conda run -n atmospheric-structures-3d \
@@ -68,55 +66,91 @@ conda run -n atmospheric-structures-3d \
   --timestamp 2021-11-08T12:00
 ```
 
-Analyze climatological dry-theta anomalies in the intended lower/mid-tropospheric window:
+Analyze dry potential temperature against climatology across all available levels first:
 
 ```bash
 conda run -n atmospheric-structures-3d \
   python skills/structure-of-data/scripts/run_structure_of_data.py \
   --field theta \
   --anomaly climatology \
-  --pressure-levels 1000,975,950,925,900,875,850,825,800,775,750,700,650,600,550,500,450,400,350,300,250 \
   --timestamp 2021-11-08T12:00
 ```
 
-## What It Analyzes
+If a later comparison needs a pressure window, choose that only after the all-level diagnostic shows why.
 
-The skill is expected to comment on at least these structural questions:
+Get machine-readable output for a follow-on step:
 
-- vertical stratification:
-  how much of the field is explained by height-dependent background structure versus horizontal variability at a given level
-- pressure-level concentration:
-  whether the field is near-surface weighted, upper-level weighted, or relatively depth-distributed
-- latitudinal concentration:
-  whether the field is disproportionately tropical, subtropical, polar, or hemispherically asymmetric
-- regional localization:
-  whether a small fraction of columns or hotspots dominate the field
-- value distribution:
-  overall range, middle spread, tail heaviness, and whether outliers matter
-- cross-level comparability:
-  whether a single raw threshold means the same thing at different pressure levels
+```bash
+conda run -n atmospheric-structures-3d \
+  python skills/structure-of-data/scripts/run_structure_of_data.py \
+  --field theta \
+  --anomaly climatology \
+  --timestamp 2021-11-08T12:00 \
+  --json
+```
 
-## Outputs
+If a later step explicitly needs files, save them deliberately instead of relying on repo logs:
 
-Each run writes a compact bundle under `skills/structure-of-data/logs/runs/<run-id>/`:
+```bash
+conda run -n atmospheric-structures-3d \
+  python skills/structure-of-data/scripts/run_structure_of_data.py \
+  --field q \
+  --timestamp 2021-11-08T12:00 \
+  --artifact-dir /tmp/structure-of-data-q \
+  --save-summary
+```
 
-- `summary.md`: full structural report
-- `summary.json`: machine-readable summary
-- `maps.png`: representative raw and high-signal maps
-- `profiles.png`: global and sample-column profiles
+## What It Should Check
 
-Use `skills/structure-of-data/logs/TOC.md` first when you want prior runs.
+Every run should cover the structural questions that matter for the chosen field.
 
-These artifacts are for the agent and for deeper inspection. The user-facing output is the chat-style report.
+Usually that means:
+
+- value distribution: range, middle spread, tails, and mode
+- vertical structure: where the signal sits by pressure level and whether a narrow layer dominates
+- horizontal structure: tropical bias, latitude-band concentration, hotspot concentration, and hemispheric imbalance
+- cross-level comparability: whether one raw threshold means the same thing at different levels
+- anomaly severity when relevant: how much area exceeds simple relative-departure or sigma-style thresholds
+
+For dry potential temperature climatology anomalies, explicitly surface:
+
+- area above simple percent departures from climatology
+- area above 1σ / 2σ / 3σ
+- which pressure levels dominate those departures
+- a quick-and-dirty per-level component count above a strong departure threshold so chat can say how many big 2D blobs would show up on each pressure level
+
+## Plot Expectations
+
+The default plots should stay lightweight and diagnostic.
+
+Good plots include:
+
+- per-level mean and spread versus pressure
+- signal share by pressure level
+- global value histogram
+- latitude concentration curve
+- horizontal concentration curve
+- anomaly-threshold heatmap when climatology anomalies are active
+- when useful, a simple pressure-vs-component-count view for quick per-level blob-count intuition
+
+## Required Agent Behavior
+
+After running the command:
+
+- summarize the result directly in chat
+- lead with the structural takeaways, not the command or the files
+- mention the plots only if they add useful evidence
+- do not tell the user to open a repo log or TOC
+- do not invent meteorology; only say what the diagnostics support
 
 ## Transition Rule
 
-Use this skill before `structure_probe`.
+Use this skill before `structure-probe`.
 
-Only move on to `structure_probe` once you understand:
+Only move on when you understand:
 
-- whether the field is dominated by vertical background structure
+- whether the field is mostly background stratification or real localized structure
 - whether the field needs a pressure window
 - whether it needs per-level normalization
 - whether sign matters
-- whether the field is physically broad or dominated by narrow hotspots
+- whether the interesting part of the field is broad, rare, or hotspot-driven
