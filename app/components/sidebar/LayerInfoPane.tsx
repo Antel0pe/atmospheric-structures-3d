@@ -70,9 +70,9 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
   potentialTemperatureLayer: {
     title: "Potential Temperature Layer",
     summary:
-      "A dry-potential-temperature compare layer that highlights warm and cold anomaly shells relative to a per-level latitude-band mean background, using a fixed top-10% selection, selectable vertical connection recipes, and switchable color ramps.",
+      "A dry-potential-temperature compare layer that highlights warm and cold anomaly shells relative to the matched climatology, with both the older bridge recipes and the new top-10%-components sign-growth extraction available as variants.",
     detail:
-      "The layer derives dry potential temperature from pressure-level temperature, subtracts a latitude-band mean at each pressure level, keeps the top 10% of absolute anomalies on each level, optionally bridges same-sign gaps between pressure levels before smoothing, and renders separate warm and cold voxel shells as solid 3D structures.",
+      "The layer derives dry potential temperature from pressure-level temperature, subtracts the matched climatological mean field, and renders separate warm and cold voxel shells. Variants either bridge same-sign gaps from the older sign-tail mask or build a stricter component core from the exact per-level top 10% absolute anomalies and then grow vertically until the anomaly sign flips.",
     legend: [
       {
         label: "Default Pressure Bands",
@@ -421,7 +421,10 @@ export default function LayerInfoPane() {
     if (potentialTemperatureLayer.visible) {
       entries.push({
         id: "potentialTemperatureLayer",
-        tag: "Latitude-mean dry-theta anomaly shells",
+        tag:
+          potentialTemperatureLayer.variant === "top10-components-sign-growth"
+            ? "Climatology dry-theta | Top-10%-component sign growth"
+            : "Climatology dry-theta | Bridge / fill shells",
         ...LAYER_INFO.potentialTemperatureLayer,
       });
     }

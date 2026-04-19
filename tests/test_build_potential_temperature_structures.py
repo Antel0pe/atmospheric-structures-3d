@@ -9,11 +9,15 @@ from scripts.build_potential_temperature_structures import (
     DatasetContents,
     apply_vertical_connection_mode,
     build_climatology_mean_anomaly,
+    build_exact_top_percent_selected_anomaly,
     build_latitude_mean_anomaly,
     build_manifest,
     build_sign_tail_selected_anomaly,
     build_top_percent_selected_anomaly,
     compute_dry_potential_temperature,
+    grow_core_columns_by_sign,
+    keep_largest_planar_component_share_per_level,
+    label_wrapped_planar_components,
     label_wrapped_volume_components,
     maybe_flip_triangle_winding,
     remove_single_level_components,
@@ -166,6 +170,38 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
         self.assertEqual(float(thresholds_100[0]), 1.0)
         np.testing.assert_array_equal(keep_mask_100, np.ones_like(keep_mask_100, dtype=bool))
         np.testing.assert_array_equal(selected_100, anomaly)
+
+    def test_build_exact_top_percent_selected_anomaly_keeps_exact_cell_count_per_level(self) -> None:
+        anomaly = np.array(
+            [
+                [
+                    [1.0, 7.0, 2.0, 9.0, 3.0],
+                    [4.0, 8.0, 5.0, 6.0, 0.5],
+                ]
+            ],
+            dtype=np.float32,
+        )
+
+        selected, keep_mask, thresholds, selected_counts, keep_top_percent = (
+            build_exact_top_percent_selected_anomaly(anomaly, keep_top_percent=20.0)
+        )
+
+        self.assertEqual(keep_top_percent, 20.0)
+        self.assertEqual(int(selected_counts[0]), 2)
+        self.assertEqual(int(np.count_nonzero(keep_mask[0])), 2)
+        self.assertEqual(float(thresholds[0]), 8.0)
+        np.testing.assert_array_equal(
+            selected,
+            np.array(
+                [
+                    [
+                        [0.0, 0.0, 0.0, 9.0, 0.0],
+                        [0.0, 8.0, 0.0, 0.0, 0.0],
+                    ]
+                ],
+                dtype=np.float32,
+            ),
+        )
 
     def test_build_sign_tail_selected_anomaly_keeps_each_sign_tail_separately(self) -> None:
         anomaly = np.array(
@@ -340,6 +376,103 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
         self.assertEqual(component_count, 1)
         self.assertEqual(int(labels[0, 0, 0]), int(labels[0, 0, 2]))
 
+    def test_label_wrapped_planar_components_merges_longitude_seam(self) -> None:
+        mask = np.array(
+            [
+                [True, False, True],
+                [False, False, False],
+            ],
+            dtype=bool,
+        )
+
+        labels, component_count = label_wrapped_planar_components(mask)
+
+        self.assertEqual(component_count, 1)
+        self.assertEqual(int(labels[0, 0]), int(labels[0, 2]))
+
+    def test_keep_largest_planar_component_share_per_level_keeps_largest_components(self) -> None:
+        anomaly = np.array(
+            [
+                [
+                    [5.0, 5.0, 0.0, 4.0, 0.0, 3.0],
+                    [5.0, 0.0, 0.0, 0.0, 0.0, 3.0],
+                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [2.0, 2.0, 0.0, 1.0, 1.0, 0.0],
+                ]
+            ],
+            dtype=np.float32,
+        )
+        keep_mask = anomaly > 0.0
+
+        core_anomaly, core_mask, level_metadata = keep_largest_planar_component_share_per_level(
+            anomaly,
+            keep_mask,
+            component_keep_top_percent=40.0,
+        )
+
+        self.assertEqual(level_metadata[0]["component_count"], 4)
+        self.assertEqual(level_metadata[0]["kept_component_count"], 2)
+        self.assertEqual(int(np.count_nonzero(core_mask)), 7)
+        self.assertTrue(bool(core_mask[0, 0, 0]))
+        self.assertTrue(bool(core_mask[0, 0, 1]))
+        self.assertTrue(bool(core_mask[0, 1, 0]))
+        self.assertTrue(bool(core_mask[0, 0, 5]))
+        self.assertTrue(bool(core_mask[0, 1, 5]))
+        self.assertEqual(level_metadata[0]["largest_component_size"], 5)
+        self.assertEqual(level_metadata[0]["largest_kept_component_size"], 5)
+        self.assertEqual(float(np.max(core_anomaly)), 5.0)
+
+    def test_grow_core_columns_by_sign_extends_until_sign_flip(self) -> None:
+        anomaly = np.array(
+            [
+                [[2.0]],
+                [[1.0]],
+                [[3.0]],
+                [[-1.0]],
+                [[-2.0]],
+            ],
+            dtype=np.float32,
+        )
+        core_mask = np.array(
+            [
+                [[False]],
+                [[True]],
+                [[False]],
+                [[False]],
+                [[True]],
+            ],
+            dtype=bool,
+        )
+
+        grown_anomaly, added_mask = grow_core_columns_by_sign(anomaly, core_mask)
+
+        np.testing.assert_array_equal(
+            grown_anomaly,
+            np.array(
+                [
+                    [[2.0]],
+                    [[1.0]],
+                    [[3.0]],
+                    [[-1.0]],
+                    [[-2.0]],
+                ],
+                dtype=np.float32,
+            ),
+        )
+        np.testing.assert_array_equal(
+            added_mask,
+            np.array(
+                [
+                    [[True]],
+                    [[False]],
+                    [[True]],
+                    [[True]],
+                    [[False]],
+                ],
+                dtype=bool,
+            ),
+        )
+
     def test_build_manifest_reports_top_percent_selection_metadata(self) -> None:
         contents = DatasetContents(
             dataset_path=Path("data/example.nc"),
@@ -368,10 +501,16 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
                     "negative_component_count": 1,
                 }
             ],
+            variant_name="bridge-gap-1",
+            threshold_basis="per-level_sign-tail_top-percent",
             keep_top_percent=50.0,
             absolute_anomaly_percentile=50.0,
             smoothing_sigma_cells=1.0,
-            connection_mode="bridge-gap-1",
+            selection_summary={
+                "vertical_connection_mode": "bridge-gap-1",
+                "vertical_connection_label": "bridge_one_missing_level",
+                "min_component_pressure_span_levels": 2,
+            },
             pressure_min_hpa=250.0,
             pressure_max_hpa=1000.0,
             latitude_stride=4,

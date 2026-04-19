@@ -39,12 +39,15 @@ export type PotentialTemperatureStructureManifest = {
     threshold_basis:
       | "per-level_sign-tail_top-percent"
       | "per-level_absolute-anomaly_top-percent"
+      | "per-level_absolute-anomaly_top-percent_then_top-component-share"
       | "per-level_absolute-anomaly_percentile";
     keep_top_percent?: number;
+    component_keep_top_percent?: number;
     absolute_anomaly_percentile: number;
     smoothing_sigma_cells: number;
     vertical_connection_mode?: string;
     vertical_connection_label?: string;
+    core_component_connectivity?: string;
     keep_signs: ["negative", "positive"];
     volume_connectivity: string;
     wraps_longitude: true;
@@ -112,20 +115,31 @@ export type PotentialTemperatureStructureMetadata = {
   longitude_min_deg: number;
   longitude_max_deg: number;
   keep_top_percent?: number;
+  component_keep_top_percent?: number;
   absolute_anomaly_percentile: number;
   smoothing_sigma_cells: number;
   connection_mode?: string;
+  selected_voxel_count_before_component_filter?: number;
+  core_voxel_count?: number;
   selection: {
     kept_signs: ["negative", "positive"];
     keep_top_percent?: number;
+    component_keep_top_percent?: number;
     absolute_anomaly_percentile?: number;
     vertical_connection_mode?: string;
     vertical_connection_label?: string;
+    core_component_connectivity?: string;
     thresholds_by_pressure_level: Array<{
       pressure_hpa: number;
       absolute_anomaly_threshold?: number;
       hot_anomaly_threshold?: number;
       cold_anomaly_threshold?: number;
+      selected_cell_count?: number;
+      component_count?: number;
+      kept_component_count?: number;
+      kept_component_size_threshold?: number;
+      largest_component_size?: number;
+      largest_kept_component_size?: number;
     }>;
   };
   warm_positions_file: string;

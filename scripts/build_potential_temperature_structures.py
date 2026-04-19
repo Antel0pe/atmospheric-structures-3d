@@ -30,6 +30,14 @@ DERIVED_UNITS = "K"
 REFERENCE_PRESSURE_HPA = 1000.0
 POTENTIAL_TEMPERATURE_KAPPA = 287.05 / 1004.0
 VOLUME_COMPONENT_STRUCTURE = np.ones((3, 3, 3), dtype=np.uint8)
+PLANAR_COMPONENT_STRUCTURE = np.array(
+    [
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 1, 0],
+    ],
+    dtype=np.uint8,
+)
 OUTPUT_VERSION = 8
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
 DEFAULT_CLIMATOLOGY_PATH = Path(
@@ -46,10 +54,12 @@ DEFAULT_PRESSURE_MAX_HPA = 1000.0
 DEFAULT_KEEP_TOP_PERCENT = 5.0
 DEFAULT_SMOOTHING_SIGMA_CELLS = 1.0
 DEFAULT_CONNECTION_MODE = "bridge-gap-1"
+COMPONENT_CORE_SIGN_GROWTH_MODE = "top10-components-sign-growth"
 CONNECTION_MODE_CHOICES = (
     "bridge-gap-1",
     "bridge-gap-2",
     "fill-between-anchors",
+    COMPONENT_CORE_SIGN_GROWTH_MODE,
 )
 
 
@@ -150,9 +160,12 @@ def parse_args() -> argparse.Namespace:
         choices=CONNECTION_MODE_CHOICES,
         default=DEFAULT_CONNECTION_MODE,
         help=(
-            "Vertical connection recipe applied after the per-level top-percent "
-            "selection and before smoothing. The fill is sign-aware and only "
-            "bridges levels whose raw anomaly keeps the same sign."
+            "Variant recipe applied after the climatology anomaly is built. "
+            "The bridge/fill modes use the existing sign-tail threshold path, "
+            "while top10-components-sign-growth uses an exact per-level top-"
+            "percent absolute-anomaly core, keeps only the largest per-level "
+            "components, and then grows columns upward and downward until the "
+            "raw anomaly sign flips."
         ),
     )
     parser.add_argument(
@@ -393,6 +406,23 @@ def resolve_keep_top_percent(
     return resolved_keep_top_percent, 100.0 - resolved_keep_top_percent
 
 
+def resolve_keep_count(total_count: int, keep_top_percent: float) -> int:
+    total = max(int(total_count), 0)
+    if total <= 0:
+        return 0
+
+    resolved_keep_top_percent, _ = resolve_keep_top_percent(
+        keep_top_percent=keep_top_percent,
+        absolute_anomaly_percentile=None,
+    )
+    if resolved_keep_top_percent <= 0.0:
+        return 0
+    if resolved_keep_top_percent >= 100.0:
+        return total
+
+    return max(1, min(total, int(np.rint(total * resolved_keep_top_percent / 100.0))))
+
+
 def build_top_percent_selected_anomaly(
     anomaly: np.ndarray,
     keep_top_percent: float,
@@ -413,6 +443,49 @@ def build_top_percent_selected_anomaly(
     )
     selected_anomaly = np.where(keep_mask, anomaly, 0.0).astype(np.float32)
     return selected_anomaly, keep_mask, thresholds, resolved_keep_top_percent
+
+
+def build_exact_top_percent_selected_anomaly(
+    anomaly: np.ndarray,
+    keep_top_percent: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
+    resolved_keep_top_percent, _ = resolve_keep_top_percent(
+        keep_top_percent=keep_top_percent,
+        absolute_anomaly_percentile=None,
+    )
+    absolute_anomaly = np.asarray(np.abs(anomaly), dtype=np.float32)
+    keep_mask = np.zeros_like(anomaly, dtype=bool)
+    thresholds = np.full(anomaly.shape[0], np.nan, dtype=np.float32)
+    selected_cell_counts = np.zeros(anomaly.shape[0], dtype=np.int32)
+
+    for level_index in range(anomaly.shape[0]):
+        level_values = np.asarray(absolute_anomaly[level_index], dtype=np.float32)
+        finite_indices = np.flatnonzero(np.isfinite(level_values))
+        keep_count = resolve_keep_count(finite_indices.size, resolved_keep_top_percent)
+        selected_cell_counts[level_index] = keep_count
+        if keep_count <= 0:
+            continue
+
+        finite_values = level_values.reshape(-1)[finite_indices]
+        if keep_count >= finite_indices.size:
+            selected_indices = finite_indices
+        else:
+            partition_indices = np.argpartition(finite_values, -keep_count)[-keep_count:]
+            selected_indices = finite_indices[partition_indices]
+
+        flat_mask = keep_mask[level_index].reshape(-1)
+        flat_mask[selected_indices] = True
+        selected_values = level_values.reshape(-1)[selected_indices]
+        thresholds[level_index] = float(np.min(selected_values))
+
+    selected_anomaly = np.where(keep_mask, anomaly, 0.0).astype(np.float32)
+    return (
+        selected_anomaly,
+        keep_mask,
+        thresholds,
+        selected_cell_counts,
+        resolved_keep_top_percent,
+    )
 
 
 def build_sign_tail_selected_anomaly(
@@ -466,6 +539,7 @@ def vertical_connection_mode_label(connection_mode: str) -> str:
         "bridge-gap-1": "bridge_one_missing_level",
         "bridge-gap-2": "bridge_up_to_two_missing_levels",
         "fill-between-anchors": "fill_between_same_sign_anchors",
+        COMPONENT_CORE_SIGN_GROWTH_MODE: "grow_same_sign_columns_from_top10_component_core",
     }
     return labels.get(connection_mode, connection_mode)
 
@@ -670,6 +744,30 @@ def build_seam_merged_component_info(
     return root_map, np.unique(root_map[1:])
 
 
+def label_wrapped_planar_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
+    occupied = np.asarray(mask, dtype=bool)
+    if occupied.ndim != 2:
+        raise ValueError("Planar component labeling expects a 2D mask.")
+    if not occupied.any():
+        return np.zeros_like(occupied, dtype=np.int32), 0
+
+    longitude_count = occupied.shape[1]
+    extended = np.concatenate([occupied, occupied[:, :1]], axis=1)
+    labels, component_count = ndimage.label(extended, structure=PLANAR_COMPONENT_STRUCTURE)
+    if component_count <= 0:
+        return np.zeros_like(occupied, dtype=np.int32), 0
+
+    seam_pairs = np.column_stack([labels[:, 0].reshape(-1), labels[:, -1].reshape(-1)])
+    root_map, unique_root_ids = build_seam_merged_component_info(labels, seam_pairs)
+    if unique_root_ids.size == 0:
+        return np.zeros_like(occupied, dtype=np.int32), 0
+
+    compact_root_ids = np.zeros(component_count + 1, dtype=np.int32)
+    compact_root_ids[unique_root_ids] = np.arange(1, unique_root_ids.size + 1, dtype=np.int32)
+    compact_labels = compact_root_ids[root_map[labels[:, :longitude_count]]]
+    return compact_labels.astype(np.int32), int(unique_root_ids.size)
+
+
 def label_wrapped_volume_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     occupied = np.asarray(mask, dtype=bool)
     if not occupied.any():
@@ -690,6 +788,79 @@ def label_wrapped_volume_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     compact_root_ids[unique_root_ids] = np.arange(1, unique_root_ids.size + 1, dtype=np.int32)
     compact_labels = compact_root_ids[root_map[labels[..., :longitude_count]]]
     return compact_labels.astype(np.int32), int(unique_root_ids.size)
+
+
+def keep_largest_planar_component_share_per_level(
+    anomaly: np.ndarray,
+    keep_mask: np.ndarray,
+    component_keep_top_percent: float,
+) -> tuple[np.ndarray, np.ndarray, list[dict[str, Any]]]:
+    core_mask = np.zeros_like(keep_mask, dtype=bool)
+    level_metadata: list[dict[str, Any]] = []
+
+    for level_index in range(keep_mask.shape[0]):
+        level_labels, component_count = label_wrapped_planar_components(keep_mask[level_index])
+        keep_component_count = resolve_keep_count(component_count, component_keep_top_percent)
+
+        if component_count > 0:
+            component_sizes = np.bincount(level_labels[level_labels > 0].ravel())[1:]
+            component_order = np.argsort(-component_sizes, kind="stable")
+            kept_component_ids = component_order[:keep_component_count] + 1
+            core_mask[level_index] = np.isin(level_labels, kept_component_ids)
+            kept_component_threshold = (
+                int(component_sizes[component_order[keep_component_count - 1]])
+                if keep_component_count > 0
+                else 0
+            )
+            largest_kept_component_size = (
+                int(component_sizes[component_order[0]]) if component_order.size > 0 else 0
+            )
+        else:
+            component_sizes = np.zeros(0, dtype=np.int32)
+            kept_component_threshold = 0
+            largest_kept_component_size = 0
+
+        level_metadata.append(
+            {
+                "component_count": int(component_count),
+                "kept_component_count": int(keep_component_count),
+                "kept_component_size_threshold": int(kept_component_threshold),
+                "largest_kept_component_size": int(largest_kept_component_size),
+                "largest_component_size": int(component_sizes.max()) if component_sizes.size else 0,
+            }
+        )
+
+    core_anomaly = np.where(core_mask, anomaly, 0.0).astype(np.float32)
+    return core_anomaly, core_mask, level_metadata
+
+
+def grow_core_columns_by_sign(
+    anomaly: np.ndarray,
+    core_mask: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    sign_field = np.sign(np.asarray(anomaly, dtype=np.float32)).astype(np.int8)
+    grown_mask = np.asarray(core_mask, dtype=bool).copy()
+    pressure_count, latitude_count, longitude_count = anomaly.shape
+
+    for latitude_index in range(latitude_count):
+        for longitude_index in range(longitude_count):
+            core_levels = np.flatnonzero(core_mask[:, latitude_index, longitude_index])
+            for level_index in core_levels:
+                sign_value = int(sign_field[level_index, latitude_index, longitude_index])
+                if sign_value == 0:
+                    continue
+
+                for direction in (-1, 1):
+                    candidate_level = int(level_index + direction)
+                    while 0 <= candidate_level < pressure_count:
+                        if int(sign_field[candidate_level, latitude_index, longitude_index]) != sign_value:
+                            break
+                        grown_mask[candidate_level, latitude_index, longitude_index] = True
+                        candidate_level += direction
+
+    added_mask = np.asarray(grown_mask & ~core_mask, dtype=bool)
+    grown_anomaly = np.where(grown_mask, anomaly, 0.0).astype(np.float32)
+    return grown_anomaly, added_mask
 
 
 def summarize_signed_components(sign_field: np.ndarray) -> dict[str, Any]:
@@ -733,13 +904,14 @@ def build_asset_payload(
     keep_top_percent: float,
     absolute_anomaly_percentile: float,
     smoothing_sigma_cells: float,
-    connection_mode: str,
-    hot_anomaly_thresholds_by_level: np.ndarray,
-    cold_anomaly_thresholds_by_level: np.ndarray,
+    variant_name: str,
+    selection_thresholds_by_pressure_level: list[dict[str, Any]],
+    selection_summary: dict[str, Any],
     base_radius: float,
     vertical_span: float,
     connection_fill_mask: np.ndarray,
     single_level_removal_summary: dict[str, int],
+    extra_metadata: dict[str, Any] | None = None,
 ) -> SignedAnomalyShellAssetPayload:
     warm_mask = np.asarray(sign_field > 0, dtype=bool)
     cold_mask = np.asarray(sign_field < 0, dtype=bool)
@@ -781,7 +953,9 @@ def build_asset_payload(
             selected_voxel_count_before_connection_fill
             + np.count_nonzero(connection_fill_mask)
         ),
-        "single_level_component_min_span_levels": 2,
+        "single_level_component_min_span_levels": int(
+            selection_summary.get("min_component_pressure_span_levels", 2)
+        ),
         **single_level_removal_summary,
         "vertex_count": int((warm_mesh.positions.size + cold_mesh.positions.size) // 3),
         "index_count": int(warm_mesh.indices.size + cold_mesh.indices.size),
@@ -805,29 +979,17 @@ def build_asset_payload(
         "keep_top_percent": float(keep_top_percent),
         "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
         "smoothing_sigma_cells": float(smoothing_sigma_cells),
-        "connection_mode": connection_mode,
+        "connection_mode": variant_name,
         "selection": {
             "kept_signs": ["negative", "positive"],
             "keep_top_percent": float(keep_top_percent),
             "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
-            "vertical_connection_mode": connection_mode,
-            "vertical_connection_label": vertical_connection_mode_label(connection_mode),
-            "min_component_pressure_span_levels": 2,
-            "thresholds_by_pressure_level": [
-                {
-                    "pressure_hpa": float(pressure_hpa),
-                    "hot_anomaly_threshold": float(hot_threshold),
-                    "cold_anomaly_threshold": float(cold_threshold),
-                }
-                for pressure_hpa, hot_threshold, cold_threshold in zip(
-                    pressure_levels_hpa.tolist(),
-                    hot_anomaly_thresholds_by_level.tolist(),
-                    cold_anomaly_thresholds_by_level.tolist(),
-                    strict=True,
-                )
-            ],
+            **selection_summary,
+            "thresholds_by_pressure_level": selection_thresholds_by_pressure_level,
         },
     }
+    if extra_metadata:
+        metadata.update(extra_metadata)
 
     return SignedAnomalyShellAssetPayload(
         timestamp=timestamp,
@@ -917,10 +1079,12 @@ def build_manifest(
     contents: DatasetContents,
     climatology_dataset_name: str,
     entries: list[dict[str, Any]],
+    variant_name: str,
+    threshold_basis: str,
     keep_top_percent: float,
     absolute_anomaly_percentile: float,
     smoothing_sigma_cells: float,
-    connection_mode: str,
+    selection_summary: dict[str, Any],
     pressure_min_hpa: float,
     pressure_max_hpa: float,
     latitude_stride: int,
@@ -937,7 +1101,7 @@ def build_manifest(
         "climatology_dataset": climatology_dataset_name,
         "variable": TEMPERATURE_VARIABLE,
         "units": contents.units,
-        "variant": connection_mode,
+        "variant": variant_name,
         "derived_variable": {
             "name": DERIVED_VARIABLE_NAME,
             "units": DERIVED_UNITS,
@@ -948,14 +1112,12 @@ def build_manifest(
         "geometry_mode": "voxel-faces",
         "selection": {
             "background": "matched_gridpoint_climatological_theta_mean",
-            "threshold_basis": "per-level_sign-tail_top-percent",
+            "threshold_basis": threshold_basis,
             "keep_top_percent": float(keep_top_percent),
             "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
             "smoothing_sigma_cells": float(smoothing_sigma_cells),
-            "vertical_connection_mode": connection_mode,
-            "vertical_connection_label": vertical_connection_mode_label(connection_mode),
-            "min_component_pressure_span_levels": 2,
             "keep_signs": ["negative", "positive"],
+            **selection_summary,
             "volume_connectivity": "26-connected-same-sign",
             "wraps_longitude": True,
         },
@@ -987,9 +1149,14 @@ def build_manifest(
 
 def main() -> None:
     args = parse_args()
+    variant_name = args.connection_mode
+    is_component_core_sign_growth = variant_name == COMPONENT_CORE_SIGN_GROWTH_MODE
     keep_top_percent, absolute_anomaly_percentile = resolve_keep_top_percent(
         keep_top_percent=args.keep_top_percent,
         absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+    )
+    effective_smoothing_sigma_cells = (
+        0.0 if is_component_core_sign_growth else float(args.smoothing_sigma_cells)
     )
     dataset_path = resolve_dataset_path(args.dataset)
     climatology_path = resolve_dataset_path(args.climatology)
@@ -1069,41 +1236,149 @@ def main() -> None:
                 theta_field,
                 climatology_pressure_window[:, :: max(int(args.latitude_stride), 1), :: max(int(args.longitude_stride), 1)],
             )
-            (
-                selected_top_percent_anomaly,
-                _,
-                hot_anomaly_thresholds_by_level,
-                cold_anomaly_thresholds_by_level,
-                _,
-                resolved_keep_top_percent,
-            ) = build_sign_tail_selected_anomaly(
-                anomaly,
-                keep_top_percent=keep_top_percent,
-            )
-            selected_anomaly, connection_fill_mask = apply_vertical_connection_mode(
-                anomaly,
-                selected_top_percent_anomaly,
-                connection_mode=args.connection_mode,
-            )
-            smoothed_anomaly_values, sign_field = smooth_selected_sign_anomaly(
-                selected_anomaly,
-                smoothing_sigma_cells=args.smoothing_sigma_cells,
-            )
-            (
-                smoothed_anomaly_values,
-                sign_field,
-                single_level_removal_summary,
-            ) = remove_single_level_components(
-                smoothed_anomaly_values,
-                sign_field,
-            )
+            selection_summary = {
+                "min_component_pressure_span_levels": 2,
+            }
+            extra_metadata: dict[str, Any] = {}
+
+            if is_component_core_sign_growth:
+                (
+                    selected_top_percent_anomaly,
+                    selected_top_percent_mask,
+                    absolute_anomaly_thresholds_by_level,
+                    selected_cell_counts_by_level,
+                    resolved_keep_top_percent,
+                ) = build_exact_top_percent_selected_anomaly(
+                    anomaly,
+                    keep_top_percent=keep_top_percent,
+                )
+                (
+                    core_anomaly,
+                    core_mask,
+                    component_level_metadata,
+                ) = keep_largest_planar_component_share_per_level(
+                    anomaly,
+                    selected_top_percent_mask,
+                    component_keep_top_percent=resolved_keep_top_percent,
+                )
+                selected_anomaly, connection_fill_mask = grow_core_columns_by_sign(
+                    anomaly,
+                    core_mask,
+                )
+                smoothed_anomaly_values = np.asarray(selected_anomaly, dtype=np.float32)
+                sign_field = np.sign(smoothed_anomaly_values).astype(np.int8)
+                single_level_removal_summary = {
+                    "removed_component_count": 0,
+                    "removed_positive_component_count": 0,
+                    "removed_negative_component_count": 0,
+                    "removed_voxel_count": 0,
+                    "removed_positive_voxel_count": 0,
+                    "removed_negative_voxel_count": 0,
+                }
+                selection_thresholds_by_pressure_level = [
+                    {
+                        "pressure_hpa": float(pressure_hpa),
+                        "absolute_anomaly_threshold": float(absolute_threshold),
+                        "selected_cell_count": int(selected_cell_count),
+                        "component_count": int(level_meta["component_count"]),
+                        "kept_component_count": int(level_meta["kept_component_count"]),
+                        "kept_component_size_threshold": int(
+                            level_meta["kept_component_size_threshold"]
+                        ),
+                        "largest_component_size": int(level_meta["largest_component_size"]),
+                        "largest_kept_component_size": int(
+                            level_meta["largest_kept_component_size"]
+                        ),
+                    }
+                    for pressure_hpa, absolute_threshold, selected_cell_count, level_meta in zip(
+                        pressure_window_levels_hpa.tolist(),
+                        absolute_anomaly_thresholds_by_level.tolist(),
+                        selected_cell_counts_by_level.tolist(),
+                        component_level_metadata,
+                        strict=True,
+                    )
+                ]
+                selection_summary.update(
+                    {
+                        "threshold_basis": "per-level_absolute-anomaly_top-percent_then_top-component-share",
+                        "component_keep_top_percent": float(resolved_keep_top_percent),
+                        "core_component_connectivity": "4-connected-with-longitude-wrap",
+                        "vertical_connection_mode": variant_name,
+                        "vertical_connection_label": vertical_connection_mode_label(
+                            variant_name
+                        ),
+                        "min_component_pressure_span_levels": 1,
+                    }
+                )
+                extra_metadata.update(
+                    {
+                        "selected_voxel_count_before_component_filter": int(
+                            np.count_nonzero(selected_top_percent_mask)
+                        ),
+                        "core_voxel_count": int(np.count_nonzero(core_mask)),
+                    }
+                )
+                selected_voxel_count_before_connection_fill = int(np.count_nonzero(core_mask))
+            else:
+                (
+                    selected_top_percent_anomaly,
+                    _,
+                    hot_anomaly_thresholds_by_level,
+                    cold_anomaly_thresholds_by_level,
+                    _,
+                    resolved_keep_top_percent,
+                ) = build_sign_tail_selected_anomaly(
+                    anomaly,
+                    keep_top_percent=keep_top_percent,
+                )
+                selected_anomaly, connection_fill_mask = apply_vertical_connection_mode(
+                    anomaly,
+                    selected_top_percent_anomaly,
+                    connection_mode=variant_name,
+                )
+                smoothed_anomaly_values, sign_field = smooth_selected_sign_anomaly(
+                    selected_anomaly,
+                    smoothing_sigma_cells=effective_smoothing_sigma_cells,
+                )
+                (
+                    smoothed_anomaly_values,
+                    sign_field,
+                    single_level_removal_summary,
+                ) = remove_single_level_components(
+                    smoothed_anomaly_values,
+                    sign_field,
+                )
+                selection_thresholds_by_pressure_level = [
+                    {
+                        "pressure_hpa": float(pressure_hpa),
+                        "hot_anomaly_threshold": float(hot_threshold),
+                        "cold_anomaly_threshold": float(cold_threshold),
+                    }
+                    for pressure_hpa, hot_threshold, cold_threshold in zip(
+                        pressure_window_levels_hpa.tolist(),
+                        hot_anomaly_thresholds_by_level.tolist(),
+                        cold_anomaly_thresholds_by_level.tolist(),
+                        strict=True,
+                    )
+                ]
+                selection_summary.update(
+                    {
+                        "vertical_connection_mode": variant_name,
+                        "vertical_connection_label": vertical_connection_mode_label(
+                            variant_name
+                        ),
+                    }
+                )
+                selected_voxel_count_before_connection_fill = int(
+                    np.count_nonzero(np.abs(selected_top_percent_anomaly) > 0.0)
+                )
             if not np.any(sign_field):
                 print(
                     "Skipped potential temperature frame after smoothing:",
                     timestamp,
                     f"keep_top_percent={resolved_keep_top_percent}",
                     f"absolute_anomaly_percentile={absolute_anomaly_percentile}",
-                    f"smoothing_sigma_cells={args.smoothing_sigma_cells}",
+                    f"smoothing_sigma_cells={effective_smoothing_sigma_cells}",
                 )
                 continue
 
@@ -1111,9 +1386,7 @@ def main() -> None:
                 timestamp=timestamp,
                 theta_field=theta_field,
                 selected_anomaly=selected_anomaly,
-                selected_voxel_count_before_connection_fill=int(
-                    np.count_nonzero(np.abs(selected_top_percent_anomaly) > 0.0)
-                ),
+                selected_voxel_count_before_connection_fill=selected_voxel_count_before_connection_fill,
                 smoothed_anomaly_values=smoothed_anomaly_values,
                 sign_field=sign_field,
                 pressure_levels_hpa=pressure_window_levels_hpa,
@@ -1121,14 +1394,15 @@ def main() -> None:
                 longitudes_deg=strided_longitudes_deg,
                 keep_top_percent=resolved_keep_top_percent,
                 absolute_anomaly_percentile=absolute_anomaly_percentile,
-                smoothing_sigma_cells=args.smoothing_sigma_cells,
-                connection_mode=args.connection_mode,
-                hot_anomaly_thresholds_by_level=hot_anomaly_thresholds_by_level,
-                cold_anomaly_thresholds_by_level=cold_anomaly_thresholds_by_level,
+                smoothing_sigma_cells=effective_smoothing_sigma_cells,
+                variant_name=variant_name,
+                selection_thresholds_by_pressure_level=selection_thresholds_by_pressure_level,
+                selection_summary=selection_summary,
                 base_radius=args.base_radius,
                 vertical_span=args.vertical_span,
                 connection_fill_mask=connection_fill_mask,
                 single_level_removal_summary=single_level_removal_summary,
+                extra_metadata=extra_metadata,
             )
             entries.append(write_frame(output_dir=output_dir, payload=payload))
             final_latitudes_deg = strided_latitudes_deg
@@ -1142,7 +1416,7 @@ def main() -> None:
                 f"components={payload.metadata['component_count']}",
                 f"positive_components={payload.metadata['positive_component_count']}",
                 f"negative_components={payload.metadata['negative_component_count']}",
-                f"connection_mode={args.connection_mode}",
+                f"connection_mode={variant_name}",
                 f"filled={payload.metadata['connection_fill_voxel_count']}",
                 f"removed_single_level={payload.metadata['removed_component_count']}",
                 f"anomaly_abs_max={payload.metadata['anomaly_abs_max']:.2f}",
@@ -1159,10 +1433,30 @@ def main() -> None:
         contents=contents,
         climatology_dataset_name=climatology_path.name,
         entries=entries,
+        variant_name=variant_name,
+        threshold_basis=(
+            "per-level_absolute-anomaly_top-percent_then_top-component-share"
+            if is_component_core_sign_growth
+            else "per-level_sign-tail_top-percent"
+        ),
         keep_top_percent=keep_top_percent,
         absolute_anomaly_percentile=absolute_anomaly_percentile,
-        smoothing_sigma_cells=args.smoothing_sigma_cells,
-        connection_mode=args.connection_mode,
+        smoothing_sigma_cells=effective_smoothing_sigma_cells,
+        selection_summary=(
+            {
+                "component_keep_top_percent": float(keep_top_percent),
+                "core_component_connectivity": "4-connected-with-longitude-wrap",
+                "vertical_connection_mode": variant_name,
+                "vertical_connection_label": vertical_connection_mode_label(variant_name),
+                "min_component_pressure_span_levels": 1,
+            }
+            if is_component_core_sign_growth
+            else {
+                "vertical_connection_mode": variant_name,
+                "vertical_connection_label": vertical_connection_mode_label(variant_name),
+                "min_component_pressure_span_levels": 2,
+            }
+        ),
         pressure_min_hpa=args.pressure_min_hpa,
         pressure_max_hpa=args.pressure_max_hpa,
         latitude_stride=args.latitude_stride,

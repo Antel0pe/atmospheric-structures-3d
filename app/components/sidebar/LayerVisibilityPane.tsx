@@ -221,8 +221,8 @@ export default function LayerVisibilityPane() {
                   fontWeight: 600,
                 }}
               >
-                <span>Vertical Connection</span>
-                <span style={{ opacity: 0.68 }}>Top 10% fixed</span>
+                <span>Structure Recipe</span>
+                <span style={{ opacity: 0.68 }}>Climatology anomaly</span>
               </div>
               <select
                 value={potentialTemperatureLayer.variant}
@@ -286,11 +286,12 @@ export default function LayerVisibilityPane() {
           Relative humidity uses the selected shell variant nearest to the active
           timestamp. The precipitable water proxy keeps only 500-1000 hPa voxels
           that pass the top-40%-q, RH, and 3-level depth gates. Potential
-          temperature derives dry potential temperature in 3D, subtracts a
-          per-pressure-level latitude-band mean background, keeps the top 10%
-          of anomalies on each level, lightly smooths that signed field,
-          and renders separate warm and cold voxel shells with switchable color
-          ramps. The precipitation layer uses static radar textures.
+          temperature derives dry potential temperature in 3D, subtracts the
+          matched climatology on each pressure level, and can now either use the
+          existing sign-tail bridge recipes or an exact top-10%-cells, top-10%
+          components, same-sign vertical-growth recipe before rendering separate
+          warm and cold voxel shells. The precipitation layer uses static radar
+          textures.
         </div>
       </div>
     </section>

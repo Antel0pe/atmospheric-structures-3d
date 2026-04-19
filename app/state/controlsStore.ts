@@ -58,6 +58,10 @@ export const POTENTIAL_TEMPERATURE_VARIANT_OPTIONS = [
   { value: "bridge-gap-1", label: "Bridge 1 Missing Level" },
   { value: "bridge-gap-2", label: "Bridge Up To 2 Levels" },
   { value: "fill-between-anchors", label: "Fill Between Anchors" },
+  {
+    value: "top10-components-sign-growth",
+    label: "Top 10% Components + Sign Growth",
+  },
 ] as const;
 
 export type PotentialTemperatureVariant =

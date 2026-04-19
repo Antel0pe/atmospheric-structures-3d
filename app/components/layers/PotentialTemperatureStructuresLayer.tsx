@@ -140,6 +140,9 @@ function buildBandScale(
   kind: ShellKind
 ) {
   const thresholds = frame.metadata.selection.thresholds_by_pressure_level;
+  if (thresholds.length === 0) {
+    return { boundaryRadii: [] as number[], levelColors: [] as THREE.Color[] };
+  }
   const radii = thresholds.map((entry) => pressureToRadius(frame, entry.pressure_hpa));
   const boundaryRadii = radii
     .slice(0, -1)
@@ -244,6 +247,7 @@ export default function PotentialTemperatureStructuresLayer() {
     const material = materialRef.current;
     const frame = frameRef.current;
     if (!root || !material || !frame) return;
+    root.userData.variant = frame.manifest.variant ?? layerState.variant;
 
     warmMeshRef.current?.removeFromParent();
     warmMeshRef.current?.geometry.dispose();
@@ -319,8 +323,9 @@ export default function PotentialTemperatureStructuresLayer() {
     if (!root || !material) return;
 
     root.visible = layerState.visible;
-    material.opacity = 1;
-    material.depthWrite = true;
+    material.transparent = layerState.opacity < 0.999;
+    material.opacity = layerState.opacity;
+    material.depthWrite = layerState.opacity >= 0.999;
     material.side = THREE.FrontSide;
     if (frameRef.current) {
       rebuildMesh();
