@@ -6,14 +6,17 @@ from pathlib import Path
 import numpy as np
 
 from scripts.build_potential_temperature_structures import (
+    RAW_T_MIDPOINT_COLD_SIDE_VARIANT,
     DatasetContents,
     apply_vertical_connection_mode,
     build_climatology_mean_anomaly,
     build_exact_top_percent_selected_anomaly,
     build_latitude_mean_anomaly,
     build_manifest,
+    build_raw_temperature_midpoint_cold_mask,
     build_sign_tail_selected_anomaly,
     build_top_percent_selected_anomaly,
+    cohere_mixed_polar_edge_rows,
     compute_dry_potential_temperature,
     grow_core_columns_by_sign,
     keep_largest_planar_component_share_per_level,
@@ -111,6 +114,83 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
                 dtype=np.float32,
             ),
         )
+
+    def test_build_raw_temperature_midpoint_cold_mask_uses_per_level_midpoint(self) -> None:
+        smoothed_temperature = np.array(
+            [
+                [
+                    [260.0, 264.0, 268.0],
+                    [262.0, 266.0, 270.0],
+                ]
+            ],
+            dtype=np.float32,
+        )
+
+        cold_mask, level_min, level_max, midpoint = (
+            build_raw_temperature_midpoint_cold_mask(smoothed_temperature)
+        )
+
+        self.assertEqual(float(level_min[0]), 260.0)
+        self.assertEqual(float(level_max[0]), 270.0)
+        self.assertEqual(float(midpoint[0]), 265.0)
+        np.testing.assert_array_equal(
+            cold_mask,
+            np.array(
+                [
+                    [
+                        [True, True, False],
+                        [True, False, False],
+                    ]
+                ],
+                dtype=bool,
+            ),
+        )
+
+    def test_cohere_mixed_polar_edge_rows_resolves_from_edge_row_mean(self) -> None:
+        cold_mask = np.array(
+            [
+                [
+                    [True, False, True, False],
+                    [True, True, False, False],
+                    [False, False, False, False],
+                ],
+                [
+                    [False, False, False, False],
+                    [False, True, True, False],
+                    [True, False, True, False],
+                ],
+            ],
+            dtype=bool,
+        )
+        smoothed_temperature = np.array(
+            [
+                [
+                    [250.0, 250.0, 250.0, 250.0],
+                    [252.0, 252.0, 252.0, 252.0],
+                    [280.0, 280.0, 280.0, 280.0],
+                ],
+                [
+                    [280.0, 280.0, 280.0, 280.0],
+                    [278.0, 278.0, 278.0, 278.0],
+                    [250.0, 250.0, 250.0, 250.0],
+                ],
+            ],
+            dtype=np.float32,
+        )
+        midpoint = np.array([260.0, 260.0], dtype=np.float32)
+
+        cleaned, north_changed, south_changed = cohere_mixed_polar_edge_rows(
+            cold_mask,
+            smoothed_temperature,
+            midpoint,
+        )
+
+        np.testing.assert_array_equal(cleaned[0, 0], np.ones(4, dtype=bool))
+        np.testing.assert_array_equal(cleaned[1, -1], np.ones(4, dtype=bool))
+        self.assertTrue(bool(north_changed[0]))
+        self.assertFalse(bool(north_changed[1]))
+        self.assertFalse(bool(south_changed[0]))
+        self.assertTrue(bool(south_changed[1]))
 
     def test_resolve_keep_top_percent_treats_percentile_alias_as_inverse(self) -> None:
         keep_top_percent, percentile = resolve_keep_top_percent(
@@ -486,7 +566,6 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
 
         manifest = build_manifest(
             contents=contents,
-            climatology_dataset_name="climatology.nc",
             entries=[
                 {
                     "timestamp": "2021-11-08T12:00",
@@ -502,7 +581,16 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
                 }
             ],
             variant_name="bridge-gap-1",
+            structure_kind="potential-temperature-climatology-anomaly-shell",
+            derived_variable={
+                "name": "dry_potential_temperature",
+                "units": "K",
+                "reference_pressure_hpa": 1000.0,
+                "kappa": 0.2859,
+            },
+            selection_background="matched_gridpoint_climatological_theta_mean",
             threshold_basis="per-level_sign-tail_top-percent",
+            keep_signs=["negative", "positive"],
             keep_top_percent=50.0,
             absolute_anomaly_percentile=50.0,
             smoothing_sigma_cells=1.0,
@@ -520,6 +608,7 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
             pressure_levels_hpa=contents.pressure_levels_hpa,
             base_radius=100.0,
             vertical_span=12.0,
+            climatology_dataset_name="climatology.nc",
         )
 
         self.assertEqual(
@@ -528,9 +617,63 @@ class BuildPotentialTemperatureStructuresTests(unittest.TestCase):
         )
         self.assertEqual(manifest["variant"], "bridge-gap-1")
         self.assertEqual(manifest["selection"]["keep_top_percent"], 50.0)
+
         self.assertEqual(manifest["selection"]["absolute_anomaly_percentile"], 50.0)
         self.assertEqual(manifest["selection"]["vertical_connection_mode"], "bridge-gap-1")
         self.assertEqual(manifest["selection"]["min_component_pressure_span_levels"], 2)
+
+    def test_build_manifest_supports_raw_temperature_midpoint_variant(self) -> None:
+        contents = DatasetContents(
+            dataset_path=Path("data/example.nc"),
+            units="K",
+            pressure_levels_hpa=np.array([1000.0, 850.0], dtype=np.float32),
+            latitudes_deg=np.array([10.0, 0.0], dtype=np.float32),
+            longitudes_deg=np.array([-180.0, -90.0, 0.0], dtype=np.float32),
+            longitude_order=np.array([0, 1, 2], dtype=np.int64),
+            timestamps=["2021-11-08T12:00"],
+        )
+
+        manifest = build_manifest(
+            contents=contents,
+            entries=[],
+            variant_name=RAW_T_MIDPOINT_COLD_SIDE_VARIANT,
+            structure_kind="raw-temperature-midpoint-cold-side-shell",
+            derived_variable={"name": "temperature", "units": "K"},
+            selection_background="per-level_smoothed_raw_temperature_midpoint",
+            threshold_basis="per-level_smoothed-temperature_midpoint",
+            keep_signs=["negative"],
+            keep_top_percent=None,
+            absolute_anomaly_percentile=None,
+            smoothing_sigma_cells=2.0,
+            selection_summary={
+                "threshold_rule": "midpoint",
+                "kept_side": "cold",
+                "min_component_pressure_span_levels": 1,
+            },
+            pressure_min_hpa=250.0,
+            pressure_max_hpa=1000.0,
+            latitude_stride=4,
+            longitude_stride=4,
+            latitudes_deg=contents.latitudes_deg,
+            longitudes_deg=contents.longitudes_deg,
+            pressure_levels_hpa=contents.pressure_levels_hpa,
+            base_radius=100.0,
+            vertical_span=12.0,
+            sampling_method="subsample_centers_from_native_midpoint_mask",
+        )
+
+        self.assertEqual(manifest["variant"], RAW_T_MIDPOINT_COLD_SIDE_VARIANT)
+        self.assertEqual(manifest["derived_variable"]["name"], "temperature")
+        self.assertEqual(
+            manifest["selection"]["threshold_basis"],
+            "per-level_smoothed-temperature_midpoint",
+        )
+        self.assertNotIn("absolute_anomaly_percentile", manifest["selection"])
+        self.assertEqual(manifest["selection"]["keep_signs"], ["negative"])
+        self.assertEqual(
+            manifest["sampling"]["method"],
+            "subsample_centers_from_native_midpoint_mask",
+        )
 
 
 if __name__ == "__main__":

@@ -59,6 +59,10 @@ export const POTENTIAL_TEMPERATURE_VARIANT_OPTIONS = [
   { value: "bridge-gap-2", label: "Bridge Up To 2 Levels" },
   { value: "fill-between-anchors", label: "Fill Between Anchors" },
   {
+    value: "raw-temperature-midpoint-cold-side",
+    label: "Raw Temperature Midpoint Polar Side",
+  },
+  {
     value: "top10-components-sign-growth",
     label: "Top 10% Components + Sign Growth",
   },
@@ -66,6 +70,24 @@ export const POTENTIAL_TEMPERATURE_VARIANT_OPTIONS = [
 
 export type PotentialTemperatureVariant =
   (typeof POTENTIAL_TEMPERATURE_VARIANT_OPTIONS)[number]["value"];
+
+export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
+  {
+    value: "temperature-rh-latmean",
+    label: "Temperature + RH Anomaly",
+  },
+  {
+    value: "theta-rh-latmean",
+    label: "Theta + RH Anomaly",
+  },
+  {
+    value: "theta-q-latmean",
+    label: "Theta + Specific Humidity",
+  },
+] as const;
+
+export type AirMassClassificationVariant =
+  (typeof AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS)[number]["value"];
 
 export const POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS = [
   { value: "pressureBands", label: "Current Default" },
@@ -222,6 +244,13 @@ export type PotentialTemperatureLayerState = {
   opacity: number;
   colorMode: PotentialTemperatureColorMode;
   variant: PotentialTemperatureVariant;
+  showCellGrid: boolean;
+};
+
+export type AirMassClassificationLayerState = {
+  visible: boolean;
+  opacity: number;
+  variant: AirMassClassificationVariant;
 };
 
 export type RelativeHumidityLayerState = {
@@ -608,6 +637,7 @@ type ControlsState = {
   precipitationRadarLayer: PrecipitationRadarLayerState;
   precipitableWaterLayer: PrecipitableWaterLayerState;
   potentialTemperatureLayer: PotentialTemperatureLayerState;
+  airMassLayer: AirMassClassificationLayerState;
   relativeHumidityLayer: RelativeHumidityLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
@@ -633,6 +663,7 @@ type ControlsState = {
   setPotentialTemperatureLayer: (
     patch: Partial<PotentialTemperatureLayerState>
   ) => void;
+  setAirMassLayer: (patch: Partial<AirMassClassificationLayerState>) => void;
   setRelativeHumidityLayer: (patch: Partial<RelativeHumidityLayerState>) => void;
   setExampleShaderMeshLayer: (
     patch: Partial<ExampleShaderMeshLayerState>
@@ -675,6 +706,12 @@ export const useControls = create<ControlsState>()(
       opacity: 1,
       colorMode: "pressureBands",
       variant: "bridge-gap-1",
+      showCellGrid: false,
+    },
+    airMassLayer: {
+      visible: false,
+      opacity: 1,
+      variant: "temperature-rh-latmean",
     },
     relativeHumidityLayer: {
       visible: false,
@@ -777,6 +814,14 @@ export const useControls = create<ControlsState>()(
       set((state) => ({
         potentialTemperatureLayer: {
           ...state.potentialTemperatureLayer,
+          ...patch,
+          opacity: 1,
+        },
+      })),
+    setAirMassLayer: (patch) =>
+      set((state) => ({
+        airMassLayer: {
+          ...state.airMassLayer,
           ...patch,
           opacity: 1,
         },

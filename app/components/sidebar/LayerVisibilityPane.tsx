@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS,
   POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
   POTENTIAL_TEMPERATURE_VARIANT_OPTIONS,
   RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS,
   RELATIVE_HUMIDITY_VARIANT_OPTIONS,
+  type AirMassClassificationVariant,
   type PotentialTemperatureColorMode,
   type PotentialTemperatureVariant,
   type RelativeHumidityColorMode,
@@ -80,6 +82,7 @@ export default function LayerVisibilityPane() {
   const potentialTemperatureLayer = useControls(
     (state) => state.potentialTemperatureLayer
   );
+  const airMassLayer = useControls((state) => state.airMassLayer);
   const relativeHumidityLayer = useControls(
     (state) => state.relativeHumidityLayer
   );
@@ -95,6 +98,7 @@ export default function LayerVisibilityPane() {
   const setPotentialTemperatureLayer = useControls(
     (state) => state.setPotentialTemperatureLayer
   );
+  const setAirMassLayer = useControls((state) => state.setAirMassLayer);
   const setRelativeHumidityLayer = useControls(
     (state) => state.setRelativeHumidityLayer
   );
@@ -222,7 +226,12 @@ export default function LayerVisibilityPane() {
                 }}
               >
                 <span>Structure Recipe</span>
-                <span style={{ opacity: 0.68 }}>Climatology anomaly</span>
+                <span style={{ opacity: 0.68 }}>
+                  {potentialTemperatureLayer.variant ===
+                  "raw-temperature-midpoint-cold-side"
+                    ? "Raw temperature midpoint"
+                    : "Climatology anomaly"}
+                </span>
               </div>
               <select
                 value={potentialTemperatureLayer.variant}
@@ -270,6 +279,59 @@ export default function LayerVisibilityPane() {
                 ))}
               </select>
             </label>
+
+            <CheckboxRow
+              label="Show Cell Grid"
+              checked={potentialTemperatureLayer.showCellGrid}
+              accentColor="#cfe0ff"
+              onChange={(checked) =>
+                setPotentialTemperatureLayer({ showCellGrid: checked })
+              }
+            />
+        </div>
+
+        <CheckboxRow
+          label="Air Mass Classification"
+          checked={airMassLayer.visible}
+          accentColor="#8fe7c7"
+          onChange={(checked) => setAirMassLayer({ visible: checked })}
+        />
+
+        <div
+          style={{
+            display: airMassLayer.visible ? "grid" : "none",
+            gap: 12,
+          }}
+        >
+          <label style={{ display: "grid", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                fontWeight: 600,
+              }}
+            >
+              <span>Proxy Recipe</span>
+              <span style={{ opacity: 0.68 }}>Warm/cold + moist/dry</span>
+            </div>
+            <select
+              value={airMassLayer.variant}
+              onChange={(event) =>
+                setAirMassLayer({
+                  variant:
+                    event.currentTarget.value as AirMassClassificationVariant,
+                })
+              }
+              style={selectStyle()}
+            >
+              {AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <CheckboxRow
@@ -290,8 +352,11 @@ export default function LayerVisibilityPane() {
           matched climatology on each pressure level, and can now either use the
           existing sign-tail bridge recipes or an exact top-10%-cells, top-10%
           components, same-sign vertical-growth recipe before rendering separate
-          warm and cold voxel shells. The precipitation layer uses static radar
-          textures.
+          warm and cold voxel shells. Air mass classification is a proxy layer:
+          it combines warm/cold and moist/dry per-level latitude-band anomalies
+          into quadrant-classified voxel shells rather than doing true
+          trajectory-based Bergeron source-region analysis. The precipitation
+          layer uses static radar textures.
         </div>
       </div>
     </section>

@@ -25,6 +25,7 @@ import type { EarthViewState } from "../../lib/viewerTypes";
 import {
   resolveMoistureStructureLayerState,
   useControls,
+  type AirMassClassificationLayerState,
   type ExampleContoursLayerState,
   type ExampleParticleLayerState,
   type ExampleShaderMeshLayerState,
@@ -717,6 +718,12 @@ export default function EarthBase({
       return { ...state };
     }
 
+    function cloneAirMassLayerState(
+      state: AirMassClassificationLayerState
+    ): AirMassClassificationLayerState {
+      return { ...state };
+    }
+
     function cloneExampleShaderMeshLayerState(
       state: ExampleShaderMeshLayerState
     ): ExampleShaderMeshLayerState {
@@ -750,6 +757,7 @@ export default function EarthBase({
         potentialTemperatureLayer: clonePotentialTemperatureLayerState(
           controlsState.potentialTemperatureLayer
         ),
+        airMassLayer: cloneAirMassLayerState(controlsState.airMassLayer),
         relativeHumidityLayer: cloneRelativeHumidityLayerState(
           controlsState.relativeHumidityLayer
         ),
@@ -778,6 +786,9 @@ export default function EarthBase({
       );
       controlsState.setPotentialTemperatureLayer(
         clonePotentialTemperatureLayerState(snapshot.potentialTemperatureLayer)
+      );
+      controlsState.setAirMassLayer(
+        cloneAirMassLayerState(snapshot.airMassLayer)
       );
       controlsState.setRelativeHumidityLayer(
         cloneRelativeHumidityLayerState(snapshot.relativeHumidityLayer)

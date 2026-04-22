@@ -22,33 +22,41 @@ export type PotentialTemperatureStructureManifest = {
   variable: string;
   units: string;
   variant?: string;
-  derived_variable: {
-    name: "dry_potential_temperature";
-    units: string;
-    reference_pressure_hpa: number;
-    kappa: number;
-  };
+  derived_variable:
+    | {
+        name: "dry_potential_temperature";
+        units: string;
+        reference_pressure_hpa: number;
+        kappa: number;
+      }
+    | {
+        name: "temperature";
+        units: string;
+      };
   structure_kind:
     | "potential-temperature-latitude-mean-anomaly-shell"
-    | "potential-temperature-climatology-anomaly-shell";
+    | "potential-temperature-climatology-anomaly-shell"
+    | "raw-temperature-midpoint-cold-side-shell";
   geometry_mode: "voxel-faces";
   selection: {
     background:
       | "per-level_latitude-band_mean"
-      | "matched_gridpoint_climatological_theta_mean";
+      | "matched_gridpoint_climatological_theta_mean"
+      | "per-level_smoothed_raw_temperature_midpoint";
     threshold_basis:
       | "per-level_sign-tail_top-percent"
       | "per-level_absolute-anomaly_top-percent"
       | "per-level_absolute-anomaly_top-percent_then_top-component-share"
-      | "per-level_absolute-anomaly_percentile";
+      | "per-level_absolute-anomaly_percentile"
+      | "per-level_smoothed-temperature_midpoint";
     keep_top_percent?: number;
     component_keep_top_percent?: number;
-    absolute_anomaly_percentile: number;
+    absolute_anomaly_percentile?: number;
     smoothing_sigma_cells: number;
     vertical_connection_mode?: string;
     vertical_connection_label?: string;
     core_component_connectivity?: string;
-    keep_signs: ["negative", "positive"];
+    keep_signs: Array<"negative" | "positive">;
     volume_connectivity: string;
     wraps_longitude: true;
   };
@@ -101,9 +109,15 @@ export type PotentialTemperatureStructureMetadata = {
   warm_index_count: number;
   cold_vertex_count: number;
   cold_index_count: number;
-  theta_min: number;
-  theta_max: number;
-  theta_mean: number;
+  field_name: string;
+  field_units: string;
+  field_min: number;
+  field_max: number;
+  field_mean: number;
+  theta_min?: number;
+  theta_max?: number;
+  theta_mean?: number;
+  anomaly_name: string;
   anomaly_min: number;
   anomaly_max: number;
   anomaly_mean: number;
@@ -116,24 +130,32 @@ export type PotentialTemperatureStructureMetadata = {
   longitude_max_deg: number;
   keep_top_percent?: number;
   component_keep_top_percent?: number;
-  absolute_anomaly_percentile: number;
+  absolute_anomaly_percentile?: number;
   smoothing_sigma_cells: number;
   connection_mode?: string;
   selected_voxel_count_before_component_filter?: number;
   core_voxel_count?: number;
   selection: {
-    kept_signs: ["negative", "positive"];
+    kept_signs: Array<"negative" | "positive">;
     keep_top_percent?: number;
     component_keep_top_percent?: number;
     absolute_anomaly_percentile?: number;
     vertical_connection_mode?: string;
     vertical_connection_label?: string;
     core_component_connectivity?: string;
+    threshold_rule?: string;
+    kept_side?: string;
+    polar_cap_cleanup_rule?: string;
     thresholds_by_pressure_level: Array<{
       pressure_hpa: number;
       absolute_anomaly_threshold?: number;
       hot_anomaly_threshold?: number;
       cold_anomaly_threshold?: number;
+      temperature_min?: number;
+      temperature_max?: number;
+      midpoint_temperature?: number;
+      north_polar_edge_row_cleanup_applied?: boolean;
+      south_polar_edge_row_cleanup_applied?: boolean;
       selected_cell_count?: number;
       component_count?: number;
       kept_component_count?: number;

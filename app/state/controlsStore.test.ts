@@ -56,6 +56,14 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(useControls.getState().potentialTemperatureLayer.variant).toBe(
       "bridge-gap-1"
     );
+    expect(useControls.getState().potentialTemperatureLayer.showCellGrid).toBe(
+      false
+    );
+    expect(useControls.getState().airMassLayer.visible).toBe(false);
+    expect(useControls.getState().airMassLayer.opacity).toBe(1);
+    expect(useControls.getState().airMassLayer.variant).toBe(
+      "temperature-rh-latmean"
+    );
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35
     );

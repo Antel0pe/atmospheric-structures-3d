@@ -12,6 +12,8 @@ import {
 
 const LAYER_CLEARANCE = 10.8;
 const LAYER_RENDER_ORDER = 68;
+const CELL_GRID_RADIAL_OFFSET = 0.08;
+const CELL_GRID_OPACITY = 0.82;
 const WARM_PRESSURE_COLOR_BANDS = [
   { minHpa: 850, color: new THREE.Color("#ff5a36") },
   { minHpa: 700, color: new THREE.Color("#ff7f2a") },
@@ -227,6 +229,111 @@ function buildGeometry(
   return geometry;
 }
 
+function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
+  const positionAttribute = geometry.getAttribute("position");
+  const colorAttribute = geometry.getAttribute("color");
+  const indexAttribute = geometry.getIndex();
+  if (
+    !(positionAttribute instanceof THREE.BufferAttribute) ||
+    !(colorAttribute instanceof THREE.BufferAttribute) ||
+    !(indexAttribute instanceof THREE.BufferAttribute)
+  ) {
+    return new THREE.BufferGeometry();
+  }
+
+  const indices = indexAttribute.array;
+  const linePositions: number[] = [];
+  const lineColors: number[] = [];
+  const seenEdges = new Set<string>();
+  const edgeColor = new THREE.Color();
+  const colorA = new THREE.Color();
+  const colorB = new THREE.Color();
+  const edgeHighlight = new THREE.Color(1, 1, 1);
+  const liftedA = new THREE.Vector3();
+  const liftedB = new THREE.Vector3();
+
+  const appendEdge = (startIndex: number, endIndex: number) => {
+    if (startIndex === endIndex) return;
+    const key =
+      startIndex < endIndex
+        ? `${startIndex}:${endIndex}`
+        : `${endIndex}:${startIndex}`;
+    if (seenEdges.has(key)) return;
+    seenEdges.add(key);
+
+    liftedA.fromBufferAttribute(positionAttribute, startIndex);
+    liftedB.fromBufferAttribute(positionAttribute, endIndex);
+    const radiusA = Math.max(liftedA.length(), 1e-6);
+    const radiusB = Math.max(liftedB.length(), 1e-6);
+    liftedA.multiplyScalar((radiusA + CELL_GRID_RADIAL_OFFSET) / radiusA);
+    liftedB.multiplyScalar((radiusB + CELL_GRID_RADIAL_OFFSET) / radiusB);
+
+    linePositions.push(
+      liftedA.x,
+      liftedA.y,
+      liftedA.z,
+      liftedB.x,
+      liftedB.y,
+      liftedB.z
+    );
+
+    colorA.fromBufferAttribute(colorAttribute, startIndex);
+    colorB.fromBufferAttribute(colorAttribute, endIndex);
+    edgeColor.copy(colorA).lerp(colorB, 0.5).lerp(edgeHighlight, 0.38);
+    lineColors.push(
+      edgeColor.r,
+      edgeColor.g,
+      edgeColor.b,
+      edgeColor.r,
+      edgeColor.g,
+      edgeColor.b
+    );
+  };
+
+  for (let index = 0; index + 5 < indices.length; index += 6) {
+    const corner0 = Number(indices[index]);
+    const tri1b = Number(indices[index + 1]);
+    const tri1c = Number(indices[index + 2]);
+    const corner0Repeat = Number(indices[index + 3]);
+    const tri2b = Number(indices[index + 4]);
+    const tri2c = Number(indices[index + 5]);
+    if (corner0 !== corner0Repeat) continue;
+
+    let corner1 = -1;
+    let corner2 = -1;
+    let corner3 = -1;
+
+    if (tri1c === tri2b) {
+      corner1 = tri1b;
+      corner2 = tri1c;
+      corner3 = tri2c;
+    } else if (tri1b === tri2c) {
+      corner1 = tri1c;
+      corner2 = tri1b;
+      corner3 = tri2b;
+    } else {
+      continue;
+    }
+
+    appendEdge(corner0, corner1);
+    appendEdge(corner1, corner2);
+    appendEdge(corner2, corner3);
+    appendEdge(corner3, corner0);
+  }
+
+  const lineGeometry = new THREE.BufferGeometry();
+  lineGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(linePositions), 3)
+  );
+  lineGeometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(new Float32Array(lineColors), 3)
+  );
+  lineGeometry.computeBoundingSphere();
+  return lineGeometry;
+}
+
 export default function PotentialTemperatureStructuresLayer() {
   const layerState = useControls((state) => state.potentialTemperatureLayer);
   const verticalExaggeration = useControls(
@@ -238,21 +345,29 @@ export default function PotentialTemperatureStructuresLayer() {
   const rootRef = useRef<THREE.Group | null>(null);
   const warmMeshRef = useRef<THREE.Mesh | null>(null);
   const coldMeshRef = useRef<THREE.Mesh | null>(null);
+  const warmGridRef = useRef<THREE.LineSegments | null>(null);
+  const coldGridRef = useRef<THREE.LineSegments | null>(null);
   const materialRef = useRef<THREE.MeshLambertMaterial | null>(null);
+  const gridMaterialRef = useRef<THREE.LineBasicMaterial | null>(null);
   const frameRef = useRef<PotentialTemperatureStructureFrame | null>(null);
   const reqIdRef = useRef(0);
 
   const rebuildMesh = useCallback(() => {
     const root = rootRef.current;
     const material = materialRef.current;
+    const gridMaterial = gridMaterialRef.current;
     const frame = frameRef.current;
-    if (!root || !material || !frame) return;
+    if (!root || !material || !gridMaterial || !frame) return;
     root.userData.variant = frame.manifest.variant ?? layerState.variant;
 
     warmMeshRef.current?.removeFromParent();
     warmMeshRef.current?.geometry.dispose();
     coldMeshRef.current?.removeFromParent();
     coldMeshRef.current?.geometry.dispose();
+    warmGridRef.current?.removeFromParent();
+    warmGridRef.current?.geometry.dispose();
+    coldGridRef.current?.removeFromParent();
+    coldGridRef.current?.geometry.dispose();
 
     const warmGeometry = buildGeometry(
       frame,
@@ -267,6 +382,20 @@ export default function PotentialTemperatureStructuresLayer() {
     root.add(warmMesh);
     warmMeshRef.current = warmMesh;
 
+    if (layerState.showCellGrid && warmGeometry.index && warmGeometry.index.count > 0) {
+      const warmGrid = new THREE.LineSegments(
+        buildCellGridGeometry(warmGeometry),
+        gridMaterial
+      );
+      warmGrid.name = "potential-temperature-warm-cell-grid";
+      warmGrid.renderOrder = LAYER_RENDER_ORDER + 1;
+      warmGrid.frustumCulled = false;
+      root.add(warmGrid);
+      warmGridRef.current = warmGrid;
+    } else {
+      warmGridRef.current = null;
+    }
+
     const coldGeometry = buildGeometry(
       frame,
       verticalExaggeration,
@@ -279,7 +408,21 @@ export default function PotentialTemperatureStructuresLayer() {
     coldMesh.frustumCulled = false;
     root.add(coldMesh);
     coldMeshRef.current = coldMesh;
-  }, [layerState.colorMode, verticalExaggeration]);
+
+    if (layerState.showCellGrid && coldGeometry.index && coldGeometry.index.count > 0) {
+      const coldGrid = new THREE.LineSegments(
+        buildCellGridGeometry(coldGeometry),
+        gridMaterial
+      );
+      coldGrid.name = "potential-temperature-cold-cell-grid";
+      coldGrid.renderOrder = LAYER_RENDER_ORDER + 1;
+      coldGrid.frustumCulled = false;
+      root.add(coldGrid);
+      coldGridRef.current = coldGrid;
+    } else {
+      coldGridRef.current = null;
+    }
+  }, [layerState.colorMode, layerState.showCellGrid, layerState.variant, verticalExaggeration]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -287,7 +430,7 @@ export default function PotentialTemperatureStructuresLayer() {
 
     const root = new THREE.Group();
     root.name = "potential-temperature-structures-root";
-    root.visible = layerState.visible;
+    root.visible = false;
     root.renderOrder = LAYER_RENDER_ORDER;
     root.frustumCulled = false;
     sceneRef.current.add(root);
@@ -304,13 +447,28 @@ export default function PotentialTemperatureStructuresLayer() {
     });
     materialRef.current = material;
 
+    const gridMaterial = new THREE.LineBasicMaterial({
+      color: new THREE.Color("#eef4ff"),
+      transparent: true,
+      opacity: CELL_GRID_OPACITY,
+      depthTest: true,
+      depthWrite: false,
+    });
+    gridMaterialRef.current = gridMaterial;
+
     return () => {
       warmMeshRef.current?.geometry.dispose();
       coldMeshRef.current?.geometry.dispose();
+      warmGridRef.current?.geometry.dispose();
+      coldGridRef.current?.geometry.dispose();
       material.dispose();
+      gridMaterial.dispose();
       materialRef.current = null;
+      gridMaterialRef.current = null;
       warmMeshRef.current = null;
       coldMeshRef.current = null;
+      warmGridRef.current = null;
+      coldGridRef.current = null;
       rootRef.current = null;
       root.removeFromParent();
     };
@@ -320,13 +478,15 @@ export default function PotentialTemperatureStructuresLayer() {
     if (!engineReady) return;
     const root = rootRef.current;
     const material = materialRef.current;
-    if (!root || !material) return;
+    const gridMaterial = gridMaterialRef.current;
+    if (!root || !material || !gridMaterial) return;
 
     root.visible = layerState.visible;
     material.transparent = layerState.opacity < 0.999;
     material.opacity = layerState.opacity;
     material.depthWrite = layerState.opacity >= 0.999;
     material.side = THREE.FrontSide;
+    gridMaterial.opacity = Math.max(layerState.opacity * CELL_GRID_OPACITY, 0.12);
     if (frameRef.current) {
       rebuildMesh();
     }

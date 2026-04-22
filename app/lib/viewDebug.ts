@@ -1,4 +1,5 @@
 import type {
+  AirMassClassificationLayerState,
   ExampleContoursLayerState,
   ExampleParticleLayerState,
   ExampleShaderMeshLayerState,
@@ -38,6 +39,7 @@ export type ViewDebugLayerStateSnapshot = {
   precipitationRadarLayer: PrecipitationRadarLayerState;
   precipitableWaterLayer: PrecipitableWaterLayerState;
   potentialTemperatureLayer: PotentialTemperatureLayerState;
+  airMassLayer: AirMassClassificationLayerState;
   relativeHumidityLayer: RelativeHumidityLayerState;
   exampleShaderMeshLayer: ExampleShaderMeshLayerState;
   exampleContoursLayer: ExampleContoursLayerState;
@@ -115,6 +117,7 @@ function isLayerStateSnapshot(value: unknown): value is ViewDebugLayerStateSnaps
     !!candidate.precipitationRadarLayer &&
     !!candidate.precipitableWaterLayer &&
     !!candidate.potentialTemperatureLayer &&
+    !!candidate.airMassLayer &&
     !!candidate.relativeHumidityLayer &&
     !!candidate.exampleShaderMeshLayer &&
     !!candidate.exampleContoursLayer &&

@@ -44,6 +44,7 @@ function buildCase(): ViewDebugCase {
       precipitationRadarLayer: { ...controls.precipitationRadarLayer },
       precipitableWaterLayer: { ...controls.precipitableWaterLayer },
       potentialTemperatureLayer: { ...controls.potentialTemperatureLayer },
+      airMassLayer: { ...controls.airMassLayer },
       relativeHumidityLayer: { ...controls.relativeHumidityLayer },
       exampleShaderMeshLayer: { ...controls.exampleShaderMeshLayer },
       exampleContoursLayer: { ...controls.exampleContoursLayer },

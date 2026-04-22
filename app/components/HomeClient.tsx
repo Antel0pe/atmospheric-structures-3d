@@ -43,6 +43,14 @@ const PotentialTemperatureStructuresLayer = dynamic(
   }
 );
 
+const AirMassClassificationLayer = dynamic(
+  () => import("./layers/AirMassClassificationLayer"),
+  {
+    ssr: false,
+    loading: () => <div style={{ width: "100%", height: "100%" }} />,
+  }
+);
+
 const PrecipitationRadarLayer = dynamic(
   () => import("./layers/PrecipitationRadarLayer"),
   {
@@ -144,6 +152,7 @@ export default function HomeClient() {
           <RelativeHumidityVoxelLayer />
           <PrecipitableWaterProxyLayer />
           <PotentialTemperatureStructuresLayer />
+          <AirMassClassificationLayer />
           <ExampleShaderMeshLayer />
           <ExampleContoursLayer />
           <ExampleParticleLayer heightTex={null} />

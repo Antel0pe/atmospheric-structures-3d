@@ -55,11 +55,18 @@ DEFAULT_KEEP_TOP_PERCENT = 5.0
 DEFAULT_SMOOTHING_SIGMA_CELLS = 1.0
 DEFAULT_CONNECTION_MODE = "bridge-gap-1"
 COMPONENT_CORE_SIGN_GROWTH_MODE = "top10-components-sign-growth"
-CONNECTION_MODE_CHOICES = (
+RAW_T_MIDPOINT_COLD_SIDE_VARIANT = "raw-temperature-midpoint-cold-side"
+RAW_T_MIDPOINT_POLAR_CLEANUP_RULE = (
+    "Only if a pole-most latitude row is mixed after thresholding, resolve the full "
+    "row from the row-mean smoothed temperature relative to T_mid; otherwise leave "
+    "the midpoint mask unchanged."
+)
+VARIANT_CHOICES = (
     "bridge-gap-1",
     "bridge-gap-2",
     "fill-between-anchors",
     COMPONENT_CORE_SIGN_GROWTH_MODE,
+    RAW_T_MIDPOINT_COLD_SIDE_VARIANT,
 )
 
 
@@ -157,7 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--connection-mode",
         type=str,
-        choices=CONNECTION_MODE_CHOICES,
+        choices=VARIANT_CHOICES,
         default=DEFAULT_CONNECTION_MODE,
         help=(
             "Variant recipe applied after the climatology anomaly is built. "
@@ -165,7 +172,9 @@ def parse_args() -> argparse.Namespace:
             "while top10-components-sign-growth uses an exact per-level top-"
             "percent absolute-anomaly core, keeps only the largest per-level "
             "components, and then grows columns upward and downward until the "
-            "raw anomaly sign flips."
+            "raw anomaly sign flips. raw-temperature-midpoint-cold-side skips "
+            "the dry-theta anomaly path entirely and instead keeps the cold side "
+            "of the per-level smoothed raw-temperature midpoint contour."
         ),
     )
     parser.add_argument(
@@ -382,6 +391,64 @@ def build_climatology_mean_anomaly(
     return np.asarray(theta_field - climatology_theta_mean, dtype=np.float32)
 
 
+def smooth_raw_temperature_levels(
+    temperature_field: np.ndarray,
+    smoothing_sigma_cells: float,
+) -> np.ndarray:
+    sigma = max(float(smoothing_sigma_cells), 0.0)
+    if sigma <= 0.0:
+        return np.asarray(temperature_field, dtype=np.float32)
+
+    return np.asarray(
+        ndimage.gaussian_filter(
+            np.asarray(temperature_field, dtype=np.float32),
+            sigma=(0.0, sigma, sigma),
+            mode=("nearest", "nearest", "wrap"),
+            truncate=2.0,
+        ),
+        dtype=np.float32,
+    )
+
+
+def build_raw_temperature_midpoint_cold_mask(
+    smoothed_temperature: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    level_min = np.asarray(np.min(smoothed_temperature, axis=(1, 2)), dtype=np.float32)
+    level_max = np.asarray(np.max(smoothed_temperature, axis=(1, 2)), dtype=np.float32)
+    midpoint_temperature = np.asarray(0.5 * (level_min + level_max), dtype=np.float32)
+    cold_mask = np.asarray(
+        smoothed_temperature <= midpoint_temperature[:, None, None],
+        dtype=bool,
+    )
+    return cold_mask, level_min, level_max, midpoint_temperature
+
+
+def cohere_mixed_polar_edge_rows(
+    cold_mask: np.ndarray,
+    smoothed_temperature: np.ndarray,
+    midpoint_temperature: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    cleaned_mask = np.asarray(cold_mask, dtype=bool).copy()
+    north_row_changed = np.zeros(cold_mask.shape[0], dtype=bool)
+    south_row_changed = np.zeros(cold_mask.shape[0], dtype=bool)
+
+    for level_index in range(cleaned_mask.shape[0]):
+        for row_index, changed_flags in ((0, north_row_changed), (-1, south_row_changed)):
+            row = cleaned_mask[level_index, row_index]
+            cold_count = int(np.count_nonzero(row))
+            if cold_count <= 0 or cold_count >= row.size:
+                continue
+
+            row_mean_temperature = float(
+                np.mean(smoothed_temperature[level_index, row_index], dtype=np.float64)
+            )
+            keep_cold = row_mean_temperature <= float(midpoint_temperature[level_index])
+            cleaned_mask[level_index, row_index] = keep_cold
+            changed_flags[level_index] = True
+
+    return cleaned_mask, north_row_changed, south_row_changed
+
+
 def resolve_keep_top_percent(
     keep_top_percent: float,
     absolute_anomaly_percentile: float | None,
@@ -549,7 +616,7 @@ def apply_vertical_connection_mode(
     selected_anomaly: np.ndarray,
     connection_mode: str,
 ) -> tuple[np.ndarray, np.ndarray]:
-    if connection_mode not in CONNECTION_MODE_CHOICES:
+    if connection_mode not in VARIANT_CHOICES:
         raise ValueError(f"Unsupported connection mode: {connection_mode}")
 
     if connection_mode == "bridge-gap-1":
@@ -893,22 +960,22 @@ def summarize_signed_components(sign_field: np.ndarray) -> dict[str, Any]:
 def build_asset_payload(
     *,
     timestamp: str,
-    theta_field: np.ndarray,
-    selected_anomaly: np.ndarray,
+    scalar_field: np.ndarray,
+    scalar_field_name: str,
+    scalar_field_units: str,
+    anomaly_label: str,
     selected_voxel_count_before_connection_fill: int,
     smoothed_anomaly_values: np.ndarray,
     sign_field: np.ndarray,
     pressure_levels_hpa: np.ndarray,
     latitudes_deg: np.ndarray,
     longitudes_deg: np.ndarray,
-    keep_top_percent: float,
-    absolute_anomaly_percentile: float,
+    keep_top_percent: float | None,
+    absolute_anomaly_percentile: float | None,
     smoothing_sigma_cells: float,
     variant_name: str,
     selection_thresholds_by_pressure_level: list[dict[str, Any]],
     selection_summary: dict[str, Any],
-    base_radius: float,
-    vertical_span: float,
     connection_fill_mask: np.ndarray,
     single_level_removal_summary: dict[str, int],
     extra_metadata: dict[str, Any] | None = None,
@@ -936,9 +1003,30 @@ def build_asset_payload(
     pressure_indices = occupied_coords[:, 0]
     latitude_indices = occupied_coords[:, 1]
     longitude_indices = occupied_coords[:, 2]
-    kept_theta = np.asarray(theta_field[keep_mask], dtype=np.float32)
+    kept_scalar = np.asarray(scalar_field[keep_mask], dtype=np.float32)
     kept_anomaly = np.asarray(smoothed_anomaly_values[keep_mask], dtype=np.float32)
     component_summary = summarize_signed_components(sign_field)
+    field_min = float(np.min(kept_scalar))
+    field_max = float(np.max(kept_scalar))
+    field_mean = float(np.mean(kept_scalar))
+
+    kept_signs: list[str] = []
+    if np.any(sign_field < 0):
+        kept_signs.append("negative")
+    if np.any(sign_field > 0):
+        kept_signs.append("positive")
+
+    selection_metadata: dict[str, Any] = {
+        "kept_signs": kept_signs,
+        **selection_summary,
+        "thresholds_by_pressure_level": selection_thresholds_by_pressure_level,
+    }
+    if keep_top_percent is not None:
+        selection_metadata["keep_top_percent"] = float(keep_top_percent)
+    if absolute_anomaly_percentile is not None:
+        selection_metadata["absolute_anomaly_percentile"] = float(
+            absolute_anomaly_percentile
+        )
 
     metadata = {
         **component_summary,
@@ -963,9 +1051,12 @@ def build_asset_payload(
         "warm_index_count": int(warm_mesh.indices.size),
         "cold_vertex_count": int(cold_mesh.vertex_count),
         "cold_index_count": int(cold_mesh.indices.size),
-        "theta_min": float(np.min(kept_theta)),
-        "theta_max": float(np.max(kept_theta)),
-        "theta_mean": float(np.mean(kept_theta)),
+        "field_name": scalar_field_name,
+        "field_units": scalar_field_units,
+        "field_min": field_min,
+        "field_max": field_max,
+        "field_mean": field_mean,
+        "anomaly_name": anomaly_label,
         "anomaly_min": float(np.min(kept_anomaly)),
         "anomaly_max": float(np.max(kept_anomaly)),
         "anomaly_mean": float(np.mean(kept_anomaly)),
@@ -976,18 +1067,22 @@ def build_asset_payload(
         "latitude_max_deg": float(np.max(latitudes_deg[latitude_indices])),
         "longitude_min_deg": float(np.min(longitudes_deg[longitude_indices])),
         "longitude_max_deg": float(np.max(longitudes_deg[longitude_indices])),
-        "keep_top_percent": float(keep_top_percent),
-        "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
         "smoothing_sigma_cells": float(smoothing_sigma_cells),
         "connection_mode": variant_name,
-        "selection": {
-            "kept_signs": ["negative", "positive"],
-            "keep_top_percent": float(keep_top_percent),
-            "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
-            **selection_summary,
-            "thresholds_by_pressure_level": selection_thresholds_by_pressure_level,
-        },
+        "selection": selection_metadata,
     }
+    if keep_top_percent is not None:
+        metadata["keep_top_percent"] = float(keep_top_percent)
+    if absolute_anomaly_percentile is not None:
+        metadata["absolute_anomaly_percentile"] = float(absolute_anomaly_percentile)
+    if scalar_field_name == DERIVED_VARIABLE_NAME:
+        metadata.update(
+            {
+                "theta_min": field_min,
+                "theta_max": field_max,
+                "theta_mean": field_mean,
+            }
+        )
     if extra_metadata:
         metadata.update(extra_metadata)
 
@@ -1000,7 +1095,6 @@ def build_asset_payload(
         voxel_count=total_voxel_count,
         metadata=metadata,
     )
-
 
 def maybe_flip_triangle_winding(indices: np.ndarray) -> np.ndarray:
     normalized = np.asarray(indices, dtype=np.uint32).copy()
@@ -1077,12 +1171,15 @@ def write_frame(
 def build_manifest(
     *,
     contents: DatasetContents,
-    climatology_dataset_name: str,
     entries: list[dict[str, Any]],
     variant_name: str,
+    structure_kind: str,
+    derived_variable: dict[str, Any],
+    selection_background: str,
     threshold_basis: str,
-    keep_top_percent: float,
-    absolute_anomaly_percentile: float,
+    keep_signs: list[str],
+    keep_top_percent: float | None,
+    absolute_anomaly_percentile: float | None,
     smoothing_sigma_cells: float,
     selection_summary: dict[str, Any],
     pressure_min_hpa: float,
@@ -1094,37 +1191,37 @@ def build_manifest(
     pressure_levels_hpa: np.ndarray,
     base_radius: float,
     vertical_span: float,
+    climatology_dataset_name: str | None = None,
+    sampling_method: str = "subsample_centers",
 ) -> dict[str, Any]:
-    return {
+    selection = {
+        "background": selection_background,
+        "threshold_basis": threshold_basis,
+        "smoothing_sigma_cells": float(smoothing_sigma_cells),
+        "keep_signs": keep_signs,
+        **selection_summary,
+        "volume_connectivity": "26-connected-same-sign",
+        "wraps_longitude": True,
+    }
+    if keep_top_percent is not None:
+        selection["keep_top_percent"] = float(keep_top_percent)
+    if absolute_anomaly_percentile is not None:
+        selection["absolute_anomaly_percentile"] = float(absolute_anomaly_percentile)
+
+    manifest = {
         "version": OUTPUT_VERSION,
         "dataset": contents.dataset_path.name,
-        "climatology_dataset": climatology_dataset_name,
         "variable": TEMPERATURE_VARIABLE,
         "units": contents.units,
         "variant": variant_name,
-        "derived_variable": {
-            "name": DERIVED_VARIABLE_NAME,
-            "units": DERIVED_UNITS,
-            "reference_pressure_hpa": REFERENCE_PRESSURE_HPA,
-            "kappa": POTENTIAL_TEMPERATURE_KAPPA,
-        },
-        "structure_kind": "potential-temperature-climatology-anomaly-shell",
+        "derived_variable": derived_variable,
+        "structure_kind": structure_kind,
         "geometry_mode": "voxel-faces",
-        "selection": {
-            "background": "matched_gridpoint_climatological_theta_mean",
-            "threshold_basis": threshold_basis,
-            "keep_top_percent": float(keep_top_percent),
-            "absolute_anomaly_percentile": float(absolute_anomaly_percentile),
-            "smoothing_sigma_cells": float(smoothing_sigma_cells),
-            "keep_signs": ["negative", "positive"],
-            **selection_summary,
-            "volume_connectivity": "26-connected-same-sign",
-            "wraps_longitude": True,
-        },
+        "selection": selection,
         "sampling": {
             "latitude_stride": int(max(latitude_stride, 1)),
             "longitude_stride": int(max(longitude_stride, 1)),
-            "method": "subsample_centers",
+            "method": sampling_method,
         },
         "pressure_window_hpa": {
             "min": float(min(pressure_min_hpa, pressure_max_hpa)),
@@ -1145,43 +1242,86 @@ def build_manifest(
         },
         "timestamps": entries,
     }
-
+    if climatology_dataset_name is not None:
+        manifest["climatology_dataset"] = climatology_dataset_name
+    return manifest
 
 def main() -> None:
     args = parse_args()
     variant_name = args.connection_mode
     is_component_core_sign_growth = variant_name == COMPONENT_CORE_SIGN_GROWTH_MODE
-    keep_top_percent, absolute_anomaly_percentile = resolve_keep_top_percent(
-        keep_top_percent=args.keep_top_percent,
-        absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+    is_raw_temperature_midpoint_variant = (
+        variant_name == RAW_T_MIDPOINT_COLD_SIDE_VARIANT
     )
-    effective_smoothing_sigma_cells = (
-        0.0 if is_component_core_sign_growth else float(args.smoothing_sigma_cells)
-    )
+
+    if is_raw_temperature_midpoint_variant:
+        pressure_window = (
+            float(min(args.pressure_min_hpa, args.pressure_max_hpa)),
+            float(max(args.pressure_min_hpa, args.pressure_max_hpa)),
+        )
+        if pressure_window != (250.0, 1000.0):
+            raise ValueError(
+                "raw-temperature-midpoint-cold-side requires the 250-1000 hPa pressure window."
+            )
+        requested_sigma = float(args.smoothing_sigma_cells)
+        if not np.isclose(requested_sigma, 2.0):
+            raise ValueError(
+                "raw-temperature-midpoint-cold-side requires --smoothing-sigma-cells 2.0."
+            )
+        keep_top_percent = None
+        absolute_anomaly_percentile = None
+        effective_smoothing_sigma_cells = 2.0
+    else:
+        keep_top_percent, absolute_anomaly_percentile = resolve_keep_top_percent(
+            keep_top_percent=args.keep_top_percent,
+            absolute_anomaly_percentile=args.absolute_anomaly_percentile,
+        )
+        effective_smoothing_sigma_cells = (
+            0.0 if is_component_core_sign_growth else float(args.smoothing_sigma_cells)
+        )
+
     dataset_path = resolve_dataset_path(args.dataset)
-    climatology_path = resolve_dataset_path(args.climatology)
     contents = load_dataset_contents(dataset_path)
-    (
-        climatology_theta_mean,
-        climatology_pressure_levels_hpa,
-        climatology_latitudes_deg,
-        climatology_longitudes_deg,
-    ) = load_climatology_theta_mean(
-        climatology_path,
-        contents.longitude_order,
-    )
-    if not np.array_equal(climatology_pressure_levels_hpa, contents.pressure_levels_hpa):
-        raise ValueError(
-            "Climatology pressure levels do not match the source temperature dataset."
+
+    climatology_path: Path | None = None
+    strided_climatology_pressure_window: np.ndarray | None = None
+    if not is_raw_temperature_midpoint_variant:
+        climatology_path = resolve_dataset_path(args.climatology)
+        (
+            climatology_theta_mean,
+            climatology_pressure_levels_hpa,
+            climatology_latitudes_deg,
+            climatology_longitudes_deg,
+        ) = load_climatology_theta_mean(
+            climatology_path,
+            contents.longitude_order,
         )
-    if not np.array_equal(climatology_latitudes_deg, contents.latitudes_deg):
-        raise ValueError(
-            "Climatology latitudes do not match the source temperature dataset."
+        if not np.array_equal(climatology_pressure_levels_hpa, contents.pressure_levels_hpa):
+            raise ValueError(
+                "Climatology pressure levels do not match the source temperature dataset."
+            )
+        if not np.array_equal(climatology_latitudes_deg, contents.latitudes_deg):
+            raise ValueError(
+                "Climatology latitudes do not match the source temperature dataset."
+            )
+        if not np.array_equal(climatology_longitudes_deg, contents.longitudes_deg):
+            raise ValueError(
+                "Climatology longitudes do not match the source temperature dataset."
+            )
+        climatology_pressure_window, _ = select_pressure_window(
+            climatology_theta_mean,
+            contents.pressure_levels_hpa,
+            pressure_min_hpa=args.pressure_min_hpa,
+            pressure_max_hpa=args.pressure_max_hpa,
         )
-    if not np.array_equal(climatology_longitudes_deg, contents.longitudes_deg):
-        raise ValueError(
-            "Climatology longitudes do not match the source temperature dataset."
+        strided_climatology_pressure_window, _, _ = stride_spatial_axes(
+            climatology_pressure_window,
+            contents.latitudes_deg,
+            contents.longitudes_deg,
+            latitude_stride=args.latitude_stride,
+            longitude_stride=args.longitude_stride,
         )
+
     target_timestamps = resolve_target_timestamps(
         contents.timestamps,
         args.include_timestamps,
@@ -1209,64 +1349,70 @@ def main() -> None:
                 np.asarray(variable[time_index, :, :, :], dtype=np.float32),
                 contents.longitude_order,
             )
-            temperature_field, strided_latitudes_deg, strided_longitudes_deg = stride_spatial_axes(
-                temperature_field,
-                contents.latitudes_deg,
-                contents.longitudes_deg,
-                latitude_stride=args.latitude_stride,
-                longitude_stride=args.longitude_stride,
-            )
             pressure_window_field, pressure_window_levels_hpa = select_pressure_window(
                 temperature_field,
                 contents.pressure_levels_hpa,
                 pressure_min_hpa=args.pressure_min_hpa,
                 pressure_max_hpa=args.pressure_max_hpa,
             )
-            theta_field = compute_dry_potential_temperature(
+            (
+                strided_pressure_window_field,
+                strided_latitudes_deg,
+                strided_longitudes_deg,
+            ) = stride_spatial_axes(
                 pressure_window_field,
-                pressure_window_levels_hpa,
+                contents.latitudes_deg,
+                contents.longitudes_deg,
+                latitude_stride=args.latitude_stride,
+                longitude_stride=args.longitude_stride,
             )
-            climatology_pressure_window, _ = select_pressure_window(
-                climatology_theta_mean,
-                contents.pressure_levels_hpa,
-                pressure_min_hpa=args.pressure_min_hpa,
-                pressure_max_hpa=args.pressure_max_hpa,
-            )
-            anomaly = build_climatology_mean_anomaly(
-                theta_field,
-                climatology_pressure_window[:, :: max(int(args.latitude_stride), 1), :: max(int(args.longitude_stride), 1)],
-            )
-            selection_summary = {
-                "min_component_pressure_span_levels": 2,
-            }
-            extra_metadata: dict[str, Any] = {}
 
-            if is_component_core_sign_growth:
-                (
-                    selected_top_percent_anomaly,
-                    selected_top_percent_mask,
-                    absolute_anomaly_thresholds_by_level,
-                    selected_cell_counts_by_level,
-                    resolved_keep_top_percent,
-                ) = build_exact_top_percent_selected_anomaly(
-                    anomaly,
-                    keep_top_percent=keep_top_percent,
+            if is_raw_temperature_midpoint_variant:
+                smoothed_temperature = smooth_raw_temperature_levels(
+                    pressure_window_field,
+                    smoothing_sigma_cells=effective_smoothing_sigma_cells,
                 )
                 (
-                    core_anomaly,
-                    core_mask,
-                    component_level_metadata,
-                ) = keep_largest_planar_component_share_per_level(
-                    anomaly,
-                    selected_top_percent_mask,
-                    component_keep_top_percent=resolved_keep_top_percent,
+                    cold_mask,
+                    level_temperature_min,
+                    level_temperature_max,
+                    midpoint_temperature,
+                ) = build_raw_temperature_midpoint_cold_mask(smoothed_temperature)
+                (
+                    cold_mask,
+                    north_row_changed,
+                    south_row_changed,
+                ) = cohere_mixed_polar_edge_rows(
+                    cold_mask,
+                    smoothed_temperature,
+                    midpoint_temperature,
                 )
-                selected_anomaly, connection_fill_mask = grow_core_columns_by_sign(
-                    anomaly,
-                    core_mask,
+                strided_smoothed_temperature, _, _ = stride_spatial_axes(
+                    smoothed_temperature,
+                    contents.latitudes_deg,
+                    contents.longitudes_deg,
+                    latitude_stride=args.latitude_stride,
+                    longitude_stride=args.longitude_stride,
                 )
-                smoothed_anomaly_values = np.asarray(selected_anomaly, dtype=np.float32)
-                sign_field = np.sign(smoothed_anomaly_values).astype(np.int8)
+                strided_cold_mask_uint8, _, _ = stride_spatial_axes(
+                    cold_mask.astype(np.uint8),
+                    contents.latitudes_deg,
+                    contents.longitudes_deg,
+                    latitude_stride=args.latitude_stride,
+                    longitude_stride=args.longitude_stride,
+                )
+                strided_cold_mask = np.asarray(strided_cold_mask_uint8, dtype=bool)
+                midpoint_delta = np.asarray(
+                    strided_smoothed_temperature - midpoint_temperature[:, None, None],
+                    dtype=np.float32,
+                )
+                selected_anomaly = np.where(strided_cold_mask, midpoint_delta, 0.0).astype(
+                    np.float32
+                )
+                smoothed_anomaly_values = selected_anomaly.copy()
+                sign_field = np.zeros_like(selected_anomaly, dtype=np.int8)
+                sign_field[strided_cold_mask] = -1
+                connection_fill_mask = np.zeros_like(strided_cold_mask, dtype=bool)
                 single_level_removal_summary = {
                     "removed_component_count": 0,
                     "removed_positive_component_count": 0,
@@ -1275,131 +1421,240 @@ def main() -> None:
                     "removed_positive_voxel_count": 0,
                     "removed_negative_voxel_count": 0,
                 }
-                selection_thresholds_by_pressure_level = [
-                    {
-                        "pressure_hpa": float(pressure_hpa),
-                        "absolute_anomaly_threshold": float(absolute_threshold),
-                        "selected_cell_count": int(selected_cell_count),
-                        "component_count": int(level_meta["component_count"]),
-                        "kept_component_count": int(level_meta["kept_component_count"]),
-                        "kept_component_size_threshold": int(
-                            level_meta["kept_component_size_threshold"]
-                        ),
-                        "largest_component_size": int(level_meta["largest_component_size"]),
-                        "largest_kept_component_size": int(
-                            level_meta["largest_kept_component_size"]
-                        ),
-                    }
-                    for pressure_hpa, absolute_threshold, selected_cell_count, level_meta in zip(
-                        pressure_window_levels_hpa.tolist(),
-                        absolute_anomaly_thresholds_by_level.tolist(),
-                        selected_cell_counts_by_level.tolist(),
-                        component_level_metadata,
-                        strict=True,
-                    )
-                ]
-                selection_summary.update(
-                    {
-                        "threshold_basis": "per-level_absolute-anomaly_top-percent_then_top-component-share",
-                        "component_keep_top_percent": float(resolved_keep_top_percent),
-                        "core_component_connectivity": "4-connected-with-longitude-wrap",
-                        "vertical_connection_mode": variant_name,
-                        "vertical_connection_label": vertical_connection_mode_label(
-                            variant_name
-                        ),
-                        "min_component_pressure_span_levels": 1,
-                    }
-                )
-                extra_metadata.update(
-                    {
-                        "selected_voxel_count_before_component_filter": int(
-                            np.count_nonzero(selected_top_percent_mask)
-                        ),
-                        "core_voxel_count": int(np.count_nonzero(core_mask)),
-                    }
-                )
-                selected_voxel_count_before_connection_fill = int(np.count_nonzero(core_mask))
-            else:
-                (
-                    selected_top_percent_anomaly,
-                    _,
-                    hot_anomaly_thresholds_by_level,
-                    cold_anomaly_thresholds_by_level,
-                    _,
-                    resolved_keep_top_percent,
-                ) = build_sign_tail_selected_anomaly(
-                    anomaly,
-                    keep_top_percent=keep_top_percent,
-                )
-                selected_anomaly, connection_fill_mask = apply_vertical_connection_mode(
-                    anomaly,
-                    selected_top_percent_anomaly,
-                    connection_mode=variant_name,
-                )
-                smoothed_anomaly_values, sign_field = smooth_selected_sign_anomaly(
-                    selected_anomaly,
-                    smoothing_sigma_cells=effective_smoothing_sigma_cells,
-                )
-                (
-                    smoothed_anomaly_values,
-                    sign_field,
-                    single_level_removal_summary,
-                ) = remove_single_level_components(
-                    smoothed_anomaly_values,
-                    sign_field,
-                )
-                selection_thresholds_by_pressure_level = [
-                    {
-                        "pressure_hpa": float(pressure_hpa),
-                        "hot_anomaly_threshold": float(hot_threshold),
-                        "cold_anomaly_threshold": float(cold_threshold),
-                    }
-                    for pressure_hpa, hot_threshold, cold_threshold in zip(
-                        pressure_window_levels_hpa.tolist(),
-                        hot_anomaly_thresholds_by_level.tolist(),
-                        cold_anomaly_thresholds_by_level.tolist(),
-                        strict=True,
-                    )
-                ]
-                selection_summary.update(
-                    {
-                        "vertical_connection_mode": variant_name,
-                        "vertical_connection_label": vertical_connection_mode_label(
-                            variant_name
-                        ),
-                    }
-                )
                 selected_voxel_count_before_connection_fill = int(
-                    np.count_nonzero(np.abs(selected_top_percent_anomaly) > 0.0)
+                    np.count_nonzero(strided_cold_mask)
                 )
+                selection_thresholds_by_pressure_level = [
+                    {
+                        "pressure_hpa": float(pressure_hpa),
+                        "temperature_min": float(level_min),
+                        "temperature_max": float(level_max),
+                        "midpoint_temperature": float(level_mid),
+                        "north_polar_edge_row_cleanup_applied": bool(north_row_changed[level_index]),
+                        "south_polar_edge_row_cleanup_applied": bool(south_row_changed[level_index]),
+                    }
+                    for level_index, (pressure_hpa, level_min, level_max, level_mid) in enumerate(
+                        zip(
+                            pressure_window_levels_hpa.tolist(),
+                            level_temperature_min.tolist(),
+                            level_temperature_max.tolist(),
+                            midpoint_temperature.tolist(),
+                            strict=True,
+                        )
+                    )
+                ]
+                selection_summary = {
+                    "threshold_rule": "per-level T_mid = 0.5 * (T_min + T_max) on the horizontally smoothed raw-temperature field",
+                    "kept_side": "cold_side_where_smoothed_temperature_is_less_than_or_equal_to_T_mid",
+                    "polar_cap_cleanup_rule": RAW_T_MIDPOINT_POLAR_CLEANUP_RULE,
+                    "north_polar_edge_row_cleanup_count": int(np.count_nonzero(north_row_changed)),
+                    "south_polar_edge_row_cleanup_count": int(np.count_nonzero(south_row_changed)),
+                    "min_component_pressure_span_levels": 1,
+                }
+                extra_metadata = {
+                    "source_dataset": contents.dataset_path.name,
+                    "source_timestamp": timestamp,
+                    "field_source": "raw_temperature",
+                    "native_selected_voxel_count": int(np.count_nonzero(cold_mask)),
+                    "sampled_selected_voxel_count": int(np.count_nonzero(strided_cold_mask)),
+                    "pressure_window_rule": "1000-250 hPa inclusive",
+                }
+                scalar_field = strided_pressure_window_field
+                scalar_field_name = "temperature"
+                scalar_field_units = contents.units
+                anomaly_label = "smoothed_temperature_minus_level_midpoint"
+            else:
+                theta_field = compute_dry_potential_temperature(
+                    strided_pressure_window_field,
+                    pressure_window_levels_hpa,
+                )
+                if strided_climatology_pressure_window is None:
+                    raise ValueError("Missing strided climatology window for anomaly build.")
+                anomaly = build_climatology_mean_anomaly(
+                    theta_field,
+                    strided_climatology_pressure_window,
+                )
+                selection_summary = {
+                    "min_component_pressure_span_levels": 2,
+                }
+                extra_metadata: dict[str, Any] = {}
+
+                if is_component_core_sign_growth:
+                    (
+                        selected_top_percent_anomaly,
+                        selected_top_percent_mask,
+                        absolute_anomaly_thresholds_by_level,
+                        selected_cell_counts_by_level,
+                        resolved_keep_top_percent,
+                    ) = build_exact_top_percent_selected_anomaly(
+                        anomaly,
+                        keep_top_percent=keep_top_percent,
+                    )
+                    (
+                        core_anomaly,
+                        core_mask,
+                        component_level_metadata,
+                    ) = keep_largest_planar_component_share_per_level(
+                        anomaly,
+                        selected_top_percent_mask,
+                        component_keep_top_percent=resolved_keep_top_percent,
+                    )
+                    selected_anomaly, connection_fill_mask = grow_core_columns_by_sign(
+                        anomaly,
+                        core_mask,
+                    )
+                    smoothed_anomaly_values = np.asarray(selected_anomaly, dtype=np.float32)
+                    sign_field = np.sign(smoothed_anomaly_values).astype(np.int8)
+                    single_level_removal_summary = {
+                        "removed_component_count": 0,
+                        "removed_positive_component_count": 0,
+                        "removed_negative_component_count": 0,
+                        "removed_voxel_count": 0,
+                        "removed_positive_voxel_count": 0,
+                        "removed_negative_voxel_count": 0,
+                    }
+                    selection_thresholds_by_pressure_level = [
+                        {
+                            "pressure_hpa": float(pressure_hpa),
+                            "absolute_anomaly_threshold": float(absolute_threshold),
+                            "selected_cell_count": int(selected_cell_count),
+                            "component_count": int(level_meta["component_count"]),
+                            "kept_component_count": int(level_meta["kept_component_count"]),
+                            "kept_component_size_threshold": int(
+                                level_meta["kept_component_size_threshold"]
+                            ),
+                            "largest_component_size": int(level_meta["largest_component_size"]),
+                            "largest_kept_component_size": int(
+                                level_meta["largest_kept_component_size"]
+                            ),
+                        }
+                        for pressure_hpa, absolute_threshold, selected_cell_count, level_meta in zip(
+                            pressure_window_levels_hpa.tolist(),
+                            absolute_anomaly_thresholds_by_level.tolist(),
+                            selected_cell_counts_by_level.tolist(),
+                            component_level_metadata,
+                            strict=True,
+                        )
+                    ]
+                    selection_summary.update(
+                        {
+                            "threshold_basis": "per-level_absolute-anomaly_top-percent_then_top-component-share",
+                            "component_keep_top_percent": float(resolved_keep_top_percent),
+                            "core_component_connectivity": "4-connected-with-longitude-wrap",
+                            "vertical_connection_mode": variant_name,
+                            "vertical_connection_label": vertical_connection_mode_label(
+                                variant_name
+                            ),
+                            "min_component_pressure_span_levels": 1,
+                        }
+                    )
+                    extra_metadata.update(
+                        {
+                            "selected_voxel_count_before_component_filter": int(
+                                np.count_nonzero(selected_top_percent_mask)
+                            ),
+                            "core_voxel_count": int(np.count_nonzero(core_mask)),
+                        }
+                    )
+                    selected_voxel_count_before_connection_fill = int(
+                        np.count_nonzero(core_mask)
+                    )
+                else:
+                    (
+                        selected_top_percent_anomaly,
+                        _,
+                        hot_anomaly_thresholds_by_level,
+                        cold_anomaly_thresholds_by_level,
+                        _,
+                        resolved_keep_top_percent,
+                    ) = build_sign_tail_selected_anomaly(
+                        anomaly,
+                        keep_top_percent=keep_top_percent,
+                    )
+                    selected_anomaly, connection_fill_mask = apply_vertical_connection_mode(
+                        anomaly,
+                        selected_top_percent_anomaly,
+                        connection_mode=variant_name,
+                    )
+                    smoothed_anomaly_values, sign_field = smooth_selected_sign_anomaly(
+                        selected_anomaly,
+                        smoothing_sigma_cells=effective_smoothing_sigma_cells,
+                    )
+                    (
+                        smoothed_anomaly_values,
+                        sign_field,
+                        single_level_removal_summary,
+                    ) = remove_single_level_components(
+                        smoothed_anomaly_values,
+                        sign_field,
+                    )
+                    selection_thresholds_by_pressure_level = [
+                        {
+                            "pressure_hpa": float(pressure_hpa),
+                            "hot_anomaly_threshold": float(hot_threshold),
+                            "cold_anomaly_threshold": float(cold_threshold),
+                        }
+                        for pressure_hpa, hot_threshold, cold_threshold in zip(
+                            pressure_window_levels_hpa.tolist(),
+                            hot_anomaly_thresholds_by_level.tolist(),
+                            cold_anomaly_thresholds_by_level.tolist(),
+                            strict=True,
+                        )
+                    ]
+                    selection_summary.update(
+                        {
+                            "vertical_connection_mode": variant_name,
+                            "vertical_connection_label": vertical_connection_mode_label(
+                                variant_name
+                            ),
+                        }
+                    )
+                    selected_voxel_count_before_connection_fill = int(
+                        np.count_nonzero(np.abs(selected_top_percent_anomaly) > 0.0)
+                    )
+
+                if not np.any(sign_field):
+                    print(
+                        "Skipped potential temperature frame after smoothing:",
+                        timestamp,
+                        f"keep_top_percent={resolved_keep_top_percent}",
+                        f"absolute_anomaly_percentile={absolute_anomaly_percentile}",
+                        f"smoothing_sigma_cells={effective_smoothing_sigma_cells}",
+                    )
+                    continue
+
+                scalar_field = theta_field
+                scalar_field_name = DERIVED_VARIABLE_NAME
+                scalar_field_units = DERIVED_UNITS
+                anomaly_label = "dry_potential_temperature_anomaly_from_matched_climatology"
+                keep_top_percent = resolved_keep_top_percent
+
             if not np.any(sign_field):
                 print(
                     "Skipped potential temperature frame after smoothing:",
                     timestamp,
-                    f"keep_top_percent={resolved_keep_top_percent}",
-                    f"absolute_anomaly_percentile={absolute_anomaly_percentile}",
                     f"smoothing_sigma_cells={effective_smoothing_sigma_cells}",
                 )
                 continue
 
             payload = build_asset_payload(
                 timestamp=timestamp,
-                theta_field=theta_field,
-                selected_anomaly=selected_anomaly,
+                scalar_field=scalar_field,
+                scalar_field_name=scalar_field_name,
+                scalar_field_units=scalar_field_units,
+                anomaly_label=anomaly_label,
                 selected_voxel_count_before_connection_fill=selected_voxel_count_before_connection_fill,
                 smoothed_anomaly_values=smoothed_anomaly_values,
                 sign_field=sign_field,
                 pressure_levels_hpa=pressure_window_levels_hpa,
                 latitudes_deg=strided_latitudes_deg,
                 longitudes_deg=strided_longitudes_deg,
-                keep_top_percent=resolved_keep_top_percent,
+                keep_top_percent=keep_top_percent,
                 absolute_anomaly_percentile=absolute_anomaly_percentile,
                 smoothing_sigma_cells=effective_smoothing_sigma_cells,
                 variant_name=variant_name,
                 selection_thresholds_by_pressure_level=selection_thresholds_by_pressure_level,
                 selection_summary=selection_summary,
-                base_radius=args.base_radius,
-                vertical_span=args.vertical_span,
                 connection_fill_mask=connection_fill_mask,
                 single_level_removal_summary=single_level_removal_summary,
                 extra_metadata=extra_metadata,
@@ -1426,47 +1681,92 @@ def main() -> None:
     finally:
         raw_dataset.close()
 
-    if not entries or final_latitudes_deg is None or final_longitudes_deg is None or final_pressure_levels_hpa is None:
+    if (
+        not entries
+        or final_latitudes_deg is None
+        or final_longitudes_deg is None
+        or final_pressure_levels_hpa is None
+    ):
         raise ValueError("No potential-temperature frames were written.")
 
-    manifest = build_manifest(
-        contents=contents,
-        climatology_dataset_name=climatology_path.name,
-        entries=entries,
-        variant_name=variant_name,
-        threshold_basis=(
-            "per-level_absolute-anomaly_top-percent_then_top-component-share"
-            if is_component_core_sign_growth
-            else "per-level_sign-tail_top-percent"
-        ),
-        keep_top_percent=keep_top_percent,
-        absolute_anomaly_percentile=absolute_anomaly_percentile,
-        smoothing_sigma_cells=effective_smoothing_sigma_cells,
-        selection_summary=(
-            {
-                "component_keep_top_percent": float(keep_top_percent),
-                "core_component_connectivity": "4-connected-with-longitude-wrap",
-                "vertical_connection_mode": variant_name,
-                "vertical_connection_label": vertical_connection_mode_label(variant_name),
+    if is_raw_temperature_midpoint_variant:
+        manifest = build_manifest(
+            contents=contents,
+            entries=entries,
+            variant_name=variant_name,
+            structure_kind="raw-temperature-midpoint-cold-side-shell",
+            derived_variable={"name": "temperature", "units": contents.units},
+            selection_background="per-level_smoothed_raw_temperature_midpoint",
+            threshold_basis="per-level_smoothed-temperature_midpoint",
+            keep_signs=["negative"],
+            keep_top_percent=None,
+            absolute_anomaly_percentile=None,
+            smoothing_sigma_cells=effective_smoothing_sigma_cells,
+            selection_summary={
+                "threshold_rule": "per-level T_mid = 0.5 * (T_min + T_max) on the horizontally smoothed raw-temperature field",
+                "kept_side": "cold_side_where_smoothed_temperature_is_less_than_or_equal_to_T_mid",
+                "polar_cap_cleanup_rule": RAW_T_MIDPOINT_POLAR_CLEANUP_RULE,
                 "min_component_pressure_span_levels": 1,
-            }
-            if is_component_core_sign_growth
-            else {
-                "vertical_connection_mode": variant_name,
-                "vertical_connection_label": vertical_connection_mode_label(variant_name),
-                "min_component_pressure_span_levels": 2,
-            }
-        ),
-        pressure_min_hpa=args.pressure_min_hpa,
-        pressure_max_hpa=args.pressure_max_hpa,
-        latitude_stride=args.latitude_stride,
-        longitude_stride=args.longitude_stride,
-        latitudes_deg=final_latitudes_deg,
-        longitudes_deg=final_longitudes_deg,
-        pressure_levels_hpa=final_pressure_levels_hpa,
-        base_radius=args.base_radius,
-        vertical_span=args.vertical_span,
-    )
+            },
+            pressure_min_hpa=args.pressure_min_hpa,
+            pressure_max_hpa=args.pressure_max_hpa,
+            latitude_stride=args.latitude_stride,
+            longitude_stride=args.longitude_stride,
+            latitudes_deg=final_latitudes_deg,
+            longitudes_deg=final_longitudes_deg,
+            pressure_levels_hpa=final_pressure_levels_hpa,
+            base_radius=args.base_radius,
+            vertical_span=args.vertical_span,
+            sampling_method="subsample_centers_from_native_midpoint_mask",
+        )
+    else:
+        manifest = build_manifest(
+            contents=contents,
+            entries=entries,
+            variant_name=variant_name,
+            structure_kind="potential-temperature-climatology-anomaly-shell",
+            derived_variable={
+                "name": DERIVED_VARIABLE_NAME,
+                "units": DERIVED_UNITS,
+                "reference_pressure_hpa": REFERENCE_PRESSURE_HPA,
+                "kappa": POTENTIAL_TEMPERATURE_KAPPA,
+            },
+            selection_background="matched_gridpoint_climatological_theta_mean",
+            threshold_basis=(
+                "per-level_absolute-anomaly_top-percent_then_top-component-share"
+                if is_component_core_sign_growth
+                else "per-level_sign-tail_top-percent"
+            ),
+            keep_signs=["negative", "positive"],
+            keep_top_percent=keep_top_percent,
+            absolute_anomaly_percentile=absolute_anomaly_percentile,
+            smoothing_sigma_cells=effective_smoothing_sigma_cells,
+            selection_summary=(
+                {
+                    "component_keep_top_percent": float(keep_top_percent),
+                    "core_component_connectivity": "4-connected-with-longitude-wrap",
+                    "vertical_connection_mode": variant_name,
+                    "vertical_connection_label": vertical_connection_mode_label(variant_name),
+                    "min_component_pressure_span_levels": 1,
+                }
+                if is_component_core_sign_growth
+                else {
+                    "vertical_connection_mode": variant_name,
+                    "vertical_connection_label": vertical_connection_mode_label(variant_name),
+                    "min_component_pressure_span_levels": 2,
+                }
+            ),
+            pressure_min_hpa=args.pressure_min_hpa,
+            pressure_max_hpa=args.pressure_max_hpa,
+            latitude_stride=args.latitude_stride,
+            longitude_stride=args.longitude_stride,
+            latitudes_deg=final_latitudes_deg,
+            longitudes_deg=final_longitudes_deg,
+            pressure_levels_hpa=final_pressure_levels_hpa,
+            base_radius=args.base_radius,
+            vertical_span=args.vertical_span,
+            climatology_dataset_name=climatology_path.name if climatology_path else None,
+        )
     write_json(output_dir / "index.json", manifest)
     print(
         "Built potential temperature structures:",

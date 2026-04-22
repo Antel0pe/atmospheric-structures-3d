@@ -21,6 +21,7 @@ import type {
 type ActiveExampleId =
   | "moistureStructureLayer"
   | "potentialTemperatureLayer"
+  | "airMassLayer"
   | "exampleShaderMeshLayer"
   | "exampleContoursLayer"
   | "exampleParticleLayer";
@@ -70,9 +71,9 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
   potentialTemperatureLayer: {
     title: "Potential Temperature Layer",
     summary:
-      "A dry-potential-temperature compare layer that highlights warm and cold anomaly shells relative to the matched climatology, with both the older bridge recipes and the new top-10%-components sign-growth extraction available as variants.",
+      "A thermal compare layer that now mixes two structure families: dry-potential-temperature anomaly shells relative to the matched climatology, and a raw-temperature midpoint cold-side shell that isolates the polar-side body directly from smoothed temperature.",
     detail:
-      "The layer derives dry potential temperature from pressure-level temperature, subtracts the matched climatological mean field, and renders separate warm and cold voxel shells. Variants either bridge same-sign gaps from the older sign-tail mask or build a stricter component core from the exact per-level top 10% absolute anomalies and then grow vertically until the anomaly sign flips.",
+      "Most variants still derive dry potential temperature from pressure-level temperature, subtract the matched climatological mean field, and render separate warm and cold voxel shells. The raw-temperature midpoint variant instead smooths raw temperature level by level, finds T_mid = 0.5 * (T_min + T_max), and keeps only the cold side of that boundary through the 1000-250 hPa window, with only pole-edge cleanup if the sampled cap would otherwise break topological coherence.",
     legend: [
       {
         label: "Default Pressure Bands",
@@ -91,6 +92,33 @@ const LAYER_INFO: Record<ActiveExampleId, Omit<LayerInfoEntry, "id">> = {
         detail: "Thermal red-for-warm and blue-for-cold shading that darkens toward the lower atmosphere.",
         swatch:
           "linear-gradient(135deg, rgba(110, 14, 24, 0.96), rgba(33, 86, 191, 0.9))",
+      },
+    ],
+  },
+  airMassLayer: {
+    title: "Air Mass Classification Layer",
+    summary:
+      "A 3D proxy-classification layer that combines warm/cold and moist/dry anomaly axes into four quadrant shells, so the globe shows coherent tropical, polar, continental, and maritime-like bodies without claiming full source-region analysis.",
+    detail:
+      "Each recipe clips the main troposphere, computes either raw-temperature or dry-potential-temperature anomalies together with a moisture anomaly axis, standardizes both per pressure level, keeps only the strongest combined cells, and then separates the surviving volume into warm-dry, warm-moist, cold-dry, and cold-moist shells. These are proxy classes derived from local thermodynamic structure, not true Bergeron air-mass trajectories.",
+    legend: [
+      {
+        label: "Warm Dry",
+        detail: "Continental-tropical and superior-style proxy bodies.",
+        swatch:
+          "linear-gradient(135deg, rgba(207, 95, 33, 0.96), rgba(255, 223, 123, 0.9))",
+      },
+      {
+        label: "Warm Moist",
+        detail: "Maritime-tropical and monsoon-style proxy bodies.",
+        swatch:
+          "linear-gradient(135deg, rgba(181, 72, 62, 0.96), rgba(255, 176, 135, 0.9))",
+      },
+      {
+        label: "Cold Dry / Moist",
+        detail: "Polar-continental and maritime-polar proxy shells, split between deep blue and teal families.",
+        swatch:
+          "linear-gradient(135deg, rgba(39, 87, 191, 0.96), rgba(73, 196, 190, 0.9))",
       },
     ],
   },
@@ -349,6 +377,7 @@ export default function LayerInfoPane() {
   const potentialTemperatureLayer = useControls(
     (state) => state.potentialTemperatureLayer
   );
+  const airMassLayer = useControls((state) => state.airMassLayer);
   const exampleShaderMeshLayer = useControls(
     (state) => state.exampleShaderMeshLayer
   );
@@ -419,13 +448,30 @@ export default function LayerInfoPane() {
     }
 
     if (potentialTemperatureLayer.visible) {
+      const tag =
+        potentialTemperatureLayer.variant === "raw-temperature-midpoint-cold-side"
+          ? "Raw temperature | Midpoint cold-side shell"
+          : potentialTemperatureLayer.variant === "top10-components-sign-growth"
+            ? "Climatology dry-theta | Top-10%-component sign growth"
+            : "Climatology dry-theta | Bridge / fill shells";
       entries.push({
         id: "potentialTemperatureLayer",
-        tag:
-          potentialTemperatureLayer.variant === "top10-components-sign-growth"
-            ? "Climatology dry-theta | Top-10%-component sign growth"
-            : "Climatology dry-theta | Bridge / fill shells",
+        tag,
         ...LAYER_INFO.potentialTemperatureLayer,
+      });
+    }
+
+    if (airMassLayer.visible) {
+      const tag =
+        airMassLayer.variant === "theta-rh-latmean"
+          ? "Theta / RH anomaly proxy"
+          : airMassLayer.variant === "theta-q-latmean"
+            ? "Theta / q anomaly proxy"
+            : "Temperature / RH anomaly proxy";
+      entries.push({
+        id: "airMassLayer",
+        tag,
+        ...LAYER_INFO.airMassLayer,
       });
     }
 
