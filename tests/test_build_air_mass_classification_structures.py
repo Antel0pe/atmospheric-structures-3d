@@ -13,6 +13,7 @@ from scripts.build_air_mass_classification_structures import (
     build_manifest,
     build_score_mask,
     classify_quadrants,
+    filter_surface_attached_components,
     filter_components,
     standardize_per_level,
     DatasetContents,
@@ -123,6 +124,29 @@ class BuildAirMassClassificationStructuresTests(unittest.TestCase):
         self.assertEqual(summary["component_count"], 1)
         self.assertEqual(summary["largest_component_voxel_count"], 3)
 
+    def test_filter_surface_attached_components_keeps_only_components_touching_1000_hpa(self) -> None:
+        mask = np.zeros((3, 3, 3), dtype=bool)
+        mask[0, 0, 0] = True
+        mask[1, 0, 0] = True
+        mask[2, 2, 2] = True
+        pressure_levels_hpa = np.array([1000.0, 850.0, 700.0], dtype=np.float32)
+
+        filtered, summary = filter_surface_attached_components(mask, pressure_levels_hpa)
+
+        np.testing.assert_array_equal(
+            filtered,
+            np.array(
+                [
+                    [[True, False, False], [False, False, False], [False, False, False]],
+                    [[True, False, False], [False, False, False], [False, False, False]],
+                    [[False, False, False], [False, False, False], [False, False, False]],
+                ],
+                dtype=bool,
+            ),
+        )
+        self.assertEqual(summary["surface_attached_component_count"], 1)
+        self.assertEqual(summary["largest_surface_attached_component_voxel_count"], 2)
+
     def test_build_manifest_includes_proxy_classification_summary(self) -> None:
         contents = DatasetContents(
             dataset_path=Path("data/example.nc"),
@@ -167,6 +191,7 @@ class BuildAirMassClassificationStructuresTests(unittest.TestCase):
             manifest["classification"]["thermal_axis_field"],
             "dry_potential_temperature",
         )
+        self.assertFalse(manifest["classification"]["surface_attached_only"])
         self.assertEqual(
             manifest["classification"]["classes"][0]["label"],
             CLASS_PROXY_LABELS["warm_dry"],

@@ -30,6 +30,7 @@ skills/structure-probe/logs/
 /public/precipitable-water-proxy/
 /public/precipitation-radar/
 /public/relative-humidity-shell/
+/public/air-mass-structures/
 
 # misc
 .DS_Store

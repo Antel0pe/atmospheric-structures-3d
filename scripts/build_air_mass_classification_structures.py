@@ -73,6 +73,7 @@ class VariantRecipe:
     min_component_pressure_span_levels: int
     pressure_min_hpa: float
     pressure_max_hpa: float
+    surface_attached_only: bool
 
 
 VARIANT_RECIPES: dict[str, VariantRecipe] = {
@@ -89,6 +90,7 @@ VARIANT_RECIPES: dict[str, VariantRecipe] = {
         min_component_pressure_span_levels=2,
         pressure_min_hpa=250.0,
         pressure_max_hpa=1000.0,
+        surface_attached_only=False,
     ),
     "theta-rh-latmean": VariantRecipe(
         name="theta-rh-latmean",
@@ -103,6 +105,7 @@ VARIANT_RECIPES: dict[str, VariantRecipe] = {
         min_component_pressure_span_levels=2,
         pressure_min_hpa=250.0,
         pressure_max_hpa=1000.0,
+        surface_attached_only=False,
     ),
     "theta-q-latmean": VariantRecipe(
         name="theta-q-latmean",
@@ -117,6 +120,22 @@ VARIANT_RECIPES: dict[str, VariantRecipe] = {
         min_component_pressure_span_levels=2,
         pressure_min_hpa=250.0,
         pressure_max_hpa=1000.0,
+        surface_attached_only=False,
+    ),
+    "surface-attached-theta-rh-latmean": VariantRecipe(
+        name="surface-attached-theta-rh-latmean",
+        label="Surface-Attached Theta + RH",
+        thermal_field=THERMAL_THETA,
+        moisture_field=MOISTURE_RH,
+        keep_top_percent=16.0,
+        axis_min_abs_zscore=0.5,
+        smoothing_sigma_cells=1.0,
+        bridge_gap_levels=1,
+        min_component_voxels=20,
+        min_component_pressure_span_levels=2,
+        pressure_min_hpa=250.0,
+        pressure_max_hpa=1000.0,
+        surface_attached_only=True,
     ),
 }
 
@@ -558,6 +577,38 @@ def filter_components(
     }
 
 
+def filter_surface_attached_components(
+    mask: np.ndarray,
+    pressure_levels_hpa: np.ndarray,
+) -> tuple[np.ndarray, dict[str, int]]:
+    labels, _ = label_wrapped_volume_components(mask)
+    if labels.max() <= 0:
+        return np.zeros_like(mask, dtype=bool), {
+            "surface_attached_component_count": 0,
+            "largest_surface_attached_component_voxel_count": 0,
+        }
+
+    surface_level_index = int(np.argmax(np.asarray(pressure_levels_hpa, dtype=np.float32)))
+    filtered = np.zeros_like(mask, dtype=bool)
+    kept_sizes: list[int] = []
+    component_count = 0
+    for label_id in range(1, int(labels.max()) + 1):
+        component_mask = labels == label_id
+        if not bool(np.any(component_mask[surface_level_index])):
+            continue
+        voxel_count = int(np.count_nonzero(component_mask))
+        filtered |= component_mask
+        kept_sizes.append(voxel_count)
+        component_count += 1
+
+    return filtered, {
+        "surface_attached_component_count": int(component_count),
+        "largest_surface_attached_component_voxel_count": int(
+            max(kept_sizes) if kept_sizes else 0
+        ),
+    }
+
+
 def maybe_flip_triangle_winding(indices: np.ndarray) -> np.ndarray:
     normalized = np.asarray(indices, dtype=np.uint32).copy()
     for index in range(0, normalized.size, 3):
@@ -660,6 +711,23 @@ def build_timestamp_payload(
             min_component_voxels=recipe.min_component_voxels,
             min_component_pressure_span_levels=recipe.min_component_pressure_span_levels,
         )
+        surface_summary = {
+            "surface_attached_component_count": int(component_summary["component_count"]),
+            "largest_surface_attached_component_voxel_count": int(
+                component_summary["largest_component_voxel_count"]
+            ),
+        }
+        if recipe.surface_attached_only:
+            filtered, surface_summary = filter_surface_attached_components(
+                filtered,
+                pressure_levels_hpa,
+            )
+            component_summary = {
+                "component_count": int(surface_summary["surface_attached_component_count"]),
+                "largest_component_voxel_count": int(
+                    surface_summary["largest_surface_attached_component_voxel_count"]
+                ),
+            }
         voxel_count = int(np.count_nonzero(filtered))
         mesh = build_exposed_face_mesh_from_mask(
             keep_mask=filtered,
@@ -673,6 +741,7 @@ def build_timestamp_payload(
             "label": CLASS_PROXY_LABELS[class_key],
             "voxel_count": voxel_count,
             **component_summary,
+            **surface_summary,
         }
         total_voxel_count += voxel_count
         total_component_count += int(component_summary["component_count"])
@@ -738,6 +807,7 @@ def build_timestamp_payload(
             "min_component_pressure_span_levels": int(
                 recipe.min_component_pressure_span_levels
             ),
+            "surface_attached_only": bool(recipe.surface_attached_only),
             "classes": [
                 {
                     "key": class_key,
@@ -849,6 +919,7 @@ def build_manifest(
             "bridge_gap_levels": int(recipe.bridge_gap_levels),
             "min_component_voxels": int(recipe.min_component_voxels),
             "min_component_pressure_span_levels": int(recipe.min_component_pressure_span_levels),
+            "surface_attached_only": bool(recipe.surface_attached_only),
             "classes": [
                 {
                     "key": class_key,

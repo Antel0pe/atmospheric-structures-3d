@@ -122,6 +122,7 @@ export type AirMassStructureMetadata = {
     bridge_gap_levels: number;
     min_component_voxels: number;
     min_component_pressure_span_levels: number;
+    surface_attached_only?: boolean;
     classes: Array<{
       key: AirMassStructureClassKey;
       label: string;

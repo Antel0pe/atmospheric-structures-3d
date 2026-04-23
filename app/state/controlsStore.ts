@@ -84,6 +84,10 @@ export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
     value: "theta-q-latmean",
     label: "Theta + Specific Humidity",
   },
+  {
+    value: "surface-attached-theta-rh-latmean",
+    label: "Surface-Attached Theta + RH",
+  },
 ] as const;
 
 export type AirMassClassificationVariant =

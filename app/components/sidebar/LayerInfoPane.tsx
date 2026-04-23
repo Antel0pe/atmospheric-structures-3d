@@ -463,7 +463,9 @@ export default function LayerInfoPane() {
 
     if (airMassLayer.visible) {
       const tag =
-        airMassLayer.variant === "theta-rh-latmean"
+        airMassLayer.variant === "surface-attached-theta-rh-latmean"
+          ? "Surface-attached theta / RH proxy"
+          : airMassLayer.variant === "theta-rh-latmean"
           ? "Theta / RH anomaly proxy"
           : airMassLayer.variant === "theta-q-latmean"
             ? "Theta / q anomaly proxy"
