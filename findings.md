@@ -7,3 +7,9 @@ something that worked well
         - doesnt really interestingly, not super sure why - likely code correctness error
 
 - experimenting with looking at gradients between air masses more
+
+- potential temperature anomaly and raw temperature anomaly are basically the same thing
+- plots in tmp/temperature-cardinal-contrast where you sum up the temperature change in the cardinal directions look really freakin cool
+- probably want to look towards air masses of similar thermodynamic vertical character
+- obviously cant look only straight up for vertical coherence, look within window like 3x3
+- std dev and percentile based bucketing seems to work well across levels tmp/potential-temperature-anomaly-discrete-buckets-all-levels/2021-11-08T12-00/
