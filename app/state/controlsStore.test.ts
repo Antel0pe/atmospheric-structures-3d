@@ -64,6 +64,7 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(useControls.getState().airMassLayer.variant).toBe(
       "temperature-rh-latmean"
     );
+    expect(useControls.getState().airMassLayer.showCellGrid).toBe(false);
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35
     );

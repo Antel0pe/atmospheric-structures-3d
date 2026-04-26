@@ -88,6 +88,18 @@ export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
     value: "surface-attached-theta-rh-latmean",
     label: "Surface-Attached Theta + RH",
   },
+  {
+    value: "theta-anomaly-percentile-tails",
+    label: "Theta Percentile Tail Buckets",
+  },
+  {
+    value: "theta-anomaly-stddev-tails",
+    label: "Theta Std Dev Tail Buckets",
+  },
+  {
+    value: "theta-anomaly-stddev-side-6neighbor-min100k",
+    label: "Theta Std Dev Side Tails >=100k",
+  },
 ] as const;
 
 export type AirMassClassificationVariant =
@@ -255,6 +267,7 @@ export type AirMassClassificationLayerState = {
   visible: boolean;
   opacity: number;
   variant: AirMassClassificationVariant;
+  showCellGrid: boolean;
 };
 
 export type RelativeHumidityLayerState = {
@@ -716,6 +729,7 @@ export const useControls = create<ControlsState>()(
       visible: false,
       opacity: 1,
       variant: "temperature-rh-latmean",
+      showCellGrid: false,
     },
     relativeHumidityLayer: {
       visible: false,

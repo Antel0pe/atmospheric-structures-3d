@@ -9,7 +9,7 @@ export const AIR_MASS_CLASS_ORDER = [
   "cold_moist",
 ] as const;
 
-export type AirMassStructureClassKey = (typeof AIR_MASS_CLASS_ORDER)[number];
+export type AirMassStructureClassKey = string;
 
 export type AirMassStructureManifestTimestamp = {
   timestamp: string;
@@ -30,7 +30,7 @@ export type AirMassStructureManifest = {
   dataset: string;
   variant: AirMassClassificationVariant;
   variant_label: string;
-  structure_kind: "air-mass-proxy-shells";
+  structure_kind: "air-mass-proxy-shells" | "theta-anomaly-bucket-shells";
   geometry_mode: "voxel-faces";
   variables: {
     temperature: string;
@@ -51,6 +51,8 @@ export type AirMassStructureManifest = {
     classes: Array<{
       key: AirMassStructureClassKey;
       label: string;
+      bucket_index?: number;
+      color?: string;
     }>;
   };
   sampling: {
@@ -126,6 +128,8 @@ export type AirMassStructureMetadata = {
     classes: Array<{
       key: AirMassStructureClassKey;
       label: string;
+      bucket_index?: number;
+      color?: string;
     }>;
   };
   smoothing_sigma_cells: number;
@@ -148,6 +152,7 @@ export type AirMassStructureFrame = {
       indices: Uint32Array;
     }
   >;
+  classKeys: AirMassStructureClassKey[];
 };
 
 const manifestPromiseCache = new Map<
@@ -230,8 +235,9 @@ export async function fetchAirMassStructureFrame(
     }
   );
 
+  const classKeys = manifest.classification.classes.map((entry) => entry.key);
   const classBlobs = await Promise.all(
-    AIR_MASS_CLASS_ORDER.flatMap((classKey) => [
+    classKeys.flatMap((classKey) => [
       fetchBlobOrThrow(
         buildAirMassStructureUrl(
           variant,
@@ -259,7 +265,7 @@ export async function fetchAirMassStructureFrame(
 
   const classBuffers = {} as AirMassStructureFrame["classBuffers"];
   await Promise.all(
-    AIR_MASS_CLASS_ORDER.map(async (classKey, index) => {
+    classKeys.map(async (classKey, index) => {
       const positionsBlob = classBlobs[index * 2];
       const indicesBlob = classBlobs[index * 2 + 1];
       const [positionsBuffer, indicesBuffer] = await Promise.all([
@@ -278,5 +284,6 @@ export async function fetchAirMassStructureFrame(
     entry,
     metadata,
     classBuffers,
+    classKeys,
   };
 }

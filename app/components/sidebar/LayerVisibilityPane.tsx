@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import {
   AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS,
   POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
@@ -71,7 +72,24 @@ function CheckboxRow({
   );
 }
 
+function subscribeToHydrationStore() {
+  return () => {};
+}
+
+function getClientHydrationSnapshot() {
+  return true;
+}
+
+function getServerHydrationSnapshot() {
+  return false;
+}
+
 export default function LayerVisibilityPane() {
+  const mounted = useSyncExternalStore(
+    subscribeToHydrationStore,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot
+  );
   const moistureVisible = useControls(
     (state) => state.moistureStructureLayer.visible
   );
@@ -332,6 +350,15 @@ export default function LayerVisibilityPane() {
               ))}
             </select>
           </label>
+
+          {mounted ? (
+            <CheckboxRow
+              label="Show Cell Grid"
+              checked={airMassLayer.showCellGrid}
+              accentColor="#cfe0ff"
+              onChange={(checked) => setAirMassLayer({ showCellGrid: checked })}
+            />
+          ) : null}
         </div>
 
         <CheckboxRow
