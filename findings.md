@@ -13,3 +13,6 @@ something that worked well
 - probably want to look towards air masses of similar thermodynamic vertical character
 - obviously cant look only straight up for vertical coherence, look within window like 3x3
 - std dev and percentile based bucketing seems to work well across levels tmp/potential-temperature-anomaly-discrete-buckets-all-levels/2021-11-08T12-00/
+- only showing anomalously cold/warm air masses means maybe you dont see where anomalous air pushes up against normal air. can implicitly see it if the air front is tilted or something?
+
+- interpolate between standard levels somehow so altitude cutaway is better

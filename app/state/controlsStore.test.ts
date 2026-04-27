@@ -48,7 +48,7 @@ describe("resolveMoistureStructureLayerState", () => {
       "baseline"
     );
     expect(useControls.getState().precipitationRadarLayer.visible).toBe(false);
-    expect(useControls.getState().potentialTemperatureLayer.visible).toBe(true);
+    expect(useControls.getState().potentialTemperatureLayer.visible).toBe(false);
     expect(useControls.getState().potentialTemperatureLayer.opacity).toBe(1);
     expect(useControls.getState().potentialTemperatureLayer.colorMode).toBe(
       "pressureBands"
@@ -59,12 +59,19 @@ describe("resolveMoistureStructureLayerState", () => {
     expect(useControls.getState().potentialTemperatureLayer.showCellGrid).toBe(
       false
     );
-    expect(useControls.getState().airMassLayer.visible).toBe(false);
+    expect(useControls.getState().airMassLayer.visible).toBe(true);
     expect(useControls.getState().airMassLayer.opacity).toBe(1);
     expect(useControls.getState().airMassLayer.variant).toBe(
-      "temperature-rh-latmean"
+      "theta-anomaly-stddev-side-6neighbor-min100k"
     );
     expect(useControls.getState().airMassLayer.showCellGrid).toBe(false);
+    expect(useControls.getState().airMassLayer.altitudeRange01).toEqual({
+      min: 0,
+      max: 1,
+    });
+    expect(useControls.getState().airMassLayer.cameraCutawayEnabled).toBe(false);
+    expect(useControls.getState().airMassLayer.cameraCutawayRadius).toBe(40);
+    expect(useControls.getState().airMassLayer.hiddenClassKeys).toEqual([]);
     expect(useControls.getState().moistureStructureLayer.verticalExaggeration).toBe(
       2.35
     );

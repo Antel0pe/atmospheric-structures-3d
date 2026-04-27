@@ -54,6 +54,9 @@ export type AirMassStructureManifest = {
       bucket_index?: number;
       color?: string;
     }>;
+    radial_top_faces_drawn?: boolean;
+    face_exposure_basis?: string;
+    top_face_omit_rule?: string;
   };
   sampling: {
     latitude_stride: number;
@@ -88,6 +91,9 @@ export type AirMassStructureMetadata = {
   timestamp: string;
   voxel_count: number;
   component_count: number;
+  radial_top_faces_drawn?: boolean;
+  face_exposure_basis?: string;
+  top_face_omit_rule?: string;
   class_summaries: Record<
     AirMassStructureClassKey,
     {

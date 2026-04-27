@@ -41,14 +41,19 @@ from scripts.build_theta_anomaly_bucket_air_mass_variants import (
     stride_mask,
 )
 from scripts.simple_voxel_builder import (
-    build_exposed_face_mesh_from_mask,
+    NaiveVoxelMesh,
+    append_quad,
     coordinate_step_degrees,
+    build_axis_bounds,
+    build_radius_lookup_from_pressure_levels,
     timestamp_to_slug,
 )
 
 
 DEFAULT_VARIANT_NAME = "theta-anomaly-stddev-side-6neighbor-min100k"
 DEFAULT_VARIANT_LABEL = "Theta Std Dev Side Tails >=100k"
+DEFAULT_NO_TOP_VARIANT_NAME = "theta-anomaly-stddev-side-6neighbor-min100k-open-top"
+DEFAULT_NO_TOP_VARIANT_LABEL = "Theta Std Dev Side Tails >=100k Open Top"
 DEFAULT_MIN_COMPONENT_VOXELS = 100_000
 SIDE_GROUPS = (
     ("cold_tail_buckets_0_1_2", (0, 1, 2)),
@@ -70,9 +75,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--stats-dir", type=Path, default=DEFAULT_STATS_DIR)
     parser.add_argument("--timestamp", type=str, default=DEFAULT_TIMESTAMP)
-    parser.add_argument("--variant-name", type=str, default=DEFAULT_VARIANT_NAME)
-    parser.add_argument("--variant-label", type=str, default=DEFAULT_VARIANT_LABEL)
+    parser.add_argument("--variant-name", type=str, default=None)
+    parser.add_argument("--variant-label", type=str, default=None)
     parser.add_argument("--min-component-voxels", type=int, default=DEFAULT_MIN_COMPONENT_VOXELS)
+    parser.add_argument(
+        "--omit-top-faces",
+        action="store_true",
+        help=(
+            "Do not export exposed radial top faces. Bottom faces and all side "
+            "faces are still exported."
+        ),
+    )
     parser.add_argument("--latitude-stride", type=int, default=DEFAULT_LATITUDE_STRIDE)
     parser.add_argument("--longitude-stride", type=int, default=DEFAULT_LONGITUDE_STRIDE)
     parser.add_argument("--base-radius", type=float, default=DEFAULT_BASE_RADIUS)
@@ -98,6 +111,136 @@ def clear_output_dir(path: Path) -> None:
             shutil.rmtree(child)
         else:
             child.unlink()
+
+
+def build_exposed_face_mesh_from_mask_with_face_options(
+    *,
+    keep_mask: np.ndarray,
+    exposure_mask: np.ndarray,
+    top_face_omit_mask: np.ndarray | None,
+    pressure_levels_hpa: np.ndarray,
+    latitudes_deg: np.ndarray,
+    longitudes_deg: np.ndarray,
+) -> NaiveVoxelMesh:
+    if keep_mask.shape != exposure_mask.shape:
+        raise ValueError("keep_mask and exposure_mask must have the same shape.")
+    if top_face_omit_mask is not None and top_face_omit_mask.shape != keep_mask.shape:
+        raise ValueError("top_face_omit_mask must match keep_mask shape.")
+
+    radius_values = build_radius_lookup_from_pressure_levels(pressure_levels_hpa)
+    radius_bounds = build_axis_bounds(radius_values)
+    latitude_bounds = build_axis_bounds(latitudes_deg)
+    longitude_bounds = build_axis_bounds(longitudes_deg)
+
+    level_count, latitude_count, longitude_count = keep_mask.shape
+    occupied_cells = np.argwhere(keep_mask)
+    vertex_lookup: dict[tuple[int, int, int], int] = {}
+    positions: list[float] = []
+    indices: list[int] = []
+
+    for level_index, latitude_index, longitude_index in occupied_cells:
+        r0 = int(level_index)
+        r1 = r0 + 1
+        a0 = int(latitude_index)
+        a1 = a0 + 1
+        o0 = int(longitude_index)
+        o1 = o0 + 1
+
+        west_neighbor = (o0 - 1) % longitude_count
+        east_neighbor = (o0 + 1) % longitude_count
+
+        if r0 == 0 or not exposure_mask[r0 - 1, a0, o0]:
+            append_quad(
+                corners=[(r0, a0, o0), (r0, a1, o0), (r0, a1, o1), (r0, a0, o1)],
+                vertex_lookup=vertex_lookup,
+                positions=positions,
+                indices=indices,
+                radius_bounds=radius_bounds,
+                latitude_bounds=latitude_bounds,
+                longitude_bounds=longitude_bounds,
+            )
+        omit_this_top_face = bool(top_face_omit_mask is not None and top_face_omit_mask[r0, a0, o0])
+        if (
+            not omit_this_top_face
+            and (r0 == level_count - 1 or not exposure_mask[r0 + 1, a0, o0])
+        ):
+            append_quad(
+                corners=[(r1, a0, o0), (r1, a0, o1), (r1, a1, o1), (r1, a1, o0)],
+                vertex_lookup=vertex_lookup,
+                positions=positions,
+                indices=indices,
+                radius_bounds=radius_bounds,
+                latitude_bounds=latitude_bounds,
+                longitude_bounds=longitude_bounds,
+            )
+        if a0 == 0 or not exposure_mask[r0, a0 - 1, o0]:
+            append_quad(
+                corners=[(r0, a0, o0), (r0, a0, o1), (r1, a0, o1), (r1, a0, o0)],
+                vertex_lookup=vertex_lookup,
+                positions=positions,
+                indices=indices,
+                radius_bounds=radius_bounds,
+                latitude_bounds=latitude_bounds,
+                longitude_bounds=longitude_bounds,
+            )
+        if a0 == latitude_count - 1 or not exposure_mask[r0, a0 + 1, o0]:
+            append_quad(
+                corners=[(r0, a1, o0), (r1, a1, o0), (r1, a1, o1), (r0, a1, o1)],
+                vertex_lookup=vertex_lookup,
+                positions=positions,
+                indices=indices,
+                radius_bounds=radius_bounds,
+                latitude_bounds=latitude_bounds,
+                longitude_bounds=longitude_bounds,
+            )
+        if not exposure_mask[r0, a0, west_neighbor]:
+            append_quad(
+                corners=[(r0, a0, o0), (r1, a0, o0), (r1, a1, o0), (r0, a1, o0)],
+                vertex_lookup=vertex_lookup,
+                positions=positions,
+                indices=indices,
+                radius_bounds=radius_bounds,
+                latitude_bounds=latitude_bounds,
+                longitude_bounds=longitude_bounds,
+            )
+        if not exposure_mask[r0, a0, east_neighbor]:
+            append_quad(
+                corners=[(r0, a0, o1), (r0, a1, o1), (r1, a1, o1), (r1, a0, o1)],
+                vertex_lookup=vertex_lookup,
+                positions=positions,
+                indices=indices,
+                radius_bounds=radius_bounds,
+                latitude_bounds=latitude_bounds,
+                longitude_bounds=longitude_bounds,
+            )
+
+    positions_array = np.asarray(positions, dtype=np.float32)
+    indices_array = np.asarray(indices, dtype=np.uint32)
+    return NaiveVoxelMesh(
+        positions=positions_array,
+        indices=indices_array,
+        cube_count=int(occupied_cells.shape[0]),
+        vertex_count=int(positions_array.size // 3),
+        triangle_count=int(indices_array.size // 3),
+    )
+
+
+def build_highest_column_cell_mask(mask: np.ndarray) -> np.ndarray:
+    occupied = np.asarray(mask, dtype=bool)
+    result = np.zeros(occupied.shape, dtype=bool)
+    occupied_columns = np.any(occupied, axis=0)
+    if not np.any(occupied_columns):
+        return result
+
+    level_count = occupied.shape[0]
+    highest_level_by_column = level_count - 1 - np.argmax(occupied[::-1], axis=0)
+    latitude_indices, longitude_indices = np.nonzero(occupied_columns)
+    result[
+        highest_level_by_column[latitude_indices, longitude_indices],
+        latitude_indices,
+        longitude_indices,
+    ] = True
+    return result
 
 
 def kept_size_summary(sizes: np.ndarray) -> dict[str, Any]:
@@ -181,6 +324,7 @@ def build_variant(
     longitude_stride: int,
     base_radius: float,
     vertical_span: float,
+    omit_top_faces: bool,
 ) -> None:
     output_dir = output_base_dir / "variants" / variant_name
     clear_output_dir(output_dir)
@@ -191,6 +335,12 @@ def build_variant(
     class_summaries: dict[str, Any] = {}
     class_counts: dict[str, Any] = {}
     all_mask = np.zeros(filtered_buckets.shape, dtype=bool)
+    exposure_mask = filtered_buckets >= 0 if omit_top_faces else None
+    top_face_omit_mask = (
+        build_highest_column_cell_mask(exposure_mask)
+        if exposure_mask is not None
+        else None
+    )
     total_voxel_count = 0
     total_component_count = 0
 
@@ -200,8 +350,10 @@ def build_variant(
         all_mask |= mask
         voxel_count = int(np.count_nonzero(mask))
         summary = component_summary(mask, structure)
-        mesh = build_exposed_face_mesh_from_mask(
+        mesh = build_exposed_face_mesh_from_mask_with_face_options(
             keep_mask=mask,
+            exposure_mask=exposure_mask if exposure_mask is not None else mask,
+            top_face_omit_mask=top_face_omit_mask,
             pressure_levels_hpa=pressure_levels,
             latitudes_deg=latitudes,
             longitudes_deg=longitudes,
@@ -249,6 +401,13 @@ def build_variant(
         "component_connectivity": "6-neighbor with wrapped longitude",
         "component_grouping": "stddev-side; cold buckets 0-2 connect together and warm buckets 7-9 connect together",
         "component_filter_resolution": "full source grid before frontend subsampling",
+        "radial_top_faces_drawn": not omit_top_faces,
+        "face_exposure_basis": "all_retained_buckets" if omit_top_faces else "same_bucket",
+        "top_face_omit_rule": (
+            "omit only the original highest occupied radial cap face per lat/lon column"
+            if omit_top_faces
+            else "none"
+        ),
         "classes": class_entries("standard-deviation"),
     }
 
@@ -260,6 +419,9 @@ def build_variant(
         "component_connectivity": selection["component_connectivity"],
         "component_grouping": selection["component_grouping"],
         "component_filter_resolution": selection["component_filter_resolution"],
+        "radial_top_faces_drawn": selection["radial_top_faces_drawn"],
+        "face_exposure_basis": selection["face_exposure_basis"],
+        "top_face_omit_rule": selection["top_face_omit_rule"],
         "class_summaries": class_summaries,
         "pressure_levels_hpa": [float(value) for value in pressure_levels.tolist()],
         "score_thresholds_by_pressure_level": score_thresholds_by_pressure_level,
@@ -309,6 +471,9 @@ def build_variant(
             "component_connectivity": selection["component_connectivity"],
             "component_grouping": selection["component_grouping"],
             "component_filter_resolution": selection["component_filter_resolution"],
+            "radial_top_faces_drawn": selection["radial_top_faces_drawn"],
+            "face_exposure_basis": selection["face_exposure_basis"],
+            "top_face_omit_rule": selection["top_face_omit_rule"],
             "classes": class_entries("standard-deviation"),
         },
         "sampling": {
@@ -353,6 +518,9 @@ def build_variant(
         "component_connectivity": selection["component_connectivity"],
         "component_grouping": selection["component_grouping"],
         "component_filter_resolution": selection["component_filter_resolution"],
+        "radial_top_faces_drawn": selection["radial_top_faces_drawn"],
+        "face_exposure_basis": selection["face_exposure_basis"],
+        "top_face_omit_rule": selection["top_face_omit_rule"],
         "sampling": manifest["sampling"],
         "full_resolution_component_stats": full_resolution_component_stats,
         "frontend_asset_counts": {
@@ -377,6 +545,12 @@ def main() -> None:
     climatology_path = resolve_repo_path(args.climatology)
     output_base_dir = resolve_repo_path(args.output_dir)
     stats_dir = resolve_repo_path(args.stats_dir)
+    if args.omit_top_faces:
+        variant_name = args.variant_name or DEFAULT_NO_TOP_VARIANT_NAME
+        variant_label = args.variant_label or DEFAULT_NO_TOP_VARIANT_LABEL
+    else:
+        variant_name = args.variant_name or DEFAULT_VARIANT_NAME
+        variant_label = args.variant_label or DEFAULT_VARIANT_LABEL
 
     anomaly, pressure_levels, latitudes, longitudes = compute_theta_anomaly(
         temperature_path=temperature_path,
@@ -409,13 +583,14 @@ def main() -> None:
         climatology_path=climatology_path,
         output_base_dir=output_base_dir,
         stats_dir=stats_dir,
-        variant_name=args.variant_name,
-        variant_label=args.variant_label,
+        variant_name=variant_name,
+        variant_label=variant_label,
         min_component_voxels=args.min_component_voxels,
         latitude_stride=args.latitude_stride,
         longitude_stride=args.longitude_stride,
         base_radius=args.base_radius,
         vertical_span=args.vertical_span,
+        omit_top_faces=args.omit_top_faces,
     )
     print("Wrote export stats to", repo_path(stats_dir))
 

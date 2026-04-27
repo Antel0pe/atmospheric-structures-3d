@@ -100,6 +100,10 @@ export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
     value: "theta-anomaly-stddev-side-6neighbor-min100k",
     label: "Theta Std Dev Side Tails >=100k",
   },
+  {
+    value: "theta-anomaly-stddev-side-6neighbor-min100k-open-top",
+    label: "Theta Std Dev Side Tails >=100k Open Top",
+  },
 ] as const;
 
 export type AirMassClassificationVariant =
@@ -268,6 +272,13 @@ export type AirMassClassificationLayerState = {
   opacity: number;
   variant: AirMassClassificationVariant;
   showCellGrid: boolean;
+  altitudeRange01: {
+    min: number;
+    max: number;
+  };
+  cameraCutawayEnabled: boolean;
+  cameraCutawayRadius: number;
+  hiddenClassKeys: string[];
 };
 
 export type RelativeHumidityLayerState = {
@@ -719,17 +730,21 @@ export const useControls = create<ControlsState>()(
       opacity: 1,
     },
     potentialTemperatureLayer: {
-      visible: true,
+      visible: false,
       opacity: 1,
       colorMode: "pressureBands",
       variant: "bridge-gap-1",
       showCellGrid: false,
     },
     airMassLayer: {
-      visible: false,
+      visible: true,
       opacity: 1,
-      variant: "temperature-rh-latmean",
+      variant: "theta-anomaly-stddev-side-6neighbor-min100k",
       showCellGrid: false,
+      altitudeRange01: { min: 0, max: 1 },
+      cameraCutawayEnabled: false,
+      cameraCutawayRadius: 40,
+      hiddenClassKeys: [],
     },
     relativeHumidityLayer: {
       visible: false,

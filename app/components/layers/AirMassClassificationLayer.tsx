@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useEarthLayer } from "./EarthBase";
-import { useControls } from "../../state/controlsStore";
+import {
+  useControls,
+  type AirMassClassificationLayerState,
+} from "../../state/controlsStore";
 import {
   AIR_MASS_CLASS_ORDER,
   type AirMassStructureClassKey,
@@ -13,6 +16,22 @@ const LAYER_CLEARANCE = 11.1;
 const LAYER_RENDER_ORDER = 69;
 const CELL_GRID_RADIAL_OFFSET = 0.08;
 const CELL_GRID_OPACITY = 0.82;
+const MIN_ALTITUDE_RANGE_SPAN = 0.01;
+
+type AirMassAltitudeRange01 =
+  AirMassClassificationLayerState["altitudeRange01"];
+
+type AirMassShaderUniforms = {
+  cutawayCenter: { value: THREE.Vector3 };
+  cutawayRadius: { value: number };
+  cutawayEnabled: { value: number };
+};
+
+type AirMassLevelRange = {
+  start: number;
+  count: number;
+  altitudeMix: number;
+};
 
 const CLASS_COLOR_STOPS: Partial<Record<
   AirMassStructureClassKey,
@@ -44,17 +63,19 @@ const CLASS_COLOR_STOPS: Partial<Record<
   ],
 };
 
-const BUCKET_CLASS_COLORS: Record<string, THREE.Color> = {
-  bucket_0: new THREE.Color("#08306b"),
-  bucket_1: new THREE.Color("#2171b5"),
-  bucket_2: new THREE.Color("#6baed6"),
-  bucket_3: new THREE.Color("#c6dbef"),
-  bucket_4: new THREE.Color("#f7fbff"),
-  bucket_5: new THREE.Color("#fff5f0"),
-  bucket_6: new THREE.Color("#fcbba1"),
-  bucket_7: new THREE.Color("#fb6a4a"),
-  bucket_8: new THREE.Color("#cb181d"),
-  bucket_9: new THREE.Color("#67000d"),
+const BUCKET_COLOR_CONFIG: Record<
+  string,
+  {
+    hue: number;
+    lightness: number;
+  }
+> = {
+  bucket_0: { hue: 0.59, lightness: 0.24 },
+  bucket_1: { hue: 0.59, lightness: 0.42 },
+  bucket_2: { hue: 0.59, lightness: 0.64 },
+  bucket_7: { hue: 0.025, lightness: 0.62 },
+  bucket_8: { hue: 0.01, lightness: 0.43 },
+  bucket_9: { hue: 0.0, lightness: 0.27 },
 };
 
 function pressureToStandardAtmosphereHeightM(pressureHpa: number) {
@@ -98,6 +119,31 @@ function radiusToPressureHpa(frame: AirMassStructureFrame, radius: number) {
   return standardAtmosphereHeightMToPressure(heightM);
 }
 
+function normalizeAltitudeRange01(
+  range: AirMassAltitudeRange01 | undefined
+): AirMassAltitudeRange01 {
+  const min = THREE.MathUtils.clamp(range?.min ?? 0, 0, 1);
+  const max = THREE.MathUtils.clamp(range?.max ?? 1, 0, 1);
+  if (max - min >= MIN_ALTITUDE_RANGE_SPAN) {
+    return { min, max };
+  }
+  if (min <= 1 - MIN_ALTITUDE_RANGE_SPAN) {
+    return { min, max: min + MIN_ALTITUDE_RANGE_SPAN };
+  }
+  return { min: 1 - MIN_ALTITUDE_RANGE_SPAN, max: 1 };
+}
+
+function altitudeMixForPressure(frame: AirMassStructureFrame, pressureHpa: number) {
+  const pressureWindow = frame.manifest.pressure_window_hpa;
+  const lowerPressure = Math.max(pressureWindow.min, pressureWindow.max);
+  const upperPressure = Math.min(pressureWindow.min, pressureWindow.max);
+  return THREE.MathUtils.clamp(
+    (lowerPressure - pressureHpa) / Math.max(lowerPressure - upperPressure, 1e-6),
+    0,
+    1
+  );
+}
+
 function colorAtStopPosition(t: number, stops: readonly THREE.Color[]) {
   const scaled = THREE.MathUtils.clamp(t, 0, 1) * (stops.length - 1);
   const startIndex = Math.floor(scaled);
@@ -106,11 +152,26 @@ function colorAtStopPosition(t: number, stops: readonly THREE.Color[]) {
   return stops[startIndex].clone().lerp(stops[endIndex], mix);
 }
 
+function bucketColorForPressure(
+  frame: AirMassStructureFrame,
+  classKey: AirMassStructureClassKey,
+  pressureHpa: number
+) {
+  const config = BUCKET_COLOR_CONFIG[classKey];
+  if (!config) return null;
+  const pressureWindow = frame.manifest.pressure_window_hpa;
+  const lowerPressure = Math.max(pressureWindow.min, pressureWindow.max);
+  const upperPressure = Math.min(pressureWindow.min, pressureWindow.max);
+  const altitudeT = THREE.MathUtils.clamp(
+    (lowerPressure - pressureHpa) / Math.max(lowerPressure - upperPressure, 1e-6),
+    0,
+    1
+  );
+  const saturation = THREE.MathUtils.lerp(0.46, 1.0, altitudeT);
+  return new THREE.Color().setHSL(config.hue, saturation, config.lightness);
+}
+
 function buildBandScale(frame: AirMassStructureFrame, classKey: AirMassStructureClassKey) {
-  const stops = CLASS_COLOR_STOPS[classKey];
-  if (!stops) {
-    return { boundaryRadii: [] as number[], levelColors: [] as THREE.Color[] };
-  }
   const pressures = frame.metadata.pressure_levels_hpa;
   if (pressures.length === 0) {
     return { boundaryRadii: [] as number[], levelColors: [] as THREE.Color[] };
@@ -119,12 +180,15 @@ function buildBandScale(frame: AirMassStructureFrame, classKey: AirMassStructure
   const boundaryRadii = radii
     .slice(0, -1)
     .map((radius, index) => (radius + radii[index + 1]) / 2);
-  const levelColors = radii.map((_, index) =>
-    colorAtStopPosition(
-      index / Math.max(radii.length - 1, 1),
-      stops
-    )
-  );
+  const stops = CLASS_COLOR_STOPS[classKey];
+  const levelColors = stops
+    ? radii.map((_, index) =>
+        colorAtStopPosition(
+          index / Math.max(radii.length - 1, 1),
+          stops
+        )
+      )
+    : [];
   return { boundaryRadii, levelColors };
 }
 
@@ -150,7 +214,6 @@ function buildGeometry(
   classKey: AirMassStructureClassKey
 ) {
   const bandScale = buildBandScale(frame, classKey);
-  const bucketColor = BUCKET_CLASS_COLORS[classKey] ?? null;
   const fallbackStops = CLASS_COLOR_STOPS[classKey] ?? [
     new THREE.Color("#7f2531"),
     new THREE.Color("#c2534d"),
@@ -159,9 +222,18 @@ function buildGeometry(
   ];
   const classBuffer = frame.classBuffers[classKey];
   const positions = classBuffer.positions.slice();
-  const indices = classBuffer.indices.slice();
+  const indices = classBuffer.indices;
   const colors = new Float32Array(positions.length);
+  const altitudeMixes = new Float32Array(positions.length / 3);
+  const vertexLevelIndices = new Uint16Array(positions.length / 3);
   const baseRadius = frame.manifest.globe.base_radius;
+  const pressureLevels = frame.metadata.pressure_levels_hpa;
+  const levelCount = Math.max(pressureLevels.length, 1);
+  const altitudeMixByLevel =
+    pressureLevels.length > 0
+      ? pressureLevels.map((pressure) => altitudeMixForPressure(frame, pressure))
+      : [0];
+  const indicesByLevel = Array.from({ length: levelCount }, () => [] as number[]);
 
   for (let index = 0; index < positions.length; index += 3) {
     const x = positions[index];
@@ -181,8 +253,14 @@ function buildGeometry(
 
     const levelIndex = levelIndexForRadius(radius, bandScale.boundaryRadii);
     const pressureHpa = radiusToPressureHpa(frame, radius);
+    altitudeMixes[index / 3] = altitudeMixForPressure(frame, pressureHpa);
+    vertexLevelIndices[index / 3] = THREE.MathUtils.clamp(
+      levelIndex,
+      0,
+      levelCount - 1
+    );
     const color =
-      bucketColor ??
+      bucketColorForPressure(frame, classKey, pressureHpa) ??
       bandScale.levelColors[levelIndex] ??
       colorAtStopPosition(
         1 - THREE.MathUtils.clamp((pressureHpa - 250) / 750, 0, 1),
@@ -193,30 +271,162 @@ function buildGeometry(
     colors[index + 2] = color.b;
   }
 
+  for (let index = 0; index < indices.length; index += 6) {
+    const faceIndices =
+      index + 5 < indices.length
+        ? [
+            Number(indices[index]),
+            Number(indices[index + 1]),
+            Number(indices[index + 2]),
+            Number(indices[index + 3]),
+            Number(indices[index + 4]),
+            Number(indices[index + 5]),
+          ]
+        : Array.from(indices.slice(index, Math.min(index + 3, indices.length)), Number);
+    const levelIndex = THREE.MathUtils.clamp(
+      Math.round(
+        faceIndices.reduce((sum, item) => sum + vertexLevelIndices[item], 0) /
+          Math.max(faceIndices.length, 1)
+      ),
+      0,
+      levelCount - 1
+    );
+    indicesByLevel[levelIndex].push(...faceIndices);
+  }
+
+  const totalIndexCount = indicesByLevel.reduce(
+    (sum, item) => sum + item.length,
+    0
+  );
+  const sortedIndices = new Uint32Array(totalIndexCount);
+  const levelRanges: AirMassLevelRange[] = [];
+  let sortedIndexOffset = 0;
+  for (let levelIndex = 0; levelIndex < indicesByLevel.length; levelIndex += 1) {
+    const levelIndicesForGeometry = indicesByLevel[levelIndex];
+    const start = sortedIndexOffset;
+    sortedIndices.set(levelIndicesForGeometry, sortedIndexOffset);
+    sortedIndexOffset += levelIndicesForGeometry.length;
+    levelRanges.push({
+      start,
+      count: levelIndicesForGeometry.length,
+      altitudeMix:
+        altitudeMixByLevel[levelIndex] ??
+        levelIndex / Math.max(levelCount - 1, 1),
+    });
+  }
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-  geometry.computeVertexNormals();
+  geometry.setAttribute(
+    "airMassAltitudeMix",
+    new THREE.BufferAttribute(altitudeMixes, 1)
+  );
+  geometry.setIndex(
+    new THREE.BufferAttribute(sortedIndices, 1)
+  );
+  geometry.userData.airMassLevelRanges = levelRanges;
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+function attachAirMassShader(
+  material: THREE.MeshBasicMaterial | THREE.LineBasicMaterial
+) {
+  const uniforms: AirMassShaderUniforms = {
+    cutawayCenter: { value: new THREE.Vector3() },
+    cutawayRadius: { value: 0 },
+    cutawayEnabled: { value: 0 },
+  };
+
+  material.userData.airMassShaderUniforms = uniforms;
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uAirMassCutawayCenter = uniforms.cutawayCenter;
+    shader.uniforms.uAirMassCutawayRadius = uniforms.cutawayRadius;
+    shader.uniforms.uAirMassCutawayEnabled = uniforms.cutawayEnabled;
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+varying vec3 vAirMassWorldPosition;`
+      )
+      .replace(
+        "#include <worldpos_vertex>",
+        `#include <worldpos_vertex>
+vec4 airMassWorldPosition = vec4( transformed, 1.0 );
+#ifdef USE_BATCHING
+airMassWorldPosition = batchingMatrix * airMassWorldPosition;
+#endif
+#ifdef USE_INSTANCING
+airMassWorldPosition = instanceMatrix * airMassWorldPosition;
+#endif
+airMassWorldPosition = modelMatrix * airMassWorldPosition;
+vAirMassWorldPosition = airMassWorldPosition.xyz;`
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+uniform vec3 uAirMassCutawayCenter;
+uniform float uAirMassCutawayRadius;
+uniform float uAirMassCutawayEnabled;
+varying vec3 vAirMassWorldPosition;`
+      )
+      .replace(
+        "#include <clipping_planes_fragment>",
+        `#include <clipping_planes_fragment>
+if ( uAirMassCutawayEnabled > 0.5 ) {
+  vec3 cutawayDelta = vAirMassWorldPosition - uAirMassCutawayCenter;
+  if ( dot( cutawayDelta, cutawayDelta ) < uAirMassCutawayRadius * uAirMassCutawayRadius ) {
+    discard;
+  }
+}`
+      );
+  };
+  material.customProgramCacheKey = () => "air-mass-classification-cutaway-v3";
+}
+
+function setAirMassShaderUniforms(
+  material: THREE.MeshBasicMaterial | THREE.LineBasicMaterial,
+  cameraPosition: THREE.Vector3,
+  layerState: {
+    cameraCutawayEnabled: boolean;
+    cameraCutawayRadius: number;
+  }
+) {
+  const uniforms = material.userData.airMassShaderUniforms as
+    | AirMassShaderUniforms
+    | undefined;
+  if (!uniforms) return;
+
+  uniforms.cutawayCenter.value.copy(cameraPosition);
+  uniforms.cutawayRadius.value = layerState.cameraCutawayRadius;
+  uniforms.cutawayEnabled.value = layerState.cameraCutawayEnabled ? 1 : 0;
 }
 
 function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
   const positionAttribute = geometry.getAttribute("position");
   const colorAttribute = geometry.getAttribute("color");
+  const altitudeAttribute = geometry.getAttribute("airMassAltitudeMix");
   const indexAttribute = geometry.getIndex();
   if (
     !(positionAttribute instanceof THREE.BufferAttribute) ||
     !(colorAttribute instanceof THREE.BufferAttribute) ||
+    !(altitudeAttribute instanceof THREE.BufferAttribute) ||
     !(indexAttribute instanceof THREE.BufferAttribute)
   ) {
     return new THREE.BufferGeometry();
   }
 
   const indices = indexAttribute.array;
+  const shellRanges = (geometry.userData.airMassLevelRanges ??
+    []) as AirMassLevelRange[];
   const linePositions: number[] = [];
   const lineColors: number[] = [];
+  const lineAltitudeMixes: number[] = [];
+  const lineRanges: AirMassLevelRange[] = [];
   const seenEdges = new Set<string>();
   const edgeColor = new THREE.Color();
   const colorA = new THREE.Color();
@@ -261,37 +471,64 @@ function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
       edgeColor.g,
       edgeColor.b
     );
+    lineAltitudeMixes.push(
+      altitudeAttribute.getX(startIndex),
+      altitudeAttribute.getX(endIndex)
+    );
   };
 
-  for (let index = 0; index + 5 < indices.length; index += 6) {
-    const corner0 = Number(indices[index]);
-    const tri1b = Number(indices[index + 1]);
-    const tri1c = Number(indices[index + 2]);
-    const corner0Repeat = Number(indices[index + 3]);
-    const tri2b = Number(indices[index + 4]);
-    const tri2c = Number(indices[index + 5]);
-    if (corner0 !== corner0Repeat) continue;
+  const appendFaceRange = (
+    start: number,
+    count: number,
+    altitudeMix: number
+  ) => {
+    const lineStart = linePositions.length / 3;
+    const end = Math.min(start + count, indices.length);
 
-    let corner1 = -1;
-    let corner2 = -1;
-    let corner3 = -1;
+    for (let index = start; index + 5 < end; index += 6) {
+      const corner0 = Number(indices[index]);
+      const tri1b = Number(indices[index + 1]);
+      const tri1c = Number(indices[index + 2]);
+      const corner0Repeat = Number(indices[index + 3]);
+      const tri2b = Number(indices[index + 4]);
+      const tri2c = Number(indices[index + 5]);
+      if (corner0 !== corner0Repeat) continue;
 
-    if (tri1c === tri2b) {
-      corner1 = tri1b;
-      corner2 = tri1c;
-      corner3 = tri2c;
-    } else if (tri1b === tri2c) {
-      corner1 = tri1c;
-      corner2 = tri1b;
-      corner3 = tri2b;
-    } else {
-      continue;
+      let corner1 = -1;
+      let corner2 = -1;
+      let corner3 = -1;
+
+      if (tri1c === tri2b) {
+        corner1 = tri1b;
+        corner2 = tri1c;
+        corner3 = tri2c;
+      } else if (tri1b === tri2c) {
+        corner1 = tri1c;
+        corner2 = tri1b;
+        corner3 = tri2b;
+      } else {
+        continue;
+      }
+
+      appendEdge(corner0, corner1);
+      appendEdge(corner1, corner2);
+      appendEdge(corner2, corner3);
+      appendEdge(corner3, corner0);
     }
 
-    appendEdge(corner0, corner1);
-    appendEdge(corner1, corner2);
-    appendEdge(corner2, corner3);
-    appendEdge(corner3, corner0);
+    lineRanges.push({
+      start: lineStart,
+      count: linePositions.length / 3 - lineStart,
+      altitudeMix,
+    });
+  };
+
+  if (shellRanges.length > 0) {
+    for (const range of shellRanges) {
+      appendFaceRange(range.start, range.count, range.altitudeMix);
+    }
+  } else {
+    appendFaceRange(0, indices.length, 0);
   }
 
   const lineGeometry = new THREE.BufferGeometry();
@@ -303,20 +540,91 @@ function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
     "color",
     new THREE.BufferAttribute(new Float32Array(lineColors), 3)
   );
+  lineGeometry.setAttribute(
+    "airMassAltitudeMix",
+    new THREE.BufferAttribute(new Float32Array(lineAltitudeMixes), 1)
+  );
+  lineGeometry.userData.airMassLevelRanges = lineRanges;
   lineGeometry.computeBoundingSphere();
   return lineGeometry;
 }
 
+function shouldRenderDoubleSided(frame: AirMassStructureFrame) {
+  return (
+    frame.metadata.radial_top_faces_drawn === false ||
+    frame.manifest.classification.radial_top_faces_drawn === false
+  );
+}
+
+function drawRangeForAltitude(
+  geometry: THREE.BufferGeometry,
+  altitudeRange01: AirMassAltitudeRange01
+) {
+  const ranges = (geometry.userData.airMassLevelRanges ??
+    []) as AirMassLevelRange[];
+  if (ranges.length === 0) {
+    const indexCount = geometry.getIndex()?.count ?? 0;
+    return { start: 0, count: indexCount };
+  }
+
+  const altitudeRange = normalizeAltitudeRange01(altitudeRange01);
+  let start = -1;
+  let end = 0;
+
+  for (const range of ranges) {
+    if (
+      range.count <= 0 ||
+      range.altitudeMix < altitudeRange.min ||
+      range.altitudeMix > altitudeRange.max
+    ) {
+      continue;
+    }
+    if (start < 0) {
+      start = range.start;
+    }
+    end = range.start + range.count;
+  }
+
+  if (start < 0) {
+    return { start: 0, count: 0 };
+  }
+
+  return {
+    start,
+    count: end - start,
+  };
+}
+
+function setGeometryDrawRangeIfChanged(
+  geometry: THREE.BufferGeometry,
+  start: number,
+  count: number
+) {
+  if (geometry.drawRange.start === start && geometry.drawRange.count === count) {
+    return;
+  }
+  geometry.setDrawRange(start, count);
+}
+
 export default function AirMassClassificationLayer() {
-  const layerState = useControls((state) => state.airMassLayer);
+  const layerVisible = useControls((state) => state.airMassLayer.visible);
+  const layerVariant = useControls((state) => state.airMassLayer.variant);
   const verticalExaggeration = useControls(
     (state) => state.moistureStructureLayer.verticalExaggeration
   );
-  const { engineReady, sceneRef, globeRef, signalReady, timestamp } =
-    useEarthLayer("air-mass-classification");
+  const {
+    cameraRef,
+    engineReady,
+    sceneRef,
+    globeRef,
+    registerFramePass,
+    signalReady,
+    timestamp,
+    unregisterFramePass,
+  } = useEarthLayer("air-mass-classification");
 
   const rootRef = useRef<THREE.Group | null>(null);
-  const materialRef = useRef<THREE.MeshLambertMaterial | null>(null);
+  const materialRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const gridMaterialRef = useRef<THREE.LineBasicMaterial | null>(null);
   const meshRefs = useRef<Partial<Record<AirMassStructureClassKey, THREE.Mesh | null>>>(
     {}
@@ -325,6 +633,8 @@ export default function AirMassClassificationLayer() {
     Partial<Record<AirMassStructureClassKey, THREE.LineSegments | null>>
   >({});
   const frameRef = useRef<AirMassStructureFrame | null>(null);
+  const layerStateRef = useRef(useControls.getState().airMassLayer);
+  const cameraPositionRef = useRef(new THREE.Vector3());
   const reqIdRef = useRef(0);
 
   const clearMeshes = useCallback(() => {
@@ -350,20 +660,111 @@ export default function AirMassClassificationLayer() {
     }
   }, []);
 
+  const applyAltitudeAndClassVisibility = useCallback(() => {
+    const state = layerStateRef.current;
+    const hiddenClassKeys = new Set(state.hiddenClassKeys);
+    for (const classKey of new Set([
+      ...Object.keys(meshRefs.current),
+      ...Object.keys(gridRefs.current),
+    ])) {
+      const classVisible = !hiddenClassKeys.has(classKey);
+      const mesh = meshRefs.current[classKey];
+      if (mesh) {
+        const drawRange = drawRangeForAltitude(
+          mesh.geometry,
+          state.altitudeRange01
+        );
+        setGeometryDrawRangeIfChanged(
+          mesh.geometry,
+          drawRange.start,
+          drawRange.count
+        );
+        mesh.visible = classVisible && drawRange.count > 0;
+      }
+      const grid = gridRefs.current[classKey];
+      if (grid) {
+        const drawRange = drawRangeForAltitude(
+          grid.geometry,
+          state.altitudeRange01
+        );
+        setGeometryDrawRangeIfChanged(
+          grid.geometry,
+          drawRange.start,
+          drawRange.count
+        );
+        grid.visible =
+          classVisible &&
+          state.showCellGrid &&
+          drawRange.count > 0;
+      }
+    }
+  }, []);
+
+  const applyLayerRuntimeState = useCallback(
+    (state: AirMassClassificationLayerState) => {
+      const root = rootRef.current;
+      const material = materialRef.current;
+      const gridMaterial = gridMaterialRef.current;
+      if (root) {
+        root.visible = state.visible;
+      }
+      if (material) {
+        material.transparent = state.opacity < 0.999;
+        material.opacity = state.opacity;
+        material.depthWrite = state.opacity >= 0.999;
+      }
+      if (gridMaterial) {
+        gridMaterial.opacity = Math.max(state.opacity * CELL_GRID_OPACITY, 0.12);
+      }
+
+      const camera = cameraRef.current;
+      if (camera && material && gridMaterial) {
+        camera.getWorldPosition(cameraPositionRef.current);
+        setAirMassShaderUniforms(
+          material,
+          cameraPositionRef.current,
+          state
+        );
+        setAirMassShaderUniforms(
+          gridMaterial,
+          cameraPositionRef.current,
+          state
+        );
+      }
+
+      applyAltitudeAndClassVisibility();
+    },
+    [applyAltitudeAndClassVisibility, cameraRef]
+  );
+
+  useEffect(() => {
+    const applyState = (state: AirMassClassificationLayerState) => {
+      layerStateRef.current = state;
+      applyLayerRuntimeState(state);
+    };
+    applyState(useControls.getState().airMassLayer);
+    return useControls.subscribe((state, previousState) => {
+      if (state.airMassLayer === previousState.airMassLayer) return;
+      applyState(state.airMassLayer);
+    });
+  }, [applyLayerRuntimeState]);
+
   const rebuildMesh = useCallback(() => {
     const root = rootRef.current;
     const material = materialRef.current;
     const gridMaterial = gridMaterialRef.current;
     const frame = frameRef.current;
     if (!root || !material || !gridMaterial || !frame) return;
-
     root.userData.variant = frame.manifest.variant;
+    material.side = shouldRenderDoubleSided(frame) ? THREE.DoubleSide : THREE.FrontSide;
+    material.needsUpdate = true;
     clearMeshes();
 
     for (const classKey of frame.classKeys) {
       const classBuffer = frame.classBuffers[classKey];
       if (classBuffer.positions.length === 0 || classBuffer.indices.length === 0) {
         meshRefs.current[classKey] = null;
+        gridRefs.current[classKey] = null;
         continue;
       }
 
@@ -375,9 +776,10 @@ export default function AirMassClassificationLayer() {
       root.add(mesh);
       meshRefs.current[classKey] = mesh;
 
-      if (layerState.showCellGrid && geometry.index && geometry.index.count > 0) {
+      if (geometry.index && geometry.index.count > 0) {
+        const gridGeometry = buildCellGridGeometry(geometry);
         const grid = new THREE.LineSegments(
-          buildCellGridGeometry(geometry),
+          gridGeometry,
           gridMaterial
         );
         grid.name = `air-mass-${classKey}-cell-grid`;
@@ -389,7 +791,12 @@ export default function AirMassClassificationLayer() {
         gridRefs.current[classKey] = null;
       }
     }
-  }, [clearMeshes, layerState.showCellGrid, verticalExaggeration]);
+    applyAltitudeAndClassVisibility();
+  }, [
+    applyAltitudeAndClassVisibility,
+    clearMeshes,
+    verticalExaggeration,
+  ]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -403,15 +810,15 @@ export default function AirMassClassificationLayer() {
     sceneRef.current.add(root);
     rootRef.current = root;
 
-    const material = new THREE.MeshLambertMaterial({
+    const material = new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: false,
       opacity: 1,
       depthWrite: true,
       depthTest: true,
       side: THREE.FrontSide,
-      flatShading: true,
     });
+    attachAirMassShader(material);
     materialRef.current = material;
 
     const gridMaterial = new THREE.LineBasicMaterial({
@@ -421,9 +828,31 @@ export default function AirMassClassificationLayer() {
       depthTest: true,
       depthWrite: false,
     });
+    attachAirMassShader(gridMaterial);
     gridMaterialRef.current = gridMaterial;
+    applyLayerRuntimeState(layerStateRef.current);
+
+    const framePassKey = "air-mass-classification-camera-cutaway";
+    registerFramePass(framePassKey, () => {
+      const camera = cameraRef.current;
+      const currentMaterial = materialRef.current;
+      const currentGridMaterial = gridMaterialRef.current;
+      if (!camera || !currentMaterial || !currentGridMaterial) return;
+      camera.getWorldPosition(cameraPositionRef.current);
+      setAirMassShaderUniforms(
+        currentMaterial,
+        cameraPositionRef.current,
+        layerStateRef.current
+      );
+      setAirMassShaderUniforms(
+        currentGridMaterial,
+        cameraPositionRef.current,
+        layerStateRef.current
+      );
+    });
 
     return () => {
+      unregisterFramePass(framePassKey);
       clearMeshes();
       material.dispose();
       gridMaterial.dispose();
@@ -432,29 +861,23 @@ export default function AirMassClassificationLayer() {
       rootRef.current = null;
       root.removeFromParent();
     };
-  }, [clearMeshes, engineReady, globeRef, sceneRef]);
+  }, [
+    applyLayerRuntimeState,
+    cameraRef,
+    clearMeshes,
+    engineReady,
+    globeRef,
+    registerFramePass,
+    sceneRef,
+    unregisterFramePass,
+  ]);
 
   useEffect(() => {
-    if (!engineReady) return;
-    const root = rootRef.current;
-    const material = materialRef.current;
-    const gridMaterial = gridMaterialRef.current;
-    if (!root || !material || !gridMaterial) return;
-
-    root.visible = layerState.visible;
-    material.transparent = layerState.opacity < 0.999;
-    material.opacity = layerState.opacity;
-    material.depthWrite = layerState.opacity >= 0.999;
-    gridMaterial.opacity = Math.max(layerState.opacity * CELL_GRID_OPACITY, 0.12);
-  }, [engineReady, layerState.opacity, layerState.visible]);
-
-  useEffect(() => {
-    if (!engineReady || !frameRef.current || !layerState.visible) return;
+    if (!engineReady || !frameRef.current || !layerVisible) return;
     rebuildMesh();
   }, [
     engineReady,
-    layerState.showCellGrid,
-    layerState.visible,
+    layerVisible,
     rebuildMesh,
     verticalExaggeration,
   ]);
@@ -468,7 +891,7 @@ export default function AirMassClassificationLayer() {
     const requestId = ++reqIdRef.current;
     const isCancelled = () => cancelled || requestId !== reqIdRef.current;
 
-    if (!layerState.visible) {
+    if (!layerVisible) {
       root.visible = false;
       signalReady(timestamp);
       return () => {
@@ -479,7 +902,7 @@ export default function AirMassClassificationLayer() {
     root.visible = true;
 
     void fetchAirMassStructureFrame(timestamp, {
-      variant: layerState.variant,
+      variant: layerVariant,
     })
       .then((frame) => {
         if (isCancelled()) return;
@@ -498,8 +921,8 @@ export default function AirMassClassificationLayer() {
     };
   }, [
     engineReady,
-    layerState.variant,
-    layerState.visible,
+    layerVariant,
+    layerVisible,
     rebuildMesh,
     signalReady,
     timestamp,

@@ -721,7 +721,16 @@ export default function EarthBase({
     function cloneAirMassLayerState(
       state: AirMassClassificationLayerState
     ): AirMassClassificationLayerState {
-      return { ...state };
+      return {
+        ...state,
+        altitudeRange01: {
+          min: state.altitudeRange01?.min ?? 0,
+          max: state.altitudeRange01?.max ?? 1,
+        },
+        cameraCutawayEnabled: state.cameraCutawayEnabled ?? false,
+        cameraCutawayRadius: state.cameraCutawayRadius ?? 40,
+        hiddenClassKeys: [...(state.hiddenClassKeys ?? [])],
+      };
     }
 
     function cloneExampleShaderMeshLayerState(

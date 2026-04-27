@@ -3,9 +3,13 @@
 import dynamic from "next/dynamic";
 import ControlsHelp from "./ControlsHelp";
 import ExplainerCard from "./ExplainerCard";
-import LayerVisibilityPane from "./LayerVisibilityPane";
 
 const DevViewerPane = dynamic(() => import("./DevViewerPane"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const LayerVisibilityPane = dynamic(() => import("./LayerVisibilityPane"), {
   ssr: false,
   loading: () => null,
 });

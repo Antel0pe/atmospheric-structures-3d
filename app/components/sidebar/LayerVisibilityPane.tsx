@@ -339,6 +339,7 @@ export default function LayerVisibilityPane() {
                 setAirMassLayer({
                   variant:
                     event.currentTarget.value as AirMassClassificationVariant,
+                  hiddenClassKeys: [],
                 })
               }
               style={selectStyle()}
