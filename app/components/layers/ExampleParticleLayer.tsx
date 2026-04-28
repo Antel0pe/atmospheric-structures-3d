@@ -2,7 +2,7 @@
 "use client";
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
-import { useEarthLayer } from "./EarthBase";
+import { type FrameTick, useEarthLayer } from "./EarthBase";
 import { exampleParticleLayerApiUrl } from "../utils/ApiResponses"; // you said to use this
 import { useControls } from "@/app/state/controlsStore";
 import { loadDataTextureFromApi } from "./shaderUtils";
@@ -441,7 +441,12 @@ function disposeWindLayer(
   // points
   if (uvPointsRef.current) scene.remove(uvPointsRef.current);
   uvPointsRef.current?.geometry?.dispose();
-  (uvPointsRef.current?.material as any)?.dispose?.();
+  const pointsMaterial = uvPointsRef.current?.material;
+  if (Array.isArray(pointsMaterial)) {
+    for (const material of pointsMaterial) material.dispose();
+  } else {
+    pointsMaterial?.dispose();
+  }
   uvPointsRef.current = null;
 
   // overlay
@@ -462,12 +467,10 @@ function disposeWindLayer(
 
   // best-effort dispose any geometry on helper scenes
   for (const obj of L.simScene.children) {
-    const anyObj = obj as any;
-    if (anyObj.geometry?.dispose) anyObj.geometry.dispose();
+    if (obj instanceof THREE.Mesh) obj.geometry.dispose();
   }
   for (const obj of L.trailScene.children) {
-    const anyObj = obj as any;
-    if (anyObj.geometry?.dispose) anyObj.geometry.dispose();
+    if (obj instanceof THREE.Mesh) obj.geometry.dispose();
   }
 
   apiRef.current = null;
@@ -489,7 +492,7 @@ function buildWindLayer(args: {
   texH: number;
   windTexture: THREE.Texture;
 
-  registerFramePass: (key: string, fn: (tick: any) => void) => void;
+  registerFramePass: (key: string, fn: (tick: FrameTick) => void) => void;
   passKey: string;
 
   // refs (so we can keep using your existing pattern)

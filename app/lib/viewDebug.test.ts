@@ -25,33 +25,26 @@ function buildCase(): ViewDebugCase {
   const controls = useControls.getState();
   return {
     version: 1,
-    analyzer: "moisture-structure",
-    title: "Random walls debug",
+    analyzer: "air-mass",
+    title: "Layer debug",
     createdAt: "2026-04-07T00:00:00.000Z",
     source: {
       kind: "saved-view",
       id: "view-1",
-      title: "random walls",
-      path: "saved-views/random-walls.json",
+      title: "layer debug",
+      path: "saved-views/layer-debug.json",
     },
     timestamp: "2021-11-08T12:00",
     earthView: buildEarthView(),
     layerState: {
-      moistureStructureLayer: {
-        ...controls.moistureStructureLayer,
-        visibleBucketIndices: [...controls.moistureStructureLayer.visibleBucketIndices],
-      },
+      verticalExaggeration: controls.verticalExaggeration,
       precipitationRadarLayer: { ...controls.precipitationRadarLayer },
       precipitableWaterLayer: { ...controls.precipitableWaterLayer },
       potentialTemperatureLayer: { ...controls.potentialTemperatureLayer },
       airMassLayer: { ...controls.airMassLayer },
-      relativeHumidityLayer: { ...controls.relativeHumidityLayer },
-      exampleShaderMeshLayer: { ...controls.exampleShaderMeshLayer },
-      exampleContoursLayer: { ...controls.exampleContoursLayer },
-      exampleParticleLayer: { ...controls.exampleParticleLayer },
     },
     targets: [{ id: "target-1", label: "Target 1", x: 0.5, y: 0.5 }],
-    notes: "Local debug case for a wall-like target.",
+    notes: "Local debug case for a layer target.",
   };
 }
 

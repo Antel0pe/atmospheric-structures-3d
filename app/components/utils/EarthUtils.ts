@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
+export const FLAT_EARTH_MAP_WIDTH = 360;
+export const FLAT_EARTH_MAP_HEIGHT = 180;
+
 // 1) lat/lon -> world position on your globe (origin-centered)
 export function latLonToVec3(latDeg: number, lonDeg: number, radius: number, lonOffsetDeg = 270, latOffsetDeg = 0) {
     const lat = THREE.MathUtils.degToRad(latDeg + latOffsetDeg);
@@ -9,6 +12,18 @@ export function latLonToVec3(latDeg: number, lonDeg: number, radius: number, lon
     const y = radius * Math.sin(lat);
     const z = radius * Math.cos(lat) * Math.sin(lon);
     return new THREE.Vector3(x, y, z);
+}
+
+export function globeVec3ToLatLon(vector: THREE.Vector3) {
+    const radius = Math.max(vector.length(), 1e-6);
+    const lat = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(vector.y / radius, -1, 1)));
+    const lonRaw = -THREE.MathUtils.radToDeg(Math.atan2(vector.z, vector.x)) - 270;
+    const lon = ((((lonRaw + 180) % 360) + 360) % 360) - 180;
+    return { lat, lon, radius };
+}
+
+export function latLonHeightToFlatMapVec3(latDeg: number, lonDeg: number, height = 0) {
+    return new THREE.Vector3(lonDeg, height, -latDeg);
 }
 
 // 2) compute globe radius from the ThreeGlobe mesh

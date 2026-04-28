@@ -4,17 +4,11 @@ import type {
   ViewerNavigationCommand,
 } from "./viewerTypes";
 import type {
-  MoistureLegibilityExperiment,
-  MoistureStructureLayerState,
-  MoistureVisualPreset,
-} from "../state/controlsStore";
-import type {
   NormalizedScreenTarget,
   ViewDebugCase,
   ViewDebugCaseInput,
   ViewDebugLayerStateSnapshot,
 } from "./viewDebug";
-import type { MoistureSegmentationMode } from "../components/utils/ApiResponses";
 
 export const VIEWER_NAVIGATION_CONTROLS = [
   {
@@ -152,8 +146,6 @@ export type ViewerAutomationSnapshot = {
   paused: boolean;
   timestamp: string;
   zoom01: number;
-  moistureLegibilityExperiment: MoistureLegibilityExperiment;
-  moistureSegmentationMode: MoistureSegmentationMode;
   earthView: EarthViewState | null;
   savedViews: SavedViewRecord[];
 };
@@ -238,25 +230,6 @@ export type ViewerAutomationApi = {
   selectDebugTarget: (
     request: ViewerAutomationSelectionRequest
   ) => Promise<unknown>;
-  setMoistureLegibilityExperiment: (
-    experiment: MoistureLegibilityExperiment,
-    timeoutMs?: number
-  ) => Promise<ViewerAutomationSnapshot>;
-  setMoistureVisualPreset: (
-    preset: MoistureVisualPreset,
-    timeoutMs?: number
-  ) => Promise<ViewerAutomationSnapshot>;
-  setMoistureLayerPatch: (
-    patch: Partial<MoistureStructureLayerState>,
-    timeoutMs?: number
-  ) => Promise<ViewerAutomationSnapshot>;
-  resetMoistureLegibilityExperiment: (
-    timeoutMs?: number
-  ) => Promise<ViewerAutomationSnapshot>;
-  setMoistureSegmentationMode: (
-    segmentationMode: MoistureSegmentationMode,
-    timeoutMs?: number
-  ) => Promise<ViewerAutomationSnapshot>;
   listSavedViews: () => Promise<SavedViewRecord[]>;
   saveView: (input: {
     title: string;

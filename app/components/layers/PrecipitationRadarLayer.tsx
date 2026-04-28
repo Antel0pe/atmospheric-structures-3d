@@ -3,6 +3,10 @@ import * as THREE from "three";
 import { useEarthLayer } from "./EarthBase";
 import { useControls } from "../../state/controlsStore";
 import {
+  FLAT_EARTH_MAP_HEIGHT,
+  FLAT_EARTH_MAP_WIDTH,
+} from "../utils/EarthUtils";
+import {
   fetchPrecipitationRadarFrame,
   precipitationRadarImageUrl,
 } from "../utils/precipitationRadarAssets";
@@ -28,7 +32,7 @@ function applyLayerParams(
 }
 
 export default function PrecipitationRadarLayer() {
-  const { engineReady, sceneRef, globeRef, signalReady, timestamp } =
+  const { engineReady, sceneRef, globeRef, projectionMode, signalReady, timestamp } =
     useEarthLayer("precipitation-radar");
 
   const layerState = useControls((state) => state.precipitationRadarLayer);
@@ -39,13 +43,28 @@ export default function PrecipitationRadarLayer() {
 
   useEffect(() => {
     if (!engineReady) return;
-    if (!sceneRef.current || !globeRef.current) return;
+    if (!sceneRef.current) return;
+    if (projectionMode === "globe" && !globeRef.current) return;
 
     const scene = sceneRef.current;
     const state = useControls.getState();
     pendingRef.current = state.precipitationRadarLayer;
 
-    const geometry = new THREE.SphereGeometry(100 + LAYER_LIFT, 128, 128);
+    const geometry =
+      projectionMode === "flat2d"
+        ? new THREE.PlaneGeometry(
+            FLAT_EARTH_MAP_WIDTH,
+            FLAT_EARTH_MAP_HEIGHT,
+            1,
+            1
+          )
+        : new THREE.SphereGeometry(100 + LAYER_LIFT, 128, 128);
+    if (projectionMode === "flat2d") {
+      // QUICK AND DIRTY NEED TO REDO RADAR AS REAL MAP-SPACE DATA LAYER:
+      // reuse the equirectangular texture on a lifted plane for the /2d iteration.
+      geometry.rotateX(-Math.PI / 2);
+      geometry.translate(0, LAYER_LIFT, 0);
+    }
     const material = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -148,7 +167,7 @@ export default function PrecipitationRadarLayer() {
       disposeCrossfadeTextures(material);
       material.dispose();
     };
-  }, [engineReady, globeRef, sceneRef]);
+  }, [engineReady, globeRef, projectionMode, sceneRef]);
 
   useEffect(() => {
     if (!engineReady) return;

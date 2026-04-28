@@ -23,22 +23,18 @@ import {
 } from "../../lib/viewerAutomation";
 import type { EarthViewState } from "../../lib/viewerTypes";
 import {
-  resolveMoistureStructureLayerState,
   useControls,
   type AirMassClassificationLayerState,
-  type ExampleContoursLayerState,
-  type ExampleParticleLayerState,
-  type ExampleShaderMeshLayerState,
-  type MoistureLegibilityExperiment,
-  type MoistureStructureLayerState,
   type PotentialTemperatureLayerState,
   type PrecipitableWaterLayerState,
   type PrecipitationRadarLayerState,
-  type RelativeHumidityLayerState,
 } from "../../state/controlsStore";
-import type { MoistureSegmentationMode } from "../utils/ApiResponses";
 import { useViewerStore } from "../../state/viewerStore";
-import { lookAtLatLon } from "../utils/EarthUtils";
+import {
+  FLAT_EARTH_MAP_HEIGHT,
+  FLAT_EARTH_MAP_WIDTH,
+  lookAtLatLon,
+} from "../utils/EarthUtils";
 import type {
   ViewDebugAnalyzerAdapter,
   ViewDebugCase,
@@ -59,6 +55,8 @@ import {
 
 const LOCAL_GLOBE_TEXTURE_URL = "/earth-day.jpg";
 
+export type EarthProjectionMode = "globe" | "flat2d";
+
 declare global {
   interface Window {
     __ATMOS_AUTOMATION__?: ViewerAutomationApi;
@@ -73,9 +71,8 @@ export type EarthEngine = {
   cameraRef: RefObject<THREE.PerspectiveCamera | null>;
   controlsRef: RefObject<OrbitControls | null>;
   globeRef: RefObject<ThreeGlobe | null>;
+  projectionMode: EarthProjectionMode;
   ambientLightRef: RefObject<THREE.AmbientLight | null>;
-  moistureKeyLightRef: RefObject<THREE.DirectionalLight | null>;
-  moistureHeadLightRef: RefObject<THREE.DirectionalLight | null>;
   timestamp: string;
   registerLayer: (key: string) => void;
   unregisterLayer: (key: string) => void;
@@ -124,6 +121,7 @@ export type FramePass = (tick: FrameTick) => void;
 
 type Props = {
   timestamp: string;
+  projectionMode?: EarthProjectionMode;
   onAllReadyChange?: (ready: boolean, timestamp: string) => void;
   children?: ReactNode;
 };
@@ -154,6 +152,7 @@ function isEditableKeyboardTarget(target: EventTarget | null) {
 
 export default function EarthBase({
   timestamp,
+  projectionMode = "globe",
   onAllReadyChange,
   children,
 }: Props) {
@@ -165,8 +164,6 @@ export default function EarthBase({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
-  const moistureKeyLightRef = useRef<THREE.DirectionalLight | null>(null);
-  const moistureHeadLightRef = useRef<THREE.DirectionalLight | null>(null);
   const sunRef = useRef<THREE.DirectionalLight | null>(null);
   const roRef = useRef<ResizeObserver | null>(null);
   const automationEnabledRef = useRef(false);
@@ -429,6 +426,7 @@ export default function EarthBase({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    const isFlatMap = projectionMode === "flat2d";
 
     const automationEnabled =
       new URLSearchParams(window.location.search).get("automation") === "1";
@@ -459,13 +457,53 @@ export default function EarthBase({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0c10);
 
-    const globe = new ThreeGlobe()
-      .onGlobeReady(() => {
-        globeReadyRef.current = true;
-        setGlobeReady(true);
-      })
-      .globeImageUrl(LOCAL_GLOBE_TEXTURE_URL);
-    scene.add(globe);
+    const globe = isFlatMap
+      ? null
+      : new ThreeGlobe()
+          .onGlobeReady(() => {
+            globeReadyRef.current = true;
+            setGlobeReady(true);
+          })
+          .globeImageUrl(LOCAL_GLOBE_TEXTURE_URL);
+
+    if (globe) {
+      scene.add(globe);
+    } else {
+      // QUICK AND DIRTY NEED TO REDO MAP BASE BETTER: this is a textured equirectangular
+      // plane so existing globe layers can be projected onto x/lon, y/height, z/lat quickly.
+      const mapGeometry = new THREE.PlaneGeometry(
+        FLAT_EARTH_MAP_WIDTH,
+        FLAT_EARTH_MAP_HEIGHT,
+        1,
+        1
+      );
+      mapGeometry.rotateX(-Math.PI / 2);
+      const mapMaterial = new THREE.MeshBasicMaterial({
+        color: 0x5c7890,
+        side: THREE.DoubleSide,
+      });
+      const mapMesh = new THREE.Mesh(mapGeometry, mapMaterial);
+      mapMesh.name = "flat-earth-map";
+      scene.add(mapMesh);
+
+      new THREE.TextureLoader().load(
+        LOCAL_GLOBE_TEXTURE_URL,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          mapMaterial.map = texture;
+          mapMaterial.needsUpdate = true;
+          globeReadyRef.current = true;
+          setGlobeReady(true);
+          render();
+        },
+        undefined,
+        () => {
+          globeReadyRef.current = true;
+          setGlobeReady(true);
+          render();
+        }
+      );
+    }
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1e9);
     camera.up.set(0, 1, 0);
@@ -473,7 +511,7 @@ export default function EarthBase({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.enableRotate = false;
+    controls.enableRotate = isFlatMap;
     controls.minPolarAngle = 0.0001;
     controls.maxPolarAngle = Math.PI - 0.0001;
     controls.minAzimuthAngle = -Infinity;
@@ -484,27 +522,23 @@ export default function EarthBase({
     controls.update();
     renderer.render(scene, camera);
 
-    lookAtLatLon(30, -135, camera, controls, globe, 100);
-    navigationPoseRef.current = canonicalizeCameraForNavigation(camera, controls);
+    if (globe) {
+      lookAtLatLon(30, -135, camera, controls, globe, 100);
+      navigationPoseRef.current = canonicalizeCameraForNavigation(camera, controls);
+    } else {
+      camera.position.set(0, 230, 250);
+      controls.target.set(0, 0, 0);
+      controls.update();
+      camera.lookAt(controls.target);
+      navigationPoseRef.current = stabilizeNavigationPose(
+        deriveYawPitchFromCamera(camera.position, camera.quaternion)
+      );
+    }
     syncZoomState(radiusToZoom01(camera.position.length()), true);
 
     const ambient = new THREE.AmbientLight(0xffffff, 2);
     scene.add(ambient);
     const debugAdapters = debugAdaptersRef.current;
-
-    const moistureLightTarget = new THREE.Object3D();
-    moistureLightTarget.position.set(0, 0, 0);
-    scene.add(moistureLightTarget);
-
-    const moistureKeyLight = new THREE.DirectionalLight(0xf5f9ff, 0);
-    moistureKeyLight.position.set(220, -160, 260);
-    moistureKeyLight.target = moistureLightTarget;
-    scene.add(moistureKeyLight);
-
-    const moistureHeadLight = new THREE.DirectionalLight(0xcfe4ff, 0);
-    moistureHeadLight.position.copy(camera.position);
-    moistureHeadLight.target = moistureLightTarget;
-    scene.add(moistureHeadLight);
 
     const sun = null;
     const canvas = renderer.domElement;
@@ -669,35 +703,14 @@ export default function EarthBase({
 
     function getViewerSnapshot() {
       const state = useViewerStore.getState();
-      const moistureLayer = useControls.getState().moistureStructureLayer;
-      const resolvedMoistureLayer = resolveMoistureStructureLayerState(
-        moistureLayer
-      );
       return {
         ready: getReadyState(),
         paused: automationPausedRef.current,
         timestamp: state.timestamp,
         zoom01: state.zoom01,
-        moistureLegibilityExperiment: moistureLayer.legibilityExperiment,
-        moistureSegmentationMode: resolvedMoistureLayer.segmentationMode,
         earthView: state.earthView,
         savedViews: state.savedViews,
       };
-    }
-
-    function cloneMoistureStructureLayerState(
-      state: MoistureStructureLayerState
-    ): MoistureStructureLayerState {
-      return {
-        ...state,
-        visibleBucketIndices: [...state.visibleBucketIndices],
-      };
-    }
-
-    function cloneRelativeHumidityLayerState(
-      state: RelativeHumidityLayerState
-    ): RelativeHumidityLayerState {
-      return { ...state };
     }
 
     function clonePrecipitationRadarLayerState(
@@ -733,30 +746,10 @@ export default function EarthBase({
       };
     }
 
-    function cloneExampleShaderMeshLayerState(
-      state: ExampleShaderMeshLayerState
-    ): ExampleShaderMeshLayerState {
-      return { ...state };
-    }
-
-    function cloneExampleContoursLayerState(
-      state: ExampleContoursLayerState
-    ): ExampleContoursLayerState {
-      return { ...state };
-    }
-
-    function cloneExampleParticleLayerState(
-      state: ExampleParticleLayerState
-    ): ExampleParticleLayerState {
-      return { ...state };
-    }
-
     function getLayerStateSnapshot(): ViewDebugLayerStateSnapshot {
       const controlsState = useControls.getState();
       return {
-        moistureStructureLayer: cloneMoistureStructureLayerState(
-          controlsState.moistureStructureLayer
-        ),
+        verticalExaggeration: controlsState.verticalExaggeration,
         precipitationRadarLayer: clonePrecipitationRadarLayerState(
           controlsState.precipitationRadarLayer
         ),
@@ -767,26 +760,12 @@ export default function EarthBase({
           controlsState.potentialTemperatureLayer
         ),
         airMassLayer: cloneAirMassLayerState(controlsState.airMassLayer),
-        relativeHumidityLayer: cloneRelativeHumidityLayerState(
-          controlsState.relativeHumidityLayer
-        ),
-        exampleShaderMeshLayer: cloneExampleShaderMeshLayerState(
-          controlsState.exampleShaderMeshLayer
-        ),
-        exampleContoursLayer: cloneExampleContoursLayerState(
-          controlsState.exampleContoursLayer
-        ),
-        exampleParticleLayer: cloneExampleParticleLayerState(
-          controlsState.exampleParticleLayer
-        ),
       };
     }
 
     function applyLayerStateSnapshot(snapshot: ViewDebugLayerStateSnapshot) {
       const controlsState = useControls.getState();
-      controlsState.setMoistureStructureLayer(
-        cloneMoistureStructureLayerState(snapshot.moistureStructureLayer)
-      );
+      controlsState.setVerticalExaggeration(snapshot.verticalExaggeration);
       controlsState.setPrecipitationRadarLayer(
         clonePrecipitationRadarLayerState(snapshot.precipitationRadarLayer)
       );
@@ -798,18 +777,6 @@ export default function EarthBase({
       );
       controlsState.setAirMassLayer(
         cloneAirMassLayerState(snapshot.airMassLayer)
-      );
-      controlsState.setRelativeHumidityLayer(
-        cloneRelativeHumidityLayerState(snapshot.relativeHumidityLayer)
-      );
-      controlsState.setExampleShaderMeshLayer(
-        cloneExampleShaderMeshLayerState(snapshot.exampleShaderMeshLayer)
-      );
-      controlsState.setExampleContoursLayer(
-        cloneExampleContoursLayerState(snapshot.exampleContoursLayer)
-      );
-      controlsState.setExampleParticleLayer(
-        cloneExampleParticleLayerState(snapshot.exampleParticleLayer)
       );
     }
 
@@ -902,37 +869,6 @@ export default function EarthBase({
       return getViewerSnapshot();
     }
 
-    async function waitForMoistureState(timeoutMs = 90_000) {
-      const moistureLayer = useControls.getState().moistureStructureLayer;
-      const resolved = resolveMoistureStructureLayerState(moistureLayer);
-      const expectedTimestamp = useViewerStore.getState().timestamp;
-
-      await waitForCondition(
-        () => {
-          const frame = useControls.getState().moistureStructureFrame;
-          return (
-            !resolved.visible ||
-            (frame !== null &&
-              frame.timestamp === expectedTimestamp &&
-              frame.segmentationMode === resolved.segmentationMode)
-          );
-        },
-        timeoutMs,
-        `moisture state for ${resolved.segmentationMode} to settle`
-      );
-
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            render();
-            resolve();
-          })
-        );
-      });
-
-      return getViewerSnapshot();
-    }
-
     async function loadSavedViews() {
       await useViewerStore.getState().loadSavedViews();
       return useViewerStore.getState().savedViews;
@@ -1007,8 +943,6 @@ export default function EarthBase({
     controlsRef.current = controls;
     globeRef.current = globe;
     ambientLightRef.current = ambient;
-    moistureKeyLightRef.current = moistureKeyLight;
-    moistureHeadLightRef.current = moistureHeadLight;
     sunRef.current = sun;
     roRef.current = resizeObserver;
 
@@ -1158,7 +1092,6 @@ export default function EarthBase({
 
         applyEarthViewState(debugCase.earthView);
         await waitForReady(timeoutMs);
-        await waitForMoistureState(timeoutMs);
         applyEarthViewState(debugCase.earthView);
         render();
         return getViewDebugState();
@@ -1183,51 +1116,6 @@ export default function EarthBase({
         const result = adapter.selectTarget(request.targetId);
         render();
         return result ?? null;
-      },
-      async setMoistureLegibilityExperiment(
-        experiment: MoistureLegibilityExperiment,
-        timeoutMs = 90_000
-      ) {
-        if (useControls.getState().moistureStructureLayer.legibilityExperiment === experiment) {
-          return waitForMoistureState(timeoutMs);
-        }
-
-        useControls.getState().setMoistureLegibilityExperiment(experiment);
-        return waitForMoistureState(timeoutMs);
-      },
-      async setMoistureVisualPreset(preset, timeoutMs = 90_000) {
-        if (useControls.getState().moistureStructureLayer.visualPreset === preset) {
-          return waitForMoistureState(timeoutMs);
-        }
-
-        useControls.getState().setMoistureVisualPreset(preset);
-        return waitForMoistureState(timeoutMs);
-      },
-      async setMoistureLayerPatch(patch, timeoutMs = 90_000) {
-        useControls.getState().setMoistureStructureLayer(patch);
-        return waitForMoistureState(timeoutMs);
-      },
-      async resetMoistureLegibilityExperiment(timeoutMs = 90_000) {
-        if (
-          useControls.getState().moistureStructureLayer.legibilityExperiment ===
-          "bridgePruned"
-        ) {
-          return waitForMoistureState(timeoutMs);
-        }
-
-        useControls.getState().resetMoistureLegibilityExperiment();
-        return waitForMoistureState(timeoutMs);
-      },
-      async setMoistureSegmentationMode(
-        segmentationMode: MoistureSegmentationMode,
-        timeoutMs = 90_000
-      ) {
-        if (useControls.getState().moistureStructureLayer.segmentationMode === segmentationMode) {
-          return waitForMoistureState(timeoutMs);
-        }
-
-        useControls.getState().setMoistureStructureLayer({ segmentationMode });
-        return waitForMoistureState(timeoutMs);
       },
       async listSavedViews() {
         return loadSavedViews();
@@ -1285,7 +1173,9 @@ export default function EarthBase({
       },
     };
 
-    canvas.addEventListener("click", onCanvasClick);
+    if (!isFlatMap) {
+      canvas.addEventListener("click", onCanvasClick);
+    }
     document.addEventListener("pointerlockchange", onPointerLockChange);
     document.addEventListener("pointerlockerror", onPointerLockError);
     window.addEventListener("keydown", onReleaseKey);
@@ -1333,8 +1223,6 @@ export default function EarthBase({
 
       debugAdapters.clear();
       ambientLightRef.current = null;
-      moistureKeyLightRef.current = null;
-      moistureHeadLightRef.current = null;
       delete window.__ATMOS_AUTOMATION__;
     };
   }, [
@@ -1342,6 +1230,7 @@ export default function EarthBase({
     publishEarthView,
     radiusToZoom01,
     render,
+    projectionMode,
     syncViewerState,
     syncZoomState,
   ]);
@@ -1459,9 +1348,8 @@ export default function EarthBase({
       cameraRef,
       controlsRef,
       globeRef,
+      projectionMode,
       ambientLightRef,
-      moistureKeyLightRef,
-      moistureHeadLightRef,
       timestamp,
       registerLayer,
       unregisterLayer,
@@ -1477,6 +1365,7 @@ export default function EarthBase({
     [
       allLayersReady,
       engineReady,
+      projectionMode,
       registerFramePass,
       registerDebugAdapter,
       registerLayer,

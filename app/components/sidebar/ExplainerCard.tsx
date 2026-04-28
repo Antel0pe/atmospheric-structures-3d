@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 
 export default function ExplainerCard() {
@@ -37,38 +38,35 @@ export default function ExplainerCard() {
           opacity: 0.9,
         }}
       >
-        <span>Pacific Northwest Floods (2021) — Atmospheric River Anomaly</span>
-        <span style={{ opacity: 0.7 }}>{open ? "–" : "+"}</span>
+        <span>Pacific Northwest Floods (2021) - Atmospheric River Setup</span>
+        <span style={{ opacity: 0.7 }}>{open ? "-" : "+"}</span>
       </button>
 
-      {open && (
+      {open ? (
         <div style={{ display: "grid", gap: 10 }}>
-          {/* What you're looking at */}
           <div style={rowStyle()}>
             <RiverIcon />
             <div>
               What this map shows
               <div style={muted()}>
-                An atmospheric river anomaly: where moisture transport was unusually strong compared to typical conditions.
-                Think of it like extra moisture being funneled along a corridor.
+                A fast atmospheric-structure viewer for comparing layered
+                fields around the November 2021 Pacific Northwest flood setup.
               </div>
             </div>
           </div>
 
-          {/* Pineapple express */}
           <div style={rowStyle()}>
-            <PineappleIcon />
+            <MapIcon />
             <div>
-              “Pineapple Express”
+              Globe and flat map
               <div style={muted()}>
-                A nickname for a setup where tropical moisture is carried from near Hawaii toward the Pacific coast, feeding a long,
-                narrow plume of very wet air.
+                The same layer controls can drive either the 3D globe or the
+                quick flat-map projection at /2d.
               </div>
             </div>
           </div>
-
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -84,21 +82,6 @@ function rowStyle() {
 
 function muted() {
   return { opacity: 0.7, fontWeight: 400, lineHeight: 1.35 } as const;
-}
-
-function iconStroke() {
-  return {
-    stroke: "rgba(255,255,255,0.28)",
-    strokeWidth: 1.2,
-  } as const;
-}
-
-function iconFill() {
-  return {
-    fill: "rgba(255,255,255,0.08)",
-    stroke: "rgba(255,255,255,0.22)",
-    strokeWidth: 1.2,
-  } as const;
 }
 
 function RiverIcon() {
@@ -124,20 +107,23 @@ function RiverIcon() {
   );
 }
 
-function PineappleIcon() {
+function MapIcon() {
   return (
     <svg width="42" height="42" viewBox="0 0 42 42" aria-hidden>
       <circle cx="21" cy="21" r="18" fill="rgba(255,255,255,0.03)" />
-      {/* leaves */}
-      <path d="M21 9 C18 10, 17 13, 21 14 C25 13, 24 10, 21 9 Z" {...iconFill()} />
-      <path d="M16 11 C14 12, 14 15, 18 15 C20 14, 18 12, 16 11 Z" {...iconFill()} />
-      <path d="M26 11 C28 12, 28 15, 24 15 C22 14, 24 12, 26 11 Z" {...iconFill()} />
-      {/* body */}
-      <ellipse cx="21" cy="24" rx="8.5" ry="10" {...iconFill()} />
-      {/* simple cross-hatch */}
-      <path d="M16 22 L26 30" {...iconStroke()} />
-      <path d="M26 22 L16 30" {...iconStroke()} />
-      <path d="M15 26 L27 26" {...iconStroke()} />
+      <path
+        d="M10 14 L18 11 L25 14 L32 11 L32 28 L25 31 L18 28 L10 31 Z"
+        fill="rgba(255,255,255,0.08)"
+        stroke="rgba(255,255,255,0.26)"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 11 L18 28 M25 14 L25 31"
+        fill="none"
+        stroke="rgba(255,255,255,0.22)"
+        strokeWidth="1.2"
+      />
     </svg>
   );
 }

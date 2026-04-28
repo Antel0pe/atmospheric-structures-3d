@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useEarthLayer } from "./EarthBase";
+import { type EarthProjectionMode, useEarthLayer } from "./EarthBase";
 import {
   useControls,
   type PotentialTemperatureColorMode,
@@ -9,6 +9,10 @@ import {
   fetchPotentialTemperatureStructureFrame,
   type PotentialTemperatureStructureFrame,
 } from "../utils/potentialTemperatureStructureAssets";
+import {
+  globeVec3ToLatLon,
+  latLonHeightToFlatMapVec3,
+} from "../utils/EarthUtils";
 
 const LAYER_CLEARANCE = 10.8;
 const LAYER_RENDER_ORDER = 68;
@@ -184,7 +188,8 @@ function buildGeometry(
   frame: PotentialTemperatureStructureFrame,
   verticalExaggeration: number,
   kind: ShellKind,
-  colorMode: PotentialTemperatureColorMode
+  colorMode: PotentialTemperatureColorMode,
+  projectionMode: EarthProjectionMode
 ) {
   const bandScale = buildBandScale(frame, colorMode, kind);
   const positions =
@@ -193,6 +198,7 @@ function buildGeometry(
     kind === "warm" ? frame.warmIndices.slice() : frame.coldIndices.slice();
   const colors = new Float32Array((positions.length / 3) * 3);
   const baseRadius = frame.manifest.globe.base_radius;
+  const globePosition = new THREE.Vector3();
 
   for (let i = 0; i < positions.length; i += 3) {
     const x = positions[i];
@@ -202,13 +208,28 @@ function buildGeometry(
     if (radius <= 1e-6) continue;
 
     const radialOffset = Math.max(radius - baseRadius, 0);
-    const exaggeratedRadius =
-      baseRadius + LAYER_CLEARANCE + radialOffset * verticalExaggeration;
-    const scale = exaggeratedRadius / radius;
+    if (projectionMode === "flat2d") {
+      // QUICK AND DIRTY NEED TO REDO FLAT PROJECTION WITH SHARED PROJECTOR/2D
+      // ASSETS: unwrap existing globe shell vertices into lon/lat map coordinates.
+      globePosition.set(x, y, z);
+      const { lat, lon } = globeVec3ToLatLon(globePosition);
+      const flatPosition = latLonHeightToFlatMapVec3(
+        lat,
+        lon,
+        LAYER_CLEARANCE + radialOffset * verticalExaggeration
+      );
+      positions[i] = flatPosition.x;
+      positions[i + 1] = flatPosition.y;
+      positions[i + 2] = flatPosition.z;
+    } else {
+      const exaggeratedRadius =
+        baseRadius + LAYER_CLEARANCE + radialOffset * verticalExaggeration;
+      const scale = exaggeratedRadius / radius;
 
-    positions[i] *= scale;
-    positions[i + 1] *= scale;
-    positions[i + 2] *= scale;
+      positions[i] *= scale;
+      positions[i + 1] *= scale;
+      positions[i + 2] *= scale;
+    }
 
     const levelIndex = levelIndexForRadius(radius, bandScale.boundaryRadii);
     const pressureHpa = radiusToPressureHpa(frame, radius);
@@ -229,7 +250,10 @@ function buildGeometry(
   return geometry;
 }
 
-function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
+function buildCellGridGeometry(
+  geometry: THREE.BufferGeometry,
+  projectionMode: EarthProjectionMode
+) {
   const positionAttribute = geometry.getAttribute("position");
   const colorAttribute = geometry.getAttribute("color");
   const indexAttribute = geometry.getIndex();
@@ -263,10 +287,16 @@ function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
 
     liftedA.fromBufferAttribute(positionAttribute, startIndex);
     liftedB.fromBufferAttribute(positionAttribute, endIndex);
-    const radiusA = Math.max(liftedA.length(), 1e-6);
-    const radiusB = Math.max(liftedB.length(), 1e-6);
-    liftedA.multiplyScalar((radiusA + CELL_GRID_RADIAL_OFFSET) / radiusA);
-    liftedB.multiplyScalar((radiusB + CELL_GRID_RADIAL_OFFSET) / radiusB);
+    if (projectionMode === "flat2d") {
+      // QUICK AND DIRTY NEED TO REDO GRID OFFSET IN PROJECTION SPACE BETTER.
+      liftedA.y += CELL_GRID_RADIAL_OFFSET;
+      liftedB.y += CELL_GRID_RADIAL_OFFSET;
+    } else {
+      const radiusA = Math.max(liftedA.length(), 1e-6);
+      const radiusB = Math.max(liftedB.length(), 1e-6);
+      liftedA.multiplyScalar((radiusA + CELL_GRID_RADIAL_OFFSET) / radiusA);
+      liftedB.multiplyScalar((radiusB + CELL_GRID_RADIAL_OFFSET) / radiusB);
+    }
 
     linePositions.push(
       liftedA.x,
@@ -336,10 +366,8 @@ function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
 
 export default function PotentialTemperatureStructuresLayer() {
   const layerState = useControls((state) => state.potentialTemperatureLayer);
-  const verticalExaggeration = useControls(
-    (state) => state.moistureStructureLayer.verticalExaggeration
-  );
-  const { engineReady, sceneRef, globeRef, signalReady, timestamp } =
+  const verticalExaggeration = useControls((state) => state.verticalExaggeration);
+  const { engineReady, sceneRef, globeRef, projectionMode, signalReady, timestamp } =
     useEarthLayer("potential-temperature-structures");
 
   const rootRef = useRef<THREE.Group | null>(null);
@@ -373,7 +401,8 @@ export default function PotentialTemperatureStructuresLayer() {
       frame,
       verticalExaggeration,
       "warm",
-      layerState.colorMode
+      layerState.colorMode,
+      projectionMode
     );
     const warmMesh = new THREE.Mesh(warmGeometry, material);
     warmMesh.name = "potential-temperature-warm-shell";
@@ -384,7 +413,7 @@ export default function PotentialTemperatureStructuresLayer() {
 
     if (layerState.showCellGrid && warmGeometry.index && warmGeometry.index.count > 0) {
       const warmGrid = new THREE.LineSegments(
-        buildCellGridGeometry(warmGeometry),
+        buildCellGridGeometry(warmGeometry, projectionMode),
         gridMaterial
       );
       warmGrid.name = "potential-temperature-warm-cell-grid";
@@ -400,7 +429,8 @@ export default function PotentialTemperatureStructuresLayer() {
       frame,
       verticalExaggeration,
       "cold",
-      layerState.colorMode
+      layerState.colorMode,
+      projectionMode
     );
     const coldMesh = new THREE.Mesh(coldGeometry, material);
     coldMesh.name = "potential-temperature-cold-shell";
@@ -411,7 +441,7 @@ export default function PotentialTemperatureStructuresLayer() {
 
     if (layerState.showCellGrid && coldGeometry.index && coldGeometry.index.count > 0) {
       const coldGrid = new THREE.LineSegments(
-        buildCellGridGeometry(coldGeometry),
+        buildCellGridGeometry(coldGeometry, projectionMode),
         gridMaterial
       );
       coldGrid.name = "potential-temperature-cold-cell-grid";
@@ -422,11 +452,18 @@ export default function PotentialTemperatureStructuresLayer() {
     } else {
       coldGridRef.current = null;
     }
-  }, [layerState.colorMode, layerState.showCellGrid, layerState.variant, verticalExaggeration]);
+  }, [
+    layerState.colorMode,
+    layerState.showCellGrid,
+    layerState.variant,
+    projectionMode,
+    verticalExaggeration,
+  ]);
 
   useEffect(() => {
     if (!engineReady) return;
-    if (!sceneRef.current || !globeRef.current) return;
+    if (!sceneRef.current) return;
+    if (projectionMode === "globe" && !globeRef.current) return;
 
     const root = new THREE.Group();
     root.name = "potential-temperature-structures-root";
@@ -442,7 +479,7 @@ export default function PotentialTemperatureStructuresLayer() {
       opacity: 1,
       depthWrite: true,
       depthTest: true,
-      side: THREE.FrontSide,
+      side: projectionMode === "flat2d" ? THREE.DoubleSide : THREE.FrontSide,
       flatShading: true,
     });
     materialRef.current = material;
@@ -472,7 +509,7 @@ export default function PotentialTemperatureStructuresLayer() {
       rootRef.current = null;
       root.removeFromParent();
     };
-  }, [engineReady, globeRef, sceneRef]);
+  }, [engineReady, globeRef, projectionMode, sceneRef]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -485,12 +522,12 @@ export default function PotentialTemperatureStructuresLayer() {
     material.transparent = layerState.opacity < 0.999;
     material.opacity = layerState.opacity;
     material.depthWrite = layerState.opacity >= 0.999;
-    material.side = THREE.FrontSide;
+    material.side = projectionMode === "flat2d" ? THREE.DoubleSide : THREE.FrontSide;
     gridMaterial.opacity = Math.max(layerState.opacity * CELL_GRID_OPACITY, 0.12);
     if (frameRef.current) {
       rebuildMesh();
     }
-  }, [engineReady, layerState.opacity, layerState.visible, rebuildMesh]);
+  }, [engineReady, projectionMode, layerState.opacity, layerState.visible, rebuildMesh]);
 
   useEffect(() => {
     if (!engineReady) return;

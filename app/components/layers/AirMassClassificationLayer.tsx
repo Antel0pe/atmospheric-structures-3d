@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useEarthLayer } from "./EarthBase";
+import { type EarthProjectionMode, useEarthLayer } from "./EarthBase";
 import {
   useControls,
   type AirMassClassificationLayerState,
 } from "../../state/controlsStore";
+import {
+  globeVec3ToLatLon,
+  latLonHeightToFlatMapVec3,
+} from "../utils/EarthUtils";
 import {
   AIR_MASS_CLASS_ORDER,
   type AirMassStructureClassKey,
@@ -211,7 +215,8 @@ function levelIndexForRadius(radius: number, boundaryRadii: number[]) {
 function buildGeometry(
   frame: AirMassStructureFrame,
   verticalExaggeration: number,
-  classKey: AirMassStructureClassKey
+  classKey: AirMassStructureClassKey,
+  projectionMode: EarthProjectionMode
 ) {
   const bandScale = buildBandScale(frame, classKey);
   const fallbackStops = CLASS_COLOR_STOPS[classKey] ?? [
@@ -229,6 +234,7 @@ function buildGeometry(
   const baseRadius = frame.manifest.globe.base_radius;
   const pressureLevels = frame.metadata.pressure_levels_hpa;
   const levelCount = Math.max(pressureLevels.length, 1);
+  const globePosition = new THREE.Vector3();
   const altitudeMixByLevel =
     pressureLevels.length > 0
       ? pressureLevels.map((pressure) => altitudeMixForPressure(frame, pressure))
@@ -243,13 +249,28 @@ function buildGeometry(
     if (radius <= 1e-6) continue;
 
     const radialOffset = Math.max(radius - baseRadius, 0);
-    const exaggeratedRadius =
-      baseRadius + LAYER_CLEARANCE + radialOffset * verticalExaggeration;
-    const scale = exaggeratedRadius / radius;
+    if (projectionMode === "flat2d") {
+      // QUICK AND DIRTY NEED TO REDO FLAT PROJECTION WITH SHARED PROJECTOR/2D
+      // ASSETS: unwrap existing globe classification vertices into lon/lat map space.
+      globePosition.set(x, y, z);
+      const { lat, lon } = globeVec3ToLatLon(globePosition);
+      const flatPosition = latLonHeightToFlatMapVec3(
+        lat,
+        lon,
+        LAYER_CLEARANCE + radialOffset * verticalExaggeration
+      );
+      positions[index] = flatPosition.x;
+      positions[index + 1] = flatPosition.y;
+      positions[index + 2] = flatPosition.z;
+    } else {
+      const exaggeratedRadius =
+        baseRadius + LAYER_CLEARANCE + radialOffset * verticalExaggeration;
+      const scale = exaggeratedRadius / radius;
 
-    positions[index] *= scale;
-    positions[index + 1] *= scale;
-    positions[index + 2] *= scale;
+      positions[index] *= scale;
+      positions[index + 1] *= scale;
+      positions[index + 2] *= scale;
+    }
 
     const levelIndex = levelIndexForRadius(radius, bandScale.boundaryRadii);
     const pressureHpa = radiusToPressureHpa(frame, radius);
@@ -406,7 +427,10 @@ function setAirMassShaderUniforms(
   uniforms.cutawayEnabled.value = layerState.cameraCutawayEnabled ? 1 : 0;
 }
 
-function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
+function buildCellGridGeometry(
+  geometry: THREE.BufferGeometry,
+  projectionMode: EarthProjectionMode
+) {
   const positionAttribute = geometry.getAttribute("position");
   const colorAttribute = geometry.getAttribute("color");
   const altitudeAttribute = geometry.getAttribute("airMassAltitudeMix");
@@ -446,10 +470,15 @@ function buildCellGridGeometry(geometry: THREE.BufferGeometry) {
 
     liftedA.fromBufferAttribute(positionAttribute, startIndex);
     liftedB.fromBufferAttribute(positionAttribute, endIndex);
-    const radiusA = Math.max(liftedA.length(), 1e-6);
-    const radiusB = Math.max(liftedB.length(), 1e-6);
-    liftedA.multiplyScalar((radiusA + CELL_GRID_RADIAL_OFFSET) / radiusA);
-    liftedB.multiplyScalar((radiusB + CELL_GRID_RADIAL_OFFSET) / radiusB);
+    if (projectionMode === "flat2d") {
+      liftedA.y += CELL_GRID_RADIAL_OFFSET;
+      liftedB.y += CELL_GRID_RADIAL_OFFSET;
+    } else {
+      const radiusA = Math.max(liftedA.length(), 1e-6);
+      const radiusB = Math.max(liftedB.length(), 1e-6);
+      liftedA.multiplyScalar((radiusA + CELL_GRID_RADIAL_OFFSET) / radiusA);
+      liftedB.multiplyScalar((radiusB + CELL_GRID_RADIAL_OFFSET) / radiusB);
+    }
 
     linePositions.push(
       liftedA.x,
@@ -609,14 +638,13 @@ function setGeometryDrawRangeIfChanged(
 export default function AirMassClassificationLayer() {
   const layerVisible = useControls((state) => state.airMassLayer.visible);
   const layerVariant = useControls((state) => state.airMassLayer.variant);
-  const verticalExaggeration = useControls(
-    (state) => state.moistureStructureLayer.verticalExaggeration
-  );
+  const verticalExaggeration = useControls((state) => state.verticalExaggeration);
   const {
     cameraRef,
     engineReady,
     sceneRef,
     globeRef,
+    projectionMode,
     registerFramePass,
     signalReady,
     timestamp,
@@ -756,7 +784,10 @@ export default function AirMassClassificationLayer() {
     const frame = frameRef.current;
     if (!root || !material || !gridMaterial || !frame) return;
     root.userData.variant = frame.manifest.variant;
-    material.side = shouldRenderDoubleSided(frame) ? THREE.DoubleSide : THREE.FrontSide;
+    material.side =
+      projectionMode === "flat2d" || shouldRenderDoubleSided(frame)
+        ? THREE.DoubleSide
+        : THREE.FrontSide;
     material.needsUpdate = true;
     clearMeshes();
 
@@ -768,7 +799,12 @@ export default function AirMassClassificationLayer() {
         continue;
       }
 
-      const geometry = buildGeometry(frame, verticalExaggeration, classKey);
+      const geometry = buildGeometry(
+        frame,
+        verticalExaggeration,
+        classKey,
+        projectionMode
+      );
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = `air-mass-${classKey}-shell`;
       mesh.renderOrder = LAYER_RENDER_ORDER;
@@ -777,7 +813,7 @@ export default function AirMassClassificationLayer() {
       meshRefs.current[classKey] = mesh;
 
       if (geometry.index && geometry.index.count > 0) {
-        const gridGeometry = buildCellGridGeometry(geometry);
+        const gridGeometry = buildCellGridGeometry(geometry, projectionMode);
         const grid = new THREE.LineSegments(
           gridGeometry,
           gridMaterial
@@ -795,12 +831,14 @@ export default function AirMassClassificationLayer() {
   }, [
     applyAltitudeAndClassVisibility,
     clearMeshes,
+    projectionMode,
     verticalExaggeration,
   ]);
 
   useEffect(() => {
     if (!engineReady) return;
-    if (!sceneRef.current || !globeRef.current) return;
+    if (!sceneRef.current) return;
+    if (projectionMode === "globe" && !globeRef.current) return;
 
     const root = new THREE.Group();
     root.name = "air-mass-classification-root";
@@ -867,6 +905,7 @@ export default function AirMassClassificationLayer() {
     clearMeshes,
     engineReady,
     globeRef,
+    projectionMode,
     registerFramePass,
     sceneRef,
     unregisterFramePass,

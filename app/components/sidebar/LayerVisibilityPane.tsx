@@ -5,13 +5,9 @@ import {
   AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS,
   POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
   POTENTIAL_TEMPERATURE_VARIANT_OPTIONS,
-  RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS,
-  RELATIVE_HUMIDITY_VARIANT_OPTIONS,
   type AirMassClassificationVariant,
   type PotentialTemperatureColorMode,
   type PotentialTemperatureVariant,
-  type RelativeHumidityColorMode,
-  type RelativeHumidityVariant,
   useControls,
 } from "../../state/controlsStore";
 
@@ -90,9 +86,7 @@ export default function LayerVisibilityPane() {
     getClientHydrationSnapshot,
     getServerHydrationSnapshot
   );
-  const moistureVisible = useControls(
-    (state) => state.moistureStructureLayer.visible
-  );
+  const verticalExaggeration = useControls((state) => state.verticalExaggeration);
   const precipitationLayer = useControls((state) => state.precipitationRadarLayer);
   const precipitableWaterLayer = useControls(
     (state) => state.precipitableWaterLayer
@@ -101,11 +95,8 @@ export default function LayerVisibilityPane() {
     (state) => state.potentialTemperatureLayer
   );
   const airMassLayer = useControls((state) => state.airMassLayer);
-  const relativeHumidityLayer = useControls(
-    (state) => state.relativeHumidityLayer
-  );
-  const setMoistureStructureLayer = useControls(
-    (state) => state.setMoistureStructureLayer
+  const setVerticalExaggeration = useControls(
+    (state) => state.setVerticalExaggeration
   );
   const setPrecipitationRadarLayer = useControls(
     (state) => state.setPrecipitationRadarLayer
@@ -117,9 +108,6 @@ export default function LayerVisibilityPane() {
     (state) => state.setPotentialTemperatureLayer
   );
   const setAirMassLayer = useControls((state) => state.setAirMassLayer);
-  const setRelativeHumidityLayer = useControls(
-    (state) => state.setRelativeHumidityLayer
-  );
 
   return (
     <section style={sectionStyle()}>
@@ -135,84 +123,30 @@ export default function LayerVisibilityPane() {
       </div>
 
       <div style={{ display: "grid", gap: 12 }}>
-        <CheckboxRow
-          label="Moisture Structures"
-          checked={moistureVisible}
-          accentColor="#ff8a9a"
-          onChange={(checked) => setMoistureStructureLayer({ visible: checked })}
-        />
-
-        <CheckboxRow
-          label="Relative Humidity Shell"
-          checked={relativeHumidityLayer.visible}
-          accentColor="#7fe7ff"
-          onChange={(checked) => setRelativeHumidityLayer({ visible: checked })}
-        />
-
-        <div
-          style={{
-            display: relativeHumidityLayer.visible ? "grid" : "none",
-            gap: 12,
-          }}
-        >
-            <label style={{ display: "grid", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontWeight: 600,
-                }}
-              >
-                <span>RH Color Mode</span>
-                <span style={{ opacity: 0.68 }}>Voxel shell</span>
-              </div>
-              <select
-                value={relativeHumidityLayer.colorMode}
-                onChange={(event) =>
-                  setRelativeHumidityLayer({
-                    colorMode: event.currentTarget.value as RelativeHumidityColorMode,
-                  })
-                }
-                style={selectStyle()}
-              >
-                {RELATIVE_HUMIDITY_COLOR_MODE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label style={{ display: "grid", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontWeight: 600,
-                }}
-              >
-                <span>Data Variant</span>
-                <span style={{ opacity: 0.68 }}>Asset source</span>
-              </div>
-              <select
-                value={relativeHumidityLayer.variant}
-                onChange={(event) =>
-                  setRelativeHumidityLayer({
-                    variant: event.currentTarget.value as RelativeHumidityVariant,
-                  })
-                }
-                style={selectStyle()}
-              >
-                {RELATIVE_HUMIDITY_VARIANT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-        </div>
+        <label style={{ display: "grid", gap: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 8,
+              fontWeight: 600,
+            }}
+          >
+            <span>Vertical Exaggeration</span>
+            <span>{verticalExaggeration.toFixed(1)}x</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={8}
+            step={0.5}
+            value={verticalExaggeration}
+            onChange={(event) =>
+              setVerticalExaggeration(Number(event.currentTarget.value))
+            }
+            style={{ width: "100%", accentColor: "#9ebcff" }}
+          />
+        </label>
 
         <CheckboxRow
           label="Precipitable Water Proxy"
@@ -234,78 +168,78 @@ export default function LayerVisibilityPane() {
             gap: 12,
           }}
         >
-            <label style={{ display: "grid", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontWeight: 600,
-                }}
-              >
-                <span>Structure Recipe</span>
-                <span style={{ opacity: 0.68 }}>
-                  {potentialTemperatureLayer.variant ===
-                  "raw-temperature-midpoint-cold-side"
-                    ? "Raw temperature midpoint"
-                    : "Climatology anomaly"}
-                </span>
-              </div>
-              <select
-                value={potentialTemperatureLayer.variant}
-                onChange={(event) =>
-                  setPotentialTemperatureLayer({
-                    variant: event.currentTarget.value as PotentialTemperatureVariant,
-                  })
-                }
-                style={selectStyle()}
-              >
-                {POTENTIAL_TEMPERATURE_VARIANT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label style={{ display: "grid", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  fontWeight: 600,
-                }}
-              >
-                <span>Color Mode</span>
-                <span style={{ opacity: 0.68 }}>Warm/cold shell</span>
-              </div>
-              <select
-                value={potentialTemperatureLayer.colorMode}
-                onChange={(event) =>
-                  setPotentialTemperatureLayer({
-                    colorMode:
-                      event.currentTarget.value as PotentialTemperatureColorMode,
-                  })
-                }
-                style={selectStyle()}
-              >
-                {POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <CheckboxRow
-              label="Show Cell Grid"
-              checked={potentialTemperatureLayer.showCellGrid}
-              accentColor="#cfe0ff"
-              onChange={(checked) =>
-                setPotentialTemperatureLayer({ showCellGrid: checked })
+          <label style={{ display: "grid", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                fontWeight: 600,
+              }}
+            >
+              <span>Structure Recipe</span>
+              <span style={{ opacity: 0.68 }}>
+                {potentialTemperatureLayer.variant ===
+                "raw-temperature-midpoint-cold-side"
+                  ? "Raw temperature midpoint"
+                  : "Climatology anomaly"}
+              </span>
+            </div>
+            <select
+              value={potentialTemperatureLayer.variant}
+              onChange={(event) =>
+                setPotentialTemperatureLayer({
+                  variant: event.currentTarget.value as PotentialTemperatureVariant,
+                })
               }
-            />
+              style={selectStyle()}
+            >
+              {POTENTIAL_TEMPERATURE_VARIANT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                fontWeight: 600,
+              }}
+            >
+              <span>Color Mode</span>
+              <span style={{ opacity: 0.68 }}>Warm/cold shell</span>
+            </div>
+            <select
+              value={potentialTemperatureLayer.colorMode}
+              onChange={(event) =>
+                setPotentialTemperatureLayer({
+                  colorMode:
+                    event.currentTarget.value as PotentialTemperatureColorMode,
+                })
+              }
+              style={selectStyle()}
+            >
+              {POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <CheckboxRow
+            label="Show Cell Grid"
+            checked={potentialTemperatureLayer.showCellGrid}
+            accentColor="#cfe0ff"
+            onChange={(checked) =>
+              setPotentialTemperatureLayer({ showCellGrid: checked })
+            }
+          />
         </div>
 
         <CheckboxRow
@@ -368,24 +302,6 @@ export default function LayerVisibilityPane() {
           accentColor="#8dff75"
           onChange={(checked) => setPrecipitationRadarLayer({ visible: checked })}
         />
-
-        <div
-          suppressHydrationWarning
-          style={{ lineHeight: 1.45, opacity: 0.75 }}
-        >
-          Relative humidity uses the selected shell variant nearest to the active
-          timestamp. The precipitable water proxy keeps only 500-1000 hPa voxels
-          that pass the top-40%-q, RH, and 3-level depth gates. Potential
-          temperature derives dry potential temperature in 3D, subtracts the
-          matched climatology on each pressure level, and can now either use the
-          existing sign-tail bridge recipes or an exact top-10%-cells, top-10%
-          components, same-sign vertical-growth recipe before rendering separate
-          warm and cold voxel shells. Air mass classification is a proxy layer:
-          it combines warm/cold and moist/dry per-level latitude-band anomalies
-          into quadrant-classified voxel shells rather than doing true
-          trajectory-based Bergeron source-region analysis. The precipitation
-          layer uses static radar textures.
-        </div>
       </div>
     </section>
   );

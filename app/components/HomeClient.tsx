@@ -5,27 +5,12 @@ import { useEffect, useState } from "react";
 import SidebarPane from "./sidebar/SidebarPane";
 import DataNoticeOverlay from "./DataNoticeOverlay";
 import { useViewerStore } from "../state/viewerStore";
+import type { EarthProjectionMode } from "./layers/EarthBase";
 
 const EarthBase = dynamic(() => import("./layers/EarthBase"), {
   ssr: false,
   loading: () => <div style={{ width: "100%", height: "100%" }} />,
 });
-
-const MoistureStructureLayer = dynamic(
-  () => import("./layers/MoistureStructureLayer"),
-  {
-    ssr: false,
-    loading: () => <div style={{ width: "100%", height: "100%" }} />,
-  }
-);
-
-const RelativeHumidityVoxelLayer = dynamic(
-  () => import("./layers/RelativeHumidityVoxelLayer"),
-  {
-    ssr: false,
-    loading: () => <div style={{ width: "100%", height: "100%" }} />,
-  }
-);
 
 const PrecipitableWaterProxyLayer = dynamic(
   () => import("./layers/PrecipitableWaterProxyLayer"),
@@ -59,30 +44,6 @@ const PrecipitationRadarLayer = dynamic(
   }
 );
 
-const ExampleShaderMeshLayer = dynamic(
-  () => import("./layers/ExampleShaderMeshLayer"),
-  {
-    ssr: false,
-    loading: () => <div style={{ width: "100%", height: "100%" }} />,
-  }
-);
-
-const ExampleContoursLayer = dynamic(
-  () => import("./layers/ExampleContoursLayer"),
-  {
-    ssr: false,
-    loading: () => <div style={{ width: "100%", height: "100%" }} />,
-  }
-);
-
-const ExampleParticleLayer = dynamic(
-  () => import("./layers/ExampleParticleLayer"),
-  {
-    ssr: false,
-    loading: () => <div style={{ width: "100%", height: "100%" }} />,
-  }
-);
-
 const TimeSlider = dynamic(() => import("./TimeSlider"), {
   ssr: false,
   loading: () => <div style={{ height: "100%" }} />,
@@ -93,7 +54,13 @@ const LayerInfoPane = dynamic(() => import("./sidebar/LayerInfoPane"), {
   loading: () => <div style={{ width: "100%", height: "100%" }} />,
 });
 
-export default function HomeClient() {
+type HomeClientProps = {
+  projectionMode?: EarthProjectionMode;
+};
+
+export default function HomeClient({
+  projectionMode = "globe",
+}: HomeClientProps = {}) {
   const [allReady, setAllReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [layerInfoOpen, setLayerInfoOpen] = useState(true);
@@ -143,19 +110,15 @@ export default function HomeClient() {
       >
         <EarthBase
           timestamp={datehour}
+          projectionMode={projectionMode}
           onAllReadyChange={(ready, timestamp) => {
             if (timestamp === datehour) setAllReady(ready);
           }}
         >
           <PrecipitationRadarLayer />
-          <MoistureStructureLayer />
-          <RelativeHumidityVoxelLayer />
           <PrecipitableWaterProxyLayer />
           <PotentialTemperatureStructuresLayer />
           <AirMassClassificationLayer />
-          <ExampleShaderMeshLayer />
-          <ExampleContoursLayer />
-          <ExampleParticleLayer heightTex={null} />
         </EarthBase>
       </div>
 

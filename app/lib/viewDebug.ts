@@ -1,17 +1,12 @@
 import type {
   AirMassClassificationLayerState,
-  ExampleContoursLayerState,
-  ExampleParticleLayerState,
-  ExampleShaderMeshLayerState,
-  MoistureStructureLayerState,
   PotentialTemperatureLayerState,
   PrecipitableWaterLayerState,
   PrecipitationRadarLayerState,
-  RelativeHumidityLayerState,
 } from "../state/controlsStore";
 import { isEarthViewState, type EarthViewState } from "./viewerTypes";
 
-export type ViewDebugAnalyzerName = "moisture-structure" | (string & {});
+export type ViewDebugAnalyzerName = string & {};
 
 export type NormalizedScreenTarget = {
   id?: string;
@@ -35,15 +30,11 @@ export type ViewDebugExplicitSource = {
 export type ViewDebugSource = ViewDebugSavedViewSource | ViewDebugExplicitSource;
 
 export type ViewDebugLayerStateSnapshot = {
-  moistureStructureLayer: MoistureStructureLayerState;
+  verticalExaggeration: number;
   precipitationRadarLayer: PrecipitationRadarLayerState;
   precipitableWaterLayer: PrecipitableWaterLayerState;
   potentialTemperatureLayer: PotentialTemperatureLayerState;
   airMassLayer: AirMassClassificationLayerState;
-  relativeHumidityLayer: RelativeHumidityLayerState;
-  exampleShaderMeshLayer: ExampleShaderMeshLayerState;
-  exampleContoursLayer: ExampleContoursLayerState;
-  exampleParticleLayer: ExampleParticleLayerState;
 };
 
 export type ViewDebugCase = {
@@ -113,15 +104,11 @@ function isLayerStateSnapshot(value: unknown): value is ViewDebugLayerStateSnaps
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
   return (
-    !!candidate.moistureStructureLayer &&
+    isFiniteNumber(candidate.verticalExaggeration) &&
     !!candidate.precipitationRadarLayer &&
     !!candidate.precipitableWaterLayer &&
     !!candidate.potentialTemperatureLayer &&
-    !!candidate.airMassLayer &&
-    !!candidate.relativeHumidityLayer &&
-    !!candidate.exampleShaderMeshLayer &&
-    !!candidate.exampleContoursLayer &&
-    !!candidate.exampleParticleLayer
+    !!candidate.airMassLayer
   );
 }
 
