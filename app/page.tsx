@@ -1,6 +1,5 @@
-// app/page.tsx
-import HomeClient from "./components/HomeClient";
+import FlatMapClient from "./components/FlatMapClient";
 
-export default function Page() {
-  return <HomeClient />;
+export default function TwoDimensionalMapPage() {
+  return <FlatMapClient />;
 }

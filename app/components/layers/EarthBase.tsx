@@ -54,6 +54,8 @@ import {
 } from "./earthNavigation";
 
 const LOCAL_GLOBE_TEXTURE_URL = "/earth-day.jpg";
+const CAMERA_NEAR = 1;
+const CAMERA_FAR = 2_000;
 
 export type EarthProjectionMode = "globe" | "flat2d";
 
@@ -505,7 +507,12 @@ export default function EarthBase({
       );
     }
 
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1e9);
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      w / h,
+      CAMERA_NEAR,
+      CAMERA_FAR
+    );
     camera.up.set(0, 1, 0);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -526,7 +533,7 @@ export default function EarthBase({
       lookAtLatLon(30, -135, camera, controls, globe, 100);
       navigationPoseRef.current = canonicalizeCameraForNavigation(camera, controls);
     } else {
-      camera.position.set(0, 230, 250);
+      camera.position.set(0, 300, 150);
       controls.target.set(0, 0, 0);
       controls.update();
       camera.lookAt(controls.target);

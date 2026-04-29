@@ -7,6 +7,7 @@ import {
   type PrecipitableWaterProxyFrame,
 } from "../utils/precipitableWaterProxyAssets";
 import {
+  flatMapFaceStaysWithinSeam,
   globeVec3ToLatLon,
   latLonHeightToFlatMapVec3,
 } from "../utils/EarthUtils";
@@ -150,10 +151,26 @@ function buildGeometry(
     }
   }
 
+  let geometryIndices = indices;
+  if (projectionMode === "flat2d") {
+    const filteredIndices: number[] = [];
+    for (let i = 0; i + 2 < indices.length; i += 3) {
+      const faceIndices = [
+        Number(indices[i]),
+        Number(indices[i + 1]),
+        Number(indices[i + 2]),
+      ];
+      if (flatMapFaceStaysWithinSeam(positions, faceIndices)) {
+        filteredIndices.push(...faceIndices);
+      }
+    }
+    geometryIndices = new Uint32Array(filteredIndices);
+  }
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.setIndex(new THREE.BufferAttribute(geometryIndices, 1));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;

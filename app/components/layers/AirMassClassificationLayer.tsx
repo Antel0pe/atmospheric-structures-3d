@@ -6,6 +6,7 @@ import {
   type AirMassClassificationLayerState,
 } from "../../state/controlsStore";
 import {
+  flatMapFaceStaysWithinSeam,
   globeVec3ToLatLon,
   latLonHeightToFlatMapVec3,
 } from "../utils/EarthUtils";
@@ -304,6 +305,12 @@ function buildGeometry(
             Number(indices[index + 5]),
           ]
         : Array.from(indices.slice(index, Math.min(index + 3, indices.length)), Number);
+    if (
+      projectionMode === "flat2d" &&
+      !flatMapFaceStaysWithinSeam(positions, faceIndices)
+    ) {
+      continue;
+    }
     const levelIndex = THREE.MathUtils.clamp(
       Math.round(
         faceIndices.reduce((sum, item) => sum + vertexLevelIndices[item], 0) /
@@ -860,7 +867,8 @@ export default function AirMassClassificationLayer() {
     materialRef.current = material;
 
     const gridMaterial = new THREE.LineBasicMaterial({
-      vertexColors: true,
+      color: 0x808080,
+      vertexColors: false,
       transparent: true,
       opacity: CELL_GRID_OPACITY,
       depthTest: true,

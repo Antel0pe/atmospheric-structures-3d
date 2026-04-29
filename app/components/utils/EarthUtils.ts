@@ -26,6 +26,22 @@ export function latLonHeightToFlatMapVec3(latDeg: number, lonDeg: number, height
     return new THREE.Vector3(lonDeg, height, -latDeg);
 }
 
+export function flatMapFaceStaysWithinSeam(
+    positions: ArrayLike<number>,
+    faceIndices: readonly number[]
+) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    for (const vertexIndex of faceIndices) {
+        const x = positions[vertexIndex * 3];
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+    }
+
+    return maxX - minX <= FLAT_EARTH_MAP_WIDTH / 2;
+}
+
 // 2) compute globe radius from the ThreeGlobe mesh
 export function getGlobeRadius(globe: THREE.Object3D) {
     const sphere = new THREE.Sphere();

@@ -105,11 +105,11 @@ function formatAirMassAltitudeRangeLabel(
   range: { min: number; max: number }
 ) {
   const normalized = normalizeAirMassAltitudeRange(range);
-  return `${pressureForAltitudeMix(pressureWindow, normalized.max).toFixed(
+  return `${pressureForAltitudeMix(pressureWindow, normalized.min).toFixed(
     0
   )}-${pressureForAltitudeMix(
     pressureWindow,
-    normalized.min
+    normalized.max
   ).toFixed(0)} hPa`;
 }
 
