@@ -1,6 +1,10 @@
 import { fetchBlobOrThrow, fetchJsonOrThrow } from "./dataFetchErrors";
 import { snapTimestampToAvailable } from "./ApiResponses";
-import type { AirMassClassificationVariant } from "../../state/controlsStore";
+import {
+  airMassAssetVariantFor,
+  airMassClassificationVariantLabel,
+  type AirMassClassificationVariant,
+} from "../../state/controlsStore";
 
 export const AIR_MASS_CLASS_ORDER = [
   "warm_dry",
@@ -167,7 +171,7 @@ const manifestPromiseCache = new Map<
 >();
 
 function airMassStructureBaseSegments(variant: AirMassClassificationVariant) {
-  return ["air-mass-structures", "variants", variant];
+  return ["air-mass-structures", "variants", airMassAssetVariantFor(variant)];
 }
 
 function buildAirMassStructureUrl(
@@ -199,10 +203,20 @@ export async function fetchAirMassStructureManifest(opts?: {
       layerLabel: "Air-mass structures",
       notifyOnError,
     }
-  ).catch((error) => {
-    manifestPromiseCache.delete(variant);
-    throw error;
-  });
+  )
+    .then((manifest) => {
+      const assetVariant = airMassAssetVariantFor(variant);
+      if (variant === assetVariant) return manifest;
+      return {
+        ...manifest,
+        variant,
+        variant_label: airMassClassificationVariantLabel(variant),
+      };
+    })
+    .catch((error) => {
+      manifestPromiseCache.delete(variant);
+      throw error;
+    });
 
   manifestPromiseCache.set(variant, manifestPromise);
   return manifestPromise;

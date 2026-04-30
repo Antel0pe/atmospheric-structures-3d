@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { type EarthProjectionMode, useEarthLayer } from "./EarthBase";
 import {
+  isSmoothAirMassClassificationVariant,
   useControls,
   type AirMassClassificationLayerState,
 } from "../../state/controlsStore";
@@ -22,6 +23,9 @@ const LAYER_RENDER_ORDER = 69;
 const CELL_GRID_RADIAL_OFFSET = 0.08;
 const CELL_GRID_OPACITY = 0.82;
 const MIN_ALTITUDE_RANGE_SPAN = 0.01;
+const SMOOTH_VERTEX_ITERATIONS = 2;
+const SMOOTH_VERTEX_ALPHA = 0.34;
+const SMOOTH_VERTEX_KEY_SCALE = 100000;
 
 type AirMassAltitudeRange01 =
   AirMassClassificationLayerState["altitudeRange01"];
@@ -30,6 +34,9 @@ type AirMassShaderUniforms = {
   cutawayCenter: { value: THREE.Vector3 };
   cutawayRadius: { value: number };
   cutawayEnabled: { value: number };
+  altitudeMin: { value: number };
+  altitudeMax: { value: number };
+  altitudeClipEnabled: { value: number };
 };
 
 type AirMassLevelRange = {
@@ -213,11 +220,131 @@ function levelIndexForRadius(radius: number, boundaryRadii: number[]) {
   return low;
 }
 
+function positionKey(positions: Float32Array, vertexIndex: number) {
+  const offset = vertexIndex * 3;
+  return `${Math.round(positions[offset] * SMOOTH_VERTEX_KEY_SCALE)}:${Math.round(
+    positions[offset + 1] * SMOOTH_VERTEX_KEY_SCALE
+  )}:${Math.round(positions[offset + 2] * SMOOTH_VERTEX_KEY_SCALE)}`;
+}
+
+function connectNeighbor(
+  neighbors: Array<Set<number>>,
+  groupA: number,
+  groupB: number
+) {
+  if (groupA === groupB) return;
+  neighbors[groupA].add(groupB);
+  neighbors[groupB].add(groupA);
+}
+
+function smoothPositionsByAdjacency(
+  positions: Float32Array,
+  indices: Uint32Array
+) {
+  const vertexCount = positions.length / 3;
+  if (vertexCount === 0 || indices.length < 3) return positions;
+
+  const groupByVertex = new Uint32Array(vertexCount);
+  const groupMap = new Map<string, number>();
+  const groupSums: number[] = [];
+  const groupCounts: number[] = [];
+
+  for (let vertexIndex = 0; vertexIndex < vertexCount; vertexIndex += 1) {
+    const key = positionKey(positions, vertexIndex);
+    let groupIndex = groupMap.get(key);
+    if (groupIndex === undefined) {
+      groupIndex = groupCounts.length;
+      groupMap.set(key, groupIndex);
+      groupSums.push(0, 0, 0);
+      groupCounts.push(0);
+    }
+
+    groupByVertex[vertexIndex] = groupIndex;
+    const sourceOffset = vertexIndex * 3;
+    const groupOffset = groupIndex * 3;
+    groupSums[groupOffset] += positions[sourceOffset];
+    groupSums[groupOffset + 1] += positions[sourceOffset + 1];
+    groupSums[groupOffset + 2] += positions[sourceOffset + 2];
+    groupCounts[groupIndex] += 1;
+  }
+
+  const groupPositions = new Float32Array(groupCounts.length * 3);
+  for (let groupIndex = 0; groupIndex < groupCounts.length; groupIndex += 1) {
+    const groupOffset = groupIndex * 3;
+    const count = Math.max(groupCounts[groupIndex], 1);
+    groupPositions[groupOffset] = groupSums[groupOffset] / count;
+    groupPositions[groupOffset + 1] = groupSums[groupOffset + 1] / count;
+    groupPositions[groupOffset + 2] = groupSums[groupOffset + 2] / count;
+  }
+
+  const neighbors = Array.from(
+    { length: groupCounts.length },
+    () => new Set<number>()
+  );
+  for (let index = 0; index + 2 < indices.length; index += 3) {
+    const groupA = groupByVertex[Number(indices[index])];
+    const groupB = groupByVertex[Number(indices[index + 1])];
+    const groupC = groupByVertex[Number(indices[index + 2])];
+    connectNeighbor(neighbors, groupA, groupB);
+    connectNeighbor(neighbors, groupB, groupC);
+    connectNeighbor(neighbors, groupC, groupA);
+  }
+
+  let current = groupPositions;
+  for (let iteration = 0; iteration < SMOOTH_VERTEX_ITERATIONS; iteration += 1) {
+    const next = current.slice();
+    for (let groupIndex = 0; groupIndex < neighbors.length; groupIndex += 1) {
+      const neighborSet = neighbors[groupIndex];
+      if (neighborSet.size < 2) continue;
+
+      let averageX = 0;
+      let averageY = 0;
+      let averageZ = 0;
+      for (const neighborIndex of neighborSet) {
+        const neighborOffset = neighborIndex * 3;
+        averageX += current[neighborOffset];
+        averageY += current[neighborOffset + 1];
+        averageZ += current[neighborOffset + 2];
+      }
+
+      const groupOffset = groupIndex * 3;
+      const inverseNeighborCount = 1 / neighborSet.size;
+      next[groupOffset] = THREE.MathUtils.lerp(
+        current[groupOffset],
+        averageX * inverseNeighborCount,
+        SMOOTH_VERTEX_ALPHA
+      );
+      next[groupOffset + 1] = THREE.MathUtils.lerp(
+        current[groupOffset + 1],
+        averageY * inverseNeighborCount,
+        SMOOTH_VERTEX_ALPHA
+      );
+      next[groupOffset + 2] = THREE.MathUtils.lerp(
+        current[groupOffset + 2],
+        averageZ * inverseNeighborCount,
+        SMOOTH_VERTEX_ALPHA
+      );
+    }
+    current = next;
+  }
+
+  for (let vertexIndex = 0; vertexIndex < vertexCount; vertexIndex += 1) {
+    const sourceOffset = groupByVertex[vertexIndex] * 3;
+    const targetOffset = vertexIndex * 3;
+    positions[targetOffset] = current[sourceOffset];
+    positions[targetOffset + 1] = current[sourceOffset + 1];
+    positions[targetOffset + 2] = current[sourceOffset + 2];
+  }
+
+  return positions;
+}
+
 function buildGeometry(
   frame: AirMassStructureFrame,
   verticalExaggeration: number,
   classKey: AirMassStructureClassKey,
-  projectionMode: EarthProjectionMode
+  projectionMode: EarthProjectionMode,
+  smoothAltitudeClip: boolean
 ) {
   const bandScale = buildBandScale(frame, classKey);
   const fallbackStops = CLASS_COLOR_STOPS[classKey] ?? [
@@ -227,8 +354,10 @@ function buildGeometry(
     new THREE.Color("#ffd3b3"),
   ];
   const classBuffer = frame.classBuffers[classKey];
-  const positions = classBuffer.positions.slice();
   const indices = classBuffer.indices;
+  const positions = smoothAltitudeClip
+    ? smoothPositionsByAdjacency(classBuffer.positions.slice(), indices)
+    : classBuffer.positions.slice();
   const colors = new Float32Array(positions.length);
   const altitudeMixes = new Float32Array(positions.length / 3);
   const vertexLevelIndices = new Uint16Array(positions.length / 3);
@@ -353,7 +482,10 @@ function buildGeometry(
   geometry.setIndex(
     new THREE.BufferAttribute(sortedIndices, 1)
   );
-  geometry.userData.airMassLevelRanges = levelRanges;
+  geometry.userData.airMassLevelRanges = smoothAltitudeClip
+    ? [{ start: 0, count: totalIndexCount, altitudeMix: 0.5 }]
+    : levelRanges;
+  geometry.userData.airMassSmoothAltitudeClip = smoothAltitudeClip;
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -365,6 +497,9 @@ function attachAirMassShader(
     cutawayCenter: { value: new THREE.Vector3() },
     cutawayRadius: { value: 0 },
     cutawayEnabled: { value: 0 },
+    altitudeMin: { value: 0 },
+    altitudeMax: { value: 1 },
+    altitudeClipEnabled: { value: 0 },
   };
 
   material.userData.airMassShaderUniforms = uniforms;
@@ -372,12 +507,23 @@ function attachAirMassShader(
     shader.uniforms.uAirMassCutawayCenter = uniforms.cutawayCenter;
     shader.uniforms.uAirMassCutawayRadius = uniforms.cutawayRadius;
     shader.uniforms.uAirMassCutawayEnabled = uniforms.cutawayEnabled;
+    shader.uniforms.uAirMassAltitudeMin = uniforms.altitudeMin;
+    shader.uniforms.uAirMassAltitudeMax = uniforms.altitudeMax;
+    shader.uniforms.uAirMassAltitudeClipEnabled =
+      uniforms.altitudeClipEnabled;
 
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
         `#include <common>
-varying vec3 vAirMassWorldPosition;`
+attribute float airMassAltitudeMix;
+varying vec3 vAirMassWorldPosition;
+varying float vAirMassAltitudeMix;`
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+vAirMassAltitudeMix = airMassAltitudeMix;`
       )
       .replace(
         "#include <worldpos_vertex>",
@@ -400,11 +546,20 @@ vAirMassWorldPosition = airMassWorldPosition.xyz;`
 uniform vec3 uAirMassCutawayCenter;
 uniform float uAirMassCutawayRadius;
 uniform float uAirMassCutawayEnabled;
-varying vec3 vAirMassWorldPosition;`
+uniform float uAirMassAltitudeMin;
+uniform float uAirMassAltitudeMax;
+uniform float uAirMassAltitudeClipEnabled;
+varying vec3 vAirMassWorldPosition;
+varying float vAirMassAltitudeMix;`
       )
       .replace(
         "#include <clipping_planes_fragment>",
         `#include <clipping_planes_fragment>
+if ( uAirMassAltitudeClipEnabled > 0.5 ) {
+  if ( vAirMassAltitudeMix < uAirMassAltitudeMin - 0.001 || vAirMassAltitudeMix > uAirMassAltitudeMax + 0.001 ) {
+    discard;
+  }
+}
 if ( uAirMassCutawayEnabled > 0.5 ) {
   vec3 cutawayDelta = vAirMassWorldPosition - uAirMassCutawayCenter;
   if ( dot( cutawayDelta, cutawayDelta ) < uAirMassCutawayRadius * uAirMassCutawayRadius ) {
@@ -413,15 +568,17 @@ if ( uAirMassCutawayEnabled > 0.5 ) {
 }`
       );
   };
-  material.customProgramCacheKey = () => "air-mass-classification-cutaway-v3";
+  material.customProgramCacheKey = () => "air-mass-classification-cutaway-v4";
 }
 
 function setAirMassShaderUniforms(
   material: THREE.MeshBasicMaterial | THREE.LineBasicMaterial,
   cameraPosition: THREE.Vector3,
   layerState: {
+    altitudeRange01: AirMassAltitudeRange01;
     cameraCutawayEnabled: boolean;
     cameraCutawayRadius: number;
+    variant: AirMassClassificationLayerState["variant"];
   }
 ) {
   const uniforms = material.userData.airMassShaderUniforms as
@@ -432,6 +589,14 @@ function setAirMassShaderUniforms(
   uniforms.cutawayCenter.value.copy(cameraPosition);
   uniforms.cutawayRadius.value = layerState.cameraCutawayRadius;
   uniforms.cutawayEnabled.value = layerState.cameraCutawayEnabled ? 1 : 0;
+  const altitudeRange = normalizeAltitudeRange01(layerState.altitudeRange01);
+  uniforms.altitudeMin.value = altitudeRange.min;
+  uniforms.altitudeMax.value = altitudeRange.max;
+  uniforms.altitudeClipEnabled.value = isSmoothAirMassClassificationVariant(
+    layerState.variant
+  )
+    ? 1
+    : 0;
 }
 
 function buildCellGridGeometry(
@@ -581,6 +746,8 @@ function buildCellGridGeometry(
     new THREE.BufferAttribute(new Float32Array(lineAltitudeMixes), 1)
   );
   lineGeometry.userData.airMassLevelRanges = lineRanges;
+  lineGeometry.userData.airMassSmoothAltitudeClip =
+    geometry.userData.airMassSmoothAltitudeClip === true;
   lineGeometry.computeBoundingSphere();
   return lineGeometry;
 }
@@ -596,6 +763,11 @@ function drawRangeForAltitude(
   geometry: THREE.BufferGeometry,
   altitudeRange01: AirMassAltitudeRange01
 ) {
+  if (geometry.userData.airMassSmoothAltitudeClip === true) {
+    const indexCount = geometry.getIndex()?.count ?? 0;
+    return { start: 0, count: indexCount };
+  }
+
   const ranges = (geometry.userData.airMassLevelRanges ??
     []) as AirMassLevelRange[];
   if (ranges.length === 0) {
@@ -797,6 +969,9 @@ export default function AirMassClassificationLayer() {
         : THREE.FrontSide;
     material.needsUpdate = true;
     clearMeshes();
+    const smoothAltitudeClip = isSmoothAirMassClassificationVariant(
+      layerStateRef.current.variant
+    );
 
     for (const classKey of frame.classKeys) {
       const classBuffer = frame.classBuffers[classKey];
@@ -810,7 +985,8 @@ export default function AirMassClassificationLayer() {
         frame,
         verticalExaggeration,
         classKey,
-        projectionMode
+        projectionMode,
+        smoothAltitudeClip
       );
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = `air-mass-${classKey}-shell`;

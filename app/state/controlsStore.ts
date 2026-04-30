@@ -49,6 +49,11 @@ export const POTENTIAL_TEMPERATURE_VARIANT_OPTIONS = [
 export type PotentialTemperatureVariant =
   (typeof POTENTIAL_TEMPERATURE_VARIANT_OPTIONS)[number]["value"];
 
+export const AIR_MASS_STDDEV_SIDE_TAIL_VARIANT =
+  "theta-anomaly-stddev-side-6neighbor-min100k" as const;
+export const AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT =
+  "theta-anomaly-stddev-side-6neighbor-min100k-smooth" as const;
+
 export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
   {
     value: "temperature-rh-latmean",
@@ -75,8 +80,12 @@ export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
     label: "Theta Std Dev Tail Buckets",
   },
   {
-    value: "theta-anomaly-stddev-side-6neighbor-min100k",
+    value: AIR_MASS_STDDEV_SIDE_TAIL_VARIANT,
     label: "Theta Std Dev Side Tails >=100k",
+  },
+  {
+    value: AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
+    label: "Theta Std Dev Side Tails >=100k Smooth",
   },
   {
     value: "theta-anomaly-stddev-side-6neighbor-min100k-open-top",
@@ -86,6 +95,31 @@ export const AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS = [
 
 export type AirMassClassificationVariant =
   (typeof AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS)[number]["value"];
+
+export function airMassClassificationVariantLabel(
+  variant: AirMassClassificationVariant
+) {
+  return (
+    AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS.find(
+      (option) => option.value === variant
+    )?.label ?? variant
+  );
+}
+
+export function airMassAssetVariantFor(
+  variant: AirMassClassificationVariant
+): AirMassClassificationVariant {
+  if (variant === AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT) {
+    return AIR_MASS_STDDEV_SIDE_TAIL_VARIANT;
+  }
+  return variant;
+}
+
+export function isSmoothAirMassClassificationVariant(
+  variant: AirMassClassificationVariant
+) {
+  return variant === AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT;
+}
 
 export const POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS = [
   { value: "pressureBands", label: "Current Default" },
@@ -216,7 +250,7 @@ export const useControls = create<ControlsState>()(
     airMassLayer: {
       visible: true,
       opacity: 1,
-      variant: "theta-anomaly-stddev-side-6neighbor-min100k",
+      variant: AIR_MASS_STDDEV_SIDE_TAIL_VARIANT,
       showCellGrid: false,
       altitudeRange01: { min: 0, max: 1 },
       cameraCutawayEnabled: false,

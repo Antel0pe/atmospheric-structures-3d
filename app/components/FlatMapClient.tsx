@@ -2,7 +2,10 @@
 
 import { useEffect } from "react";
 import HomeClient from "./HomeClient";
-import { useControls } from "../state/controlsStore";
+import {
+  AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
+  useControls,
+} from "../state/controlsStore";
 
 export default function FlatMapClient() {
   useEffect(() => {
@@ -12,7 +15,7 @@ export default function FlatMapClient() {
     controls.setVerticalExaggeration(8);
     controls.setAirMassLayer({
       visible: true,
-      variant: "theta-anomaly-stddev-side-6neighbor-min100k",
+      variant: AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
       opacity: 1,
       showCellGrid: true,
       altitudeRange01: { min: 0, max: 1 },
