@@ -2,7 +2,11 @@
 // does not include Bun's type package for `tsc --noEmit`.
 import { describe, expect, test } from "bun:test";
 
-import { useControls } from "./controlsStore";
+import {
+  AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
+  AIR_MASS_STDDEV_SIDE_TAIL_VARIANT,
+  useControls,
+} from "./controlsStore";
 
 describe("controls store", () => {
   test("defaults to the current active layer surface", () => {
@@ -75,5 +79,22 @@ describe("controls store", () => {
       cameraCutawayRadius: 72,
       hiddenClassKeys: ["bucket_0"],
     });
+  });
+
+  test("smooth air-mass variant turns on the inspection grid by default", () => {
+    const controls = useControls.getState();
+
+    controls.setAirMassLayer({
+      variant: AIR_MASS_STDDEV_SIDE_TAIL_VARIANT,
+      showCellGrid: false,
+    });
+    controls.setAirMassLayer({
+      variant: AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
+    });
+
+    expect(useControls.getState().airMassLayer.showCellGrid).toBe(true);
+
+    controls.setAirMassLayer({ showCellGrid: false });
+    expect(useControls.getState().airMassLayer.showCellGrid).toBe(false);
   });
 });

@@ -22,6 +22,7 @@ const LAYER_CLEARANCE = 11.1;
 const LAYER_RENDER_ORDER = 69;
 const CELL_GRID_RADIAL_OFFSET = 0.08;
 const CELL_GRID_OPACITY = 0.82;
+const CELL_GRID_COLOR = 0x808080;
 const MIN_ALTITUDE_RANGE_SPAN = 0.01;
 const SMOOTH_VERTEX_ITERATIONS = 2;
 const SMOOTH_VERTEX_ALPHA = 0.34;
@@ -344,8 +345,13 @@ function buildGeometry(
   verticalExaggeration: number,
   classKey: AirMassStructureClassKey,
   projectionMode: EarthProjectionMode,
-  smoothAltitudeClip: boolean
+  opts?: {
+    smoothMesh?: boolean;
+    smoothAltitudeClip?: boolean;
+  }
 ) {
+  const smoothMesh = opts?.smoothMesh ?? false;
+  const smoothAltitudeClip = opts?.smoothAltitudeClip ?? false;
   const bandScale = buildBandScale(frame, classKey);
   const fallbackStops = CLASS_COLOR_STOPS[classKey] ?? [
     new THREE.Color("#7f2531"),
@@ -355,7 +361,7 @@ function buildGeometry(
   ];
   const classBuffer = frame.classBuffers[classKey];
   const indices = classBuffer.indices;
-  const positions = smoothAltitudeClip
+  const positions = smoothMesh
     ? smoothPositionsByAdjacency(classBuffer.positions.slice(), indices)
     : classBuffer.positions.slice();
   const colors = new Float32Array(positions.length);
@@ -764,8 +770,11 @@ function drawRangeForAltitude(
   altitudeRange01: AirMassAltitudeRange01
 ) {
   if (geometry.userData.airMassSmoothAltitudeClip === true) {
-    const indexCount = geometry.getIndex()?.count ?? 0;
-    return { start: 0, count: indexCount };
+    const geometryCount =
+      geometry.getIndex()?.count ??
+      geometry.getAttribute("position")?.count ??
+      0;
+    return { start: 0, count: geometryCount };
   }
 
   const ranges = (geometry.userData.airMassLevelRanges ??
@@ -921,6 +930,8 @@ export default function AirMassClassificationLayer() {
         material.depthWrite = state.opacity >= 0.999;
       }
       if (gridMaterial) {
+        gridMaterial.color.setHex(CELL_GRID_COLOR);
+        if (!gridMaterial.depthTest) gridMaterial.depthTest = true;
         gridMaterial.opacity = Math.max(state.opacity * CELL_GRID_OPACITY, 0.12);
       }
 
@@ -986,7 +997,10 @@ export default function AirMassClassificationLayer() {
         verticalExaggeration,
         classKey,
         projectionMode,
-        smoothAltitudeClip
+        {
+          smoothMesh: smoothAltitudeClip,
+          smoothAltitudeClip,
+        }
       );
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = `air-mass-${classKey}-shell`;
@@ -996,7 +1010,25 @@ export default function AirMassClassificationLayer() {
       meshRefs.current[classKey] = mesh;
 
       if (geometry.index && geometry.index.count > 0) {
-        const gridGeometry = buildCellGridGeometry(geometry, projectionMode);
+        const gridSourceGeometry = smoothAltitudeClip
+          ? buildGeometry(
+              frame,
+              verticalExaggeration,
+              classKey,
+              projectionMode,
+              {
+                smoothMesh: false,
+                smoothAltitudeClip: true,
+              }
+            )
+          : geometry;
+        const gridGeometry = buildCellGridGeometry(
+          gridSourceGeometry,
+          projectionMode
+        );
+        if (gridSourceGeometry !== geometry) {
+          gridSourceGeometry.dispose();
+        }
         const grid = new THREE.LineSegments(
           gridGeometry,
           gridMaterial
@@ -1043,7 +1075,7 @@ export default function AirMassClassificationLayer() {
     materialRef.current = material;
 
     const gridMaterial = new THREE.LineBasicMaterial({
-      color: 0x808080,
+      color: CELL_GRID_COLOR,
       vertexColors: false,
       transparent: true,
       opacity: CELL_GRID_OPACITY,

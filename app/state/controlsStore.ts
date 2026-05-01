@@ -307,11 +307,21 @@ export const useControls = create<ControlsState>()(
       })),
     setAirMassLayer: (patch) =>
       set((state) => ({
-        airMassLayer: {
-          ...state.airMassLayer,
-          ...patch,
-          opacity: 1,
-        },
+        airMassLayer: (() => {
+          const nextLayer = {
+            ...state.airMassLayer,
+            ...patch,
+            opacity: 1,
+          };
+          if (
+            patch.variant &&
+            patch.showCellGrid === undefined &&
+            isSmoothAirMassClassificationVariant(patch.variant)
+          ) {
+            nextLayer.showCellGrid = true;
+          }
+          return nextLayer;
+        })(),
       })),
   }))
 );

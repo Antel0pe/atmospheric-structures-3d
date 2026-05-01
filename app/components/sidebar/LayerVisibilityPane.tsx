@@ -5,6 +5,7 @@ import {
   AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS,
   POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
   POTENTIAL_TEMPERATURE_VARIANT_OPTIONS,
+  isSmoothAirMassClassificationVariant,
   type AirMassClassificationVariant,
   type PotentialTemperatureColorMode,
   type PotentialTemperatureVariant,
@@ -269,13 +270,17 @@ export default function LayerVisibilityPane() {
             </div>
             <select
               value={airMassLayer.variant}
-              onChange={(event) =>
+              onChange={(event) => {
+                const variant = event.currentTarget
+                  .value as AirMassClassificationVariant;
                 setAirMassLayer({
-                  variant:
-                    event.currentTarget.value as AirMassClassificationVariant,
+                  variant,
+                  showCellGrid:
+                    airMassLayer.showCellGrid ||
+                    isSmoothAirMassClassificationVariant(variant),
                   hiddenClassKeys: [],
-                })
-              }
+                });
+              }}
               style={selectStyle()}
             >
               {AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS.map((option) => (
