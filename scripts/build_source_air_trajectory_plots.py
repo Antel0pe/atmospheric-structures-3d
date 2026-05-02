@@ -16,8 +16,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+from netCDF4 import Dataset
 import numpy as np
-import xarray as xr
 from matplotlib.colors import ListedColormap
 
 
@@ -99,6 +99,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--cluster-count", type=int, default=DEFAULT_CLUSTER_COUNT)
     parser.add_argument(
+        "--methods",
+        choices=("both", "source-color", "clustered"),
+        default="both",
+        help="Which plot family to write.",
+    )
+    parser.add_argument(
         "--max-kmeans-points",
         type=int,
         default=120_000,
@@ -155,51 +161,73 @@ def great_circle_distance_km(
     return (2.0 * EARTH_RADIUS_M * np.arcsin(np.minimum(1.0, np.sqrt(a)))) / 1000.0
 
 
-def find_coord_name(dataset: xr.Dataset, candidates: tuple[str, ...]) -> str:
+def find_nc_name(dataset: Dataset, candidates: tuple[str, ...]) -> str:
     for name in candidates:
-        if name in dataset.coords or name in dataset.dims:
+        if name in dataset.variables or name in dataset.dimensions:
             return name
-    raise KeyError(f"Could not find any coordinate named {candidates}.")
+    raise KeyError(f"Could not find any NetCDF variable or dimension named {candidates}.")
 
 
-def find_var_name(dataset: xr.Dataset, candidates: tuple[str, ...]) -> str:
-    for name in candidates:
-        if name in dataset.data_vars:
-            return name
-    raise KeyError(f"Could not find any variable named {candidates}.")
-
-
-def load_wind_cube(path: Path, target_time: np.datetime64, max_lookback_hours: int, stride: int) -> WindCube:
-    dataset = xr.open_dataset(path.expanduser().resolve())
+def load_wind_cube(
+    path: Path,
+    target_time: np.datetime64,
+    max_lookback_hours: int,
+    stride: int,
+    requested_levels: list[float] | None,
+) -> WindCube:
+    dataset = Dataset(path.expanduser().resolve())
     try:
-        time_name = find_coord_name(dataset, ("valid_time", "time"))
-        level_name = find_coord_name(dataset, ("pressure_level", "level", "isobaricInhPa"))
-        lat_name = find_coord_name(dataset, ("latitude", "lat"))
-        lon_name = find_coord_name(dataset, ("longitude", "lon"))
-        u_name = find_var_name(dataset, ("u", "u_component_of_wind"))
-        v_name = find_var_name(dataset, ("v", "v_component_of_wind"))
-        omega_name = find_var_name(dataset, ("w", "omega", "vertical_velocity"))
+        time_name = find_nc_name(dataset, ("valid_time", "time"))
+        level_name = find_nc_name(dataset, ("pressure_level", "level", "isobaricInhPa"))
+        lat_name = find_nc_name(dataset, ("latitude", "lat"))
+        lon_name = find_nc_name(dataset, ("longitude", "lon"))
+        u_name = find_nc_name(dataset, ("u", "u_component_of_wind"))
+        v_name = find_nc_name(dataset, ("v", "v_component_of_wind"))
+        omega_name = find_nc_name(dataset, ("w", "omega", "vertical_velocity"))
 
         start_time = target_time - np.timedelta64(int(max_lookback_hours), "h")
-        subset = dataset.sel({time_name: slice(start_time, target_time)})
-        subset = subset.isel({lat_name: slice(None, None, stride), lon_name: slice(None, None, stride)})
-
-        times = np.asarray(subset[time_name].values, dtype="datetime64[s]")
+        raw_times = np.asarray(dataset.variables[time_name][:], dtype=np.int64).astype("datetime64[s]")
+        time_indices = np.flatnonzero((raw_times >= start_time) & (raw_times <= target_time))
+        if time_indices.size < 2:
+            raise ValueError("Trajectory integration needs at least two wind time slices.")
+        time_indexer = slice(int(time_indices[0]), int(time_indices[-1]) + 1)
+        times = raw_times[time_indices]
         if times.size < 2:
             raise ValueError("Trajectory integration needs at least two wind time slices.")
         target_seconds = target_time.astype("datetime64[s]").astype(np.int64)
         time_hours = (times.astype("datetime64[s]").astype(np.int64) - target_seconds) / SECONDS_PER_HOUR
 
-        pressures = np.asarray(subset[level_name].values, dtype=np.float32)
-        lats = np.asarray(subset[lat_name].values, dtype=np.float32)
-        lons = normalize_lon_360(np.asarray(subset[lon_name].values, dtype=np.float32))
+        all_pressures = np.asarray(dataset.variables[level_name][:], dtype=np.float32)
+        if requested_levels:
+            level_indices = np.asarray(
+                [int(np.argmin(np.abs(all_pressures - float(level)))) for level in requested_levels],
+                dtype=np.int64,
+            )
+            level_indices = np.unique(level_indices)
+            level_indexer: slice | np.ndarray = level_indices
+        else:
+            level_indices = np.arange(all_pressures.size, dtype=np.int64)
+            level_indexer = slice(None)
+        pressures = all_pressures[level_indices]
 
-        u = np.asarray(subset[u_name].transpose(time_name, level_name, lat_name, lon_name).values, dtype=np.float32)
-        v = np.asarray(subset[v_name].transpose(time_name, level_name, lat_name, lon_name).values, dtype=np.float32)
-        omega = np.asarray(
-            subset[omega_name].transpose(time_name, level_name, lat_name, lon_name).values,
-            dtype=np.float32,
-        )
+        all_lats = np.asarray(dataset.variables[lat_name][:], dtype=np.float32)
+        all_lons = normalize_lon_360(np.asarray(dataset.variables[lon_name][:], dtype=np.float32))
+        lat_indices = np.arange(0, all_lats.size, stride, dtype=np.int64)
+        lon_indices = np.arange(0, all_lons.size, stride, dtype=np.int64)
+        use_contiguous_grid_read = stride > 1 and len(level_indices) <= 4
+        lat_indexer = slice(None) if use_contiguous_grid_read else slice(None, None, stride)
+        lon_indexer = slice(None) if use_contiguous_grid_read else slice(None, None, stride)
+
+        selector = (time_indexer, level_indexer, lat_indexer, lon_indexer)
+        u = np.asarray(dataset.variables[u_name][selector], dtype=np.float32)
+        v = np.asarray(dataset.variables[v_name][selector], dtype=np.float32)
+        omega = np.asarray(dataset.variables[omega_name][selector], dtype=np.float32)
+        if use_contiguous_grid_read:
+            u = u[:, :, lat_indices, :][:, :, :, lon_indices]
+            v = v[:, :, lat_indices, :][:, :, :, lon_indices]
+            omega = omega[:, :, lat_indices, :][:, :, :, lon_indices]
+        lats = all_lats[lat_indices]
+        lons = all_lons[lon_indices]
 
         if np.any(np.diff(pressures) < 0):
             order = np.argsort(pressures)
@@ -280,6 +308,81 @@ def trilinear_sample(
     return c0 * (1.0 - wp) + c1 * wp
 
 
+def spatial_interpolation_weights(
+    pressures: np.ndarray,
+    lats: np.ndarray,
+    lons: np.ndarray,
+    pressure_hpa: np.ndarray,
+    lat_deg: np.ndarray,
+    lon_deg: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if len(pressures) == 1:
+        p0 = np.zeros(pressure_hpa.shape, dtype=np.int64)
+        p1 = p0
+        wp = np.zeros(pressure_hpa.shape, dtype=np.float32)
+    else:
+        p = np.clip(pressure_hpa, float(pressures[0]), float(pressures[-1]))
+        p0 = np.searchsorted(pressures, p, side="right") - 1
+        p0 = np.clip(p0, 0, len(pressures) - 2)
+        p1 = p0 + 1
+        wp = ((p - pressures[p0]) / np.maximum(1e-6, pressures[p1] - pressures[p0])).astype(np.float32)
+
+    y = np.clip(lat_deg, float(lats[0]), float(lats[-1]))
+    y0 = np.searchsorted(lats, y, side="right") - 1
+    y0 = np.clip(y0, 0, len(lats) - 2)
+    y1 = y0 + 1
+    wy = ((y - lats[y0]) / np.maximum(1e-6, lats[y1] - lats[y0])).astype(np.float32)
+
+    lon0 = float(lons[0])
+    dx = float(np.median(np.diff(lons)))
+    x_float = ((normalize_lon_360(lon_deg) - lon0) % 360.0) / dx
+    x_floor = np.floor(x_float)
+    x0 = x_floor.astype(np.int64) % len(lons)
+    x1 = (x0 + 1) % len(lons)
+    wx = (x_float - x_floor).astype(np.float32)
+    return p0, p1, wp, y0, y1, wy, x0, x1, wx
+
+
+def sample_field_with_weights(
+    field: np.ndarray,
+    p0: np.ndarray,
+    p1: np.ndarray,
+    wp: np.ndarray,
+    y0: np.ndarray,
+    y1: np.ndarray,
+    wy: np.ndarray,
+    x0: np.ndarray,
+    x1: np.ndarray,
+    wx: np.ndarray,
+) -> np.ndarray:
+    if field.shape[0] == 1:
+        c00 = field[0, y0, x0]
+        c01 = field[0, y1, x0]
+        c0 = c00 * (1.0 - wy) + c01 * wy
+
+        c10 = field[0, y0, x1]
+        c11 = field[0, y1, x1]
+        c1 = c10 * (1.0 - wy) + c11 * wy
+        return c0 * (1.0 - wx) + c1 * wx
+
+    c000 = field[p0, y0, x0]
+    c001 = field[p0, y0, x1]
+    c010 = field[p0, y1, x0]
+    c011 = field[p0, y1, x1]
+    c100 = field[p1, y0, x0]
+    c101 = field[p1, y0, x1]
+    c110 = field[p1, y1, x0]
+    c111 = field[p1, y1, x1]
+
+    c00 = c000 * (1.0 - wx) + c001 * wx
+    c01 = c010 * (1.0 - wx) + c011 * wx
+    c10 = c100 * (1.0 - wx) + c101 * wx
+    c11 = c110 * (1.0 - wx) + c111 * wx
+    c0 = c00 * (1.0 - wy) + c01 * wy
+    c1 = c10 * (1.0 - wy) + c11 * wy
+    return c0 * (1.0 - wp) + c1 * wp
+
+
 def sample_wind(cube: WindCube, lon: np.ndarray, lat: np.ndarray, pressure: np.ndarray, time_hour: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     t = float(np.clip(time_hour, float(cube.time_hours[0]), float(cube.time_hours[-1])))
     t0 = int(np.searchsorted(cube.time_hours, t, side="right") - 1)
@@ -287,14 +390,13 @@ def sample_wind(cube: WindCube, lon: np.ndarray, lat: np.ndarray, pressure: np.n
     t1 = t0 + 1
     wt = (t - float(cube.time_hours[t0])) / max(1e-6, float(cube.time_hours[t1] - cube.time_hours[t0]))
 
+    weights = spatial_interpolation_weights(
+        cube.pressure_hpa, cube.latitude_deg, cube.longitude_deg, pressure, lat, lon
+    )
     values: list[np.ndarray] = []
     for field in (cube.u_ms, cube.v_ms, cube.omega_pa_s):
-        first = trilinear_sample(
-            field[t0], cube.pressure_hpa, cube.latitude_deg, cube.longitude_deg, pressure, lat, lon
-        )
-        second = trilinear_sample(
-            field[t1], cube.pressure_hpa, cube.latitude_deg, cube.longitude_deg, pressure, lat, lon
-        )
+        first = sample_field_with_weights(field[t0], *weights)
+        second = sample_field_with_weights(field[t1], *weights)
         values.append(first * (1.0 - wt) + second * wt)
     return values[0], values[1], values[2]
 
@@ -617,6 +719,7 @@ def build_outputs(
     output_dir: Path,
     cluster_count: int,
     max_kmeans_points: int,
+    methods: str,
 ) -> tuple[list[TrajectorySummary], list[ClusterSummary]]:
     lon_grid, lat_grid = np.meshgrid(cube.longitude_deg, cube.latitude_deg)
     flat_shape = lon_grid.shape
@@ -629,8 +732,10 @@ def build_outputs(
         lookback_dir = output_dir / f"{lookback_hours:02d}h"
         source_color_dir = lookback_dir / "source-color-map"
         cluster_dir = lookback_dir / "clustered-source-regions"
-        source_color_dir.mkdir(parents=True, exist_ok=True)
-        cluster_dir.mkdir(parents=True, exist_ok=True)
+        if methods in {"both", "source-color"}:
+            source_color_dir.mkdir(parents=True, exist_ok=True)
+        if methods in {"both", "clustered"}:
+            cluster_dir.mkdir(parents=True, exist_ok=True)
 
         features = endpoint_features(snapshot["source_lon"], snapshot["source_lat"])
         centers = fit_kmeans(
@@ -670,26 +775,28 @@ def build_outputs(
             source_color_plot = source_color_dir / f"source_color_{pressure_slug}.png"
             clustered_plot = cluster_dir / f"clustered_sources_{pressure_slug}.png"
 
-            save_source_color_plot(
-                source_color_plot,
-                lon_grid,
-                lat_grid,
-                source_lon,
-                source_lat,
-                lookback_hours,
-                float(pressure_hpa),
-            )
-            save_cluster_plot(
-                clustered_plot,
-                lon_grid,
-                lat_grid,
-                source_lon,
-                source_lat,
-                cluster_grid,
-                centers,
-                lookback_hours,
-                float(pressure_hpa),
-            )
+            if methods in {"both", "source-color"}:
+                save_source_color_plot(
+                    source_color_plot,
+                    lon_grid,
+                    lat_grid,
+                    source_lon,
+                    source_lat,
+                    lookback_hours,
+                    float(pressure_hpa),
+                )
+            if methods in {"both", "clustered"}:
+                save_cluster_plot(
+                    clustered_plot,
+                    lon_grid,
+                    lat_grid,
+                    source_lon,
+                    source_lat,
+                    cluster_grid,
+                    centers,
+                    lookback_hours,
+                    float(pressure_hpa),
+                )
 
             distance = great_circle_distance_km(target_lon, target_lat, snapshot["source_lon"][mask], snapshot["source_lat"][mask])
             summaries.append(
@@ -702,8 +809,12 @@ def build_outputs(
                     mean_endpoint_pressure_hpa=float(np.nanmean(source_pressure)),
                     lower_boundary_fraction=float(np.mean(source_pressure >= cube.pressure_hpa[-1] - 1e-3)),
                     upper_boundary_fraction=float(np.mean(source_pressure <= cube.pressure_hpa[0] + 1e-3)),
-                    source_color_plot=to_repo_relative(source_color_plot),
-                    clustered_plot=to_repo_relative(clustered_plot),
+                    source_color_plot=to_repo_relative(source_color_plot)
+                    if methods in {"both", "source-color"}
+                    else "",
+                    clustered_plot=to_repo_relative(clustered_plot)
+                    if methods in {"both", "clustered"}
+                    else "",
                 )
             )
 
@@ -725,6 +836,7 @@ def write_summary(
         "rk4_step_hours": float(args.step_hours),
         "grid_stride": int(args.stride),
         "cluster_count": int(args.cluster_count),
+        "methods": args.methods,
         "time_hours_relative_to_target": [float(item) for item in cube.time_hours],
         "target_pressure_levels_hpa": [float(item) for item in levels],
         "latitude_count": int(len(cube.latitude_deg)),
@@ -747,9 +859,8 @@ def write_summary(
         "",
         "## Output Layout",
         "",
-        "- `24h/source-color-map/` and `24h/clustered-source-regions/`",
-        "- `48h/source-color-map/` and `48h/clustered-source-regions/`",
-        "- `72h/source-color-map/` and `72h/clustered-source-regions/`",
+        f"- selected methods: `{args.methods}`",
+        "- lookback folders are named `24h/`, `48h/`, and `72h/`",
         "",
         "## Notes",
         "",
@@ -767,13 +878,8 @@ def main() -> None:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    cube = load_wind_cube(args.dataset, target_time, max(args.lookback_hours), args.stride)
-    if args.levels:
-        requested = np.asarray(args.levels, dtype=np.float32)
-        levels = np.asarray([cube.pressure_hpa[np.argmin(np.abs(cube.pressure_hpa - level))] for level in requested])
-        levels = np.unique(levels)
-    else:
-        levels = cube.pressure_hpa.copy()
+    cube = load_wind_cube(args.dataset, target_time, max(args.lookback_hours), args.stride, args.levels)
+    levels = cube.pressure_hpa.copy()
 
     snapshots = run_trajectories(cube, levels=levels, lookback_hours=list(args.lookback_hours), step_hours=args.step_hours)
     trajectory_summaries, cluster_summaries = build_outputs(
@@ -783,12 +889,14 @@ def main() -> None:
         output_dir=output_dir,
         cluster_count=args.cluster_count,
         max_kmeans_points=args.max_kmeans_points,
+        methods=args.methods,
     )
     write_summary(output_dir, args, cube, levels, trajectory_summaries, cluster_summaries)
 
     print(json.dumps({
         "output_dir": to_repo_relative(output_dir),
-        "plot_count": len(trajectory_summaries) * 2,
+        "plot_count": len(trajectory_summaries)
+        * (2 if args.methods == "both" else 1),
         "levels": [float(item) for item in levels],
     }, indent=2))
 

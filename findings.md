@@ -26,6 +26,7 @@ what is the stated goal?
 - view that takes temperature and emphasizes other information it typically tells you like pressure, etc
 - does it even make sense to group the atmosphere temperature wise vertically? is the structure just 2d slabs?
 - see weather systems like a meteorologist?
+- learned meteorologists might not even think in 3d as much as recognizing phenomena and if x,y,z then this happens intuition
 
 requirements:
 - if vertical structure exists should show vertical coherence, tilted, tubes, whatever the case
