@@ -163,6 +163,15 @@ export type PrecipitableWaterLayerState = {
   opacity: number;
 };
 
+export type TemperatureSliceColorScaleMode = "global" | "perLevel";
+
+export type TemperatureSliceLayerState = {
+  visible: boolean;
+  opacity: number;
+  pressureHpa: number;
+  colorScaleMode: TemperatureSliceColorScaleMode;
+};
+
 export type PotentialTemperatureLayerState = {
   visible: boolean;
   opacity: number;
@@ -192,6 +201,7 @@ type ControlsState = {
   exampleParticleLayer: ExampleParticleLayerState;
   precipitationRadarLayer: PrecipitationRadarLayerState;
   precipitableWaterLayer: PrecipitableWaterLayerState;
+  temperatureSliceLayer: TemperatureSliceLayerState;
   potentialTemperatureLayer: PotentialTemperatureLayerState;
   airMassLayer: AirMassClassificationLayerState;
   setVerticalExaggeration: (verticalExaggeration: number) => void;
@@ -205,6 +215,9 @@ type ControlsState = {
   ) => void;
   setPrecipitableWaterLayer: (
     patch: Partial<PrecipitableWaterLayerState>
+  ) => void;
+  setTemperatureSliceLayer: (
+    patch: Partial<TemperatureSliceLayerState>
   ) => void;
   setPotentialTemperatureLayer: (
     patch: Partial<PotentialTemperatureLayerState>
@@ -240,6 +253,12 @@ export const useControls = create<ControlsState>()(
       visible: false,
       opacity: 1,
     },
+    temperatureSliceLayer: {
+      visible: false,
+      opacity: 1,
+      pressureHpa: 500,
+      colorScaleMode: "global",
+    },
     potentialTemperatureLayer: {
       visible: false,
       opacity: 1,
@@ -248,7 +267,7 @@ export const useControls = create<ControlsState>()(
       showCellGrid: false,
     },
     airMassLayer: {
-      visible: true,
+      visible: false,
       opacity: 1,
       variant: AIR_MASS_STDDEV_SIDE_TAIL_VARIANT,
       showCellGrid: false,
@@ -296,6 +315,25 @@ export const useControls = create<ControlsState>()(
           ...patch,
           opacity: 1,
         },
+      })),
+    setTemperatureSliceLayer: (patch) =>
+      set((state) => ({
+        temperatureSliceLayer: (() => {
+          const nextLayer = {
+            ...state.temperatureSliceLayer,
+            ...patch,
+          };
+          if (
+            nextLayer.visible === state.temperatureSliceLayer.visible &&
+            nextLayer.opacity === state.temperatureSliceLayer.opacity &&
+            nextLayer.pressureHpa === state.temperatureSliceLayer.pressureHpa &&
+            nextLayer.colorScaleMode ===
+              state.temperatureSliceLayer.colorScaleMode
+          ) {
+            return state.temperatureSliceLayer;
+          }
+          return nextLayer;
+        })(),
       })),
     setPotentialTemperatureLayer: (patch) =>
       set((state) => ({

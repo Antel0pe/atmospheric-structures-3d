@@ -2,25 +2,25 @@
 
 import { useEffect } from "react";
 import HomeClient from "./HomeClient";
-import {
-  AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
-  useControls,
-} from "../state/controlsStore";
+import { useControls } from "../state/controlsStore";
 
 export default function FlatMapClient() {
   useEffect(() => {
     const controls = useControls.getState();
-    // QUICK AND DIRTY NEED TO REDO ROUTE-LEVEL PRESETS BETTER: force the first /2d pass
-    // toward the requested theta std-dev side-tail air-mass view without adding route state.
     controls.setVerticalExaggeration(8);
     controls.setAirMassLayer({
-      visible: true,
-      variant: AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
+      visible: false,
       opacity: 1,
-      showCellGrid: true,
+      showCellGrid: false,
       altitudeRange01: { min: 0, max: 1 },
       cameraCutawayEnabled: false,
       hiddenClassKeys: [],
+    });
+    controls.setTemperatureSliceLayer({
+      visible: true,
+      pressureHpa: 500,
+      opacity: 1,
+      colorScaleMode: "global",
     });
   }, []);
 

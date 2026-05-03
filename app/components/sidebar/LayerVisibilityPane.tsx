@@ -92,6 +92,9 @@ export default function LayerVisibilityPane() {
   const precipitableWaterLayer = useControls(
     (state) => state.precipitableWaterLayer
   );
+  const temperatureSliceLayer = useControls(
+    (state) => state.temperatureSliceLayer
+  );
   const potentialTemperatureLayer = useControls(
     (state) => state.potentialTemperatureLayer
   );
@@ -104,6 +107,9 @@ export default function LayerVisibilityPane() {
   );
   const setPrecipitableWaterLayer = useControls(
     (state) => state.setPrecipitableWaterLayer
+  );
+  const setTemperatureSliceLayer = useControls(
+    (state) => state.setTemperatureSliceLayer
   );
   const setPotentialTemperatureLayer = useControls(
     (state) => state.setPotentialTemperatureLayer
@@ -154,6 +160,13 @@ export default function LayerVisibilityPane() {
           checked={precipitableWaterLayer.visible}
           accentColor="#f3de6f"
           onChange={(checked) => setPrecipitableWaterLayer({ visible: checked })}
+        />
+
+        <CheckboxRow
+          label="Temperature Slice"
+          checked={temperatureSliceLayer.visible}
+          accentColor="#ff6f5f"
+          onChange={(checked) => setTemperatureSliceLayer({ visible: checked })}
         />
 
         <CheckboxRow

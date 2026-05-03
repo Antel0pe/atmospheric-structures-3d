@@ -41,3 +41,5 @@ target thermal representation
 - look at gradients? or 2nd derivatives?
 - looking at skew t plot with a smooth variation in temperature, is it possible to detect different air masses by how differently the skew t line changes
 - some element of 3d
+
+- maybe show correlated fields like look at pressure at specific level and have pop up that says oh temperature high, divergence low correlated with this field. select area by circling area on screen

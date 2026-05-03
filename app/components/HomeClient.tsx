@@ -28,6 +28,14 @@ const PotentialTemperatureStructuresLayer = dynamic(
   }
 );
 
+const TemperatureSliceLayer = dynamic(
+  () => import("./layers/TemperatureSliceLayer"),
+  {
+    ssr: false,
+    loading: () => <div style={{ width: "100%", height: "100%" }} />,
+  }
+);
+
 const AirMassClassificationLayer = dynamic(
   () => import("./layers/AirMassClassificationLayer"),
   {
@@ -117,6 +125,7 @@ export default function HomeClient({
         >
           <PrecipitationRadarLayer />
           <PrecipitableWaterProxyLayer />
+          <TemperatureSliceLayer />
           <PotentialTemperatureStructuresLayer />
           <AirMassClassificationLayer />
         </EarthBase>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   type AirMassClassificationVariant,
+  type TemperatureSliceColorScaleMode,
   useControls,
 } from "@/app/state/controlsStore";
 import {
@@ -12,6 +13,7 @@ import {
 
 type ActiveLayerId =
   | "precipitableWaterLayer"
+  | "temperatureSliceLayer"
   | "potentialTemperatureLayer"
   | "airMassLayer"
   | "precipitationRadarLayer";
@@ -121,6 +123,10 @@ function variantLabel(variant: AirMassClassificationVariant) {
     return "Surface-attached theta + RH";
   }
   return "Temperature + RH anomaly";
+}
+
+function temperatureScaleLabel(mode: TemperatureSliceColorScaleMode) {
+  return mode === "perLevel" ? "Per-level scale" : "Global scale";
 }
 
 function CompactRangeControl({
@@ -314,8 +320,162 @@ function AirMassAltitudeRangeControl({
         />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", opacity: 0.62 }}>
-        <span>Surface</span>
-        <span>Top</span>
+        <span>1000 hPa</span>
+        <span>250 hPa</span>
+      </div>
+    </div>
+  );
+}
+
+function TemperaturePressureControl({
+  pressureHpa,
+  colorScaleMode,
+  onChange,
+  onColorScaleModeChange,
+}: {
+  pressureHpa: number;
+  colorScaleMode: TemperatureSliceColorScaleMode;
+  onChange: (pressureHpa: number) => void;
+  onColorScaleModeChange: (mode: TemperatureSliceColorScaleMode) => void;
+}) {
+  const clampedPressure = Math.min(Math.max(Math.round(pressureHpa), 250), 1000);
+  const percent = Math.round(((1000 - clampedPressure) / (1000 - 250)) * 100);
+
+  return (
+    <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+      <style>{`
+        .temperature-pressure-range {
+          position: relative;
+          height: 30px;
+        }
+        .temperature-pressure-range input[type="range"] {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 30px;
+          margin: 0;
+          pointer-events: none;
+          appearance: none;
+          background: transparent;
+        }
+        .temperature-pressure-range input[type="range"]::-webkit-slider-thumb {
+          pointer-events: auto;
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 999px;
+          border: 2px solid rgba(255, 255, 255, 0.92);
+          background: #ff6f5f;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+          cursor: pointer;
+        }
+        .temperature-pressure-range input[type="range"]::-moz-range-thumb {
+          pointer-events: auto;
+          width: 16px;
+          height: 16px;
+          border-radius: 999px;
+          border: 2px solid rgba(255, 255, 255, 0.92);
+          background: #ff6f5f;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+          cursor: pointer;
+        }
+        .temperature-pressure-range input[type="range"]::-webkit-slider-runnable-track {
+          appearance: none;
+          height: 30px;
+          background: transparent;
+        }
+        .temperature-pressure-range input[type="range"]::-moz-range-track {
+          height: 30px;
+          background: transparent;
+        }
+        .temperature-color-scale-select {
+          width: 100%;
+          border: 1px solid rgba(255,255,255,0.14);
+          border-radius: 8px;
+          background: rgba(6, 10, 18, 0.72);
+          color: #e9eef7;
+          padding: 7px 8px;
+          font: 700 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto;
+        }
+      `}</style>
+      <label style={{ display: "grid", gap: 7 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            fontWeight: 600,
+          }}
+        >
+          <span>Color Scale</span>
+          <span style={{ opacity: 0.68 }}>
+            {temperatureScaleLabel(colorScaleMode)}
+          </span>
+        </div>
+        <select
+          className="temperature-color-scale-select"
+          value={colorScaleMode}
+          onChange={(event) =>
+            onColorScaleModeChange(
+              event.currentTarget.value as TemperatureSliceColorScaleMode
+            )
+          }
+        >
+          <option value="global">Global 250-1000 hPa</option>
+          <option value="perLevel">Each pressure level</option>
+        </select>
+      </label>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          fontWeight: 600,
+        }}
+      >
+        <span>Pressure</span>
+        <span style={{ opacity: 0.68 }}>{clampedPressure.toFixed(0)} hPa</span>
+      </div>
+      <div className="temperature-pressure-range">
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 13,
+            height: 4,
+            borderRadius: 999,
+            background: "rgba(255,255,255,0.16)",
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: `${100 - percent}%`,
+            top: 13,
+            height: 4,
+            borderRadius: 999,
+            background: "linear-gradient(90deg, #5e86ff, #ff6f5f)",
+          }}
+        />
+        <input
+          type="range"
+          min={250}
+          max={1000}
+          step={1}
+          value={clampedPressure}
+          aria-label="Temperature slice pressure"
+          onInput={(event) => onChange(Number(event.currentTarget.value))}
+          onChange={(event) => onChange(Number(event.currentTarget.value))}
+          style={{ direction: "rtl" }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", opacity: 0.62 }}>
+        <span>1000 hPa</span>
+        <span>250 hPa</span>
       </div>
     </div>
   );
@@ -325,11 +485,17 @@ export default function LayerInfoPane() {
   const precipitableWaterLayer = useControls(
     (state) => state.precipitableWaterLayer
   );
+  const temperatureSliceLayer = useControls(
+    (state) => state.temperatureSliceLayer
+  );
   const potentialTemperatureLayer = useControls(
     (state) => state.potentialTemperatureLayer
   );
   const airMassLayer = useControls((state) => state.airMassLayer);
   const precipitationLayer = useControls((state) => state.precipitationRadarLayer);
+  const setTemperatureSliceLayer = useControls(
+    (state) => state.setTemperatureSliceLayer
+  );
   const setAirMassLayer = useControls((state) => state.setAirMassLayer);
   const [airMassComponentState, setAirMassComponentState] = useState<{
     variant: AirMassClassificationVariant;
@@ -384,6 +550,20 @@ export default function LayerInfoPane() {
       });
     }
 
+    if (temperatureSliceLayer.visible) {
+      layers.push({
+        id: "temperatureSliceLayer",
+        title: "Temperature Slice",
+        tag: `${temperatureSliceLayer.pressureHpa.toFixed(
+          0
+        )} hPa / ${temperatureScaleLabel(temperatureSliceLayer.colorScaleMode)}`,
+        summary:
+          temperatureSliceLayer.colorScaleMode === "perLevel"
+            ? "A full-map raw-temperature pressure slice with each pressure level stretched to its own min/max."
+            : "A full-map raw-temperature pressure slice colored from the 250-1000 hPa global minimum to maximum.",
+      });
+    }
+
     if (potentialTemperatureLayer.visible) {
       layers.push({
         id: "potentialTemperatureLayer",
@@ -430,6 +610,9 @@ export default function LayerInfoPane() {
     airMassLayer.visible,
     precipitableWaterLayer.visible,
     precipitationLayer.visible,
+    temperatureSliceLayer.pressureHpa,
+    temperatureSliceLayer.colorScaleMode,
+    temperatureSliceLayer.visible,
     potentialTemperatureLayer.colorMode,
     potentialTemperatureLayer.variant,
     potentialTemperatureLayer.visible,
@@ -499,6 +682,19 @@ export default function LayerInfoPane() {
           ))}
         </div>
       )}
+
+      {temperatureSliceLayer.visible ? (
+        <TemperaturePressureControl
+          pressureHpa={temperatureSliceLayer.pressureHpa}
+          colorScaleMode={temperatureSliceLayer.colorScaleMode}
+          onChange={(pressureHpa) =>
+            setTemperatureSliceLayer({ pressureHpa })
+          }
+          onColorScaleModeChange={(colorScaleMode) =>
+            setTemperatureSliceLayer({ colorScaleMode })
+          }
+        />
+      ) : null}
 
       {airMassLayer.visible && airMassComponents.length > 0 ? (
         <div style={{ display: "grid", gap: 10, marginTop: 14 }}>

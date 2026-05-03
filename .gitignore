@@ -31,6 +31,7 @@ skills/structure-probe/logs/
 /public/precipitation-radar/
 /public/relative-humidity-shell/
 /public/air-mass-structures/
+/public/temperature-slices/
 
 # misc
 .DS_Store
