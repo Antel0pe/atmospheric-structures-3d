@@ -21,6 +21,13 @@ describe("controls store", () => {
       visible: false,
       opacity: 1,
     });
+    expect(state.temperatureSliceLayer).toEqual({
+      visible: false,
+      opacity: 1,
+      pressureHpa: 500,
+      variant: "raw-temperature",
+      colorScaleMode: "global",
+    });
     expect(state.potentialTemperatureLayer).toEqual({
       visible: false,
       opacity: 1,
@@ -29,7 +36,7 @@ describe("controls store", () => {
       showCellGrid: false,
     });
     expect(state.airMassLayer).toEqual({
-      visible: true,
+      visible: false,
       opacity: 1,
       variant: "theta-anomaly-stddev-side-6neighbor-min100k",
       showCellGrid: false,
@@ -45,6 +52,11 @@ describe("controls store", () => {
 
     controls.setVerticalExaggeration(3.5);
     controls.setPrecipitationRadarLayer({ visible: true, opacity: 0.4 });
+    controls.setTemperatureSliceLayer({
+      visible: true,
+      variant: "temperature-minus-climatology",
+      colorScaleMode: "perLevel",
+    });
     controls.setPotentialTemperatureLayer({
       visible: true,
       variant: "fill-between-anchors",
@@ -63,6 +75,13 @@ describe("controls store", () => {
       visible: true,
       opacity: 0.4,
     });
+    expect(nextState.temperatureSliceLayer).toMatchObject({
+      visible: true,
+      opacity: 1,
+      pressureHpa: 500,
+      variant: "temperature-minus-climatology",
+      colorScaleMode: "perLevel",
+    });
     expect(nextState.potentialTemperatureLayer).toMatchObject({
       visible: true,
       opacity: 1,
@@ -71,7 +90,7 @@ describe("controls store", () => {
       showCellGrid: false,
     });
     expect(nextState.airMassLayer).toMatchObject({
-      visible: true,
+      visible: false,
       opacity: 1,
       showCellGrid: true,
       altitudeRange01: { min: 0.2, max: 0.75 },

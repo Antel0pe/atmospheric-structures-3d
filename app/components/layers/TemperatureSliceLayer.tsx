@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useControls } from "../../state/controlsStore";
+import {
+  useControls,
+  type TemperatureSliceVariant,
+} from "../../state/controlsStore";
 import {
   FLAT_EARTH_MAP_HEIGHT,
   FLAT_EARTH_MAP_WIDTH,
@@ -11,6 +14,7 @@ import {
   temperatureSliceBorderTextureUrl,
   temperatureSliceImageUrl,
   type TemperatureSliceLevelEntry,
+  type TemperatureSliceManifest,
   type TemperatureSliceManifestTimestamp,
 } from "../utils/temperatureSliceAssets";
 import {
@@ -102,8 +106,11 @@ function pressurePairFor(
   };
 }
 
-function textureCacheKey(level: TemperatureSliceLevelEntry) {
-  return `${level.pressure_hpa}:${level.image}`;
+function textureCacheKey(
+  variant: TemperatureSliceVariant,
+  level: TemperatureSliceLevelEntry
+) {
+  return `${variant}:${level.pressure_hpa}:${level.image}`;
 }
 
 function levelRangeToEncodedRange(
@@ -128,6 +135,13 @@ function levelRangeToEncodedRange(
   );
 }
 
+function isSaturationEncodedManifest(manifest: TemperatureSliceManifest) {
+  return (
+    manifest.rendering.encoding ===
+    "raw-temperature-uint16-rg-saturation-strength-b"
+  );
+}
+
 export default function TemperatureSliceLayer() {
   const {
     engineReady,
@@ -142,6 +156,7 @@ export default function TemperatureSliceLayer() {
   const pendingRef = useRef<TemperatureSliceLayerParams | null>(null);
   const hasContentRef = useRef(false);
   const frameEntryRef = useRef<TemperatureSliceManifestTimestamp | null>(null);
+  const frameVariantRef = useRef<TemperatureSliceVariant | null>(null);
   const globalTemperatureRangeRef = useRef<TemperatureRangeK | null>(null);
   const textureCacheRef = useRef(new Map<string, THREE.Texture>());
   const texturePromiseRef = useRef(new Map<string, Promise<THREE.Texture>>());
@@ -188,6 +203,7 @@ export default function TemperatureSliceLayer() {
           value:
             state.temperatureSliceLayer.colorScaleMode === "perLevel" ? 1.0 : 0.0,
         },
+        uSaturationMode: { value: 0.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -207,6 +223,7 @@ export default function TemperatureSliceLayer() {
         uniform float uPressureMix;
         uniform float uLayerOpacity;
         uniform float uColorScaleMode;
+        uniform float uSaturationMode;
 
         varying vec2 vUv;
 
@@ -242,8 +259,10 @@ export default function TemperatureSliceLayer() {
         }
 
         void main() {
-          float valueA = decodePackedTemperature(texture2D(uTexA, vUv));
-          float valueB = decodePackedTemperature(texture2D(uTexB, vUv));
+          vec4 sampleA = texture2D(uTexA, vUv);
+          vec4 sampleB = texture2D(uTexB, vUv);
+          float valueA = decodePackedTemperature(sampleA);
+          float valueB = decodePackedTemperature(sampleB);
           float levelValueA = clamp(
             (valueA - uTexALevelRange.x) /
               max(uTexALevelRange.y - uTexALevelRange.x, 0.000001),
@@ -260,6 +279,10 @@ export default function TemperatureSliceLayer() {
           float levelValue = mix(levelValueA, levelValueB, clamp(uPressureMix, 0.0, 1.0));
           float value = mix(globalValue, levelValue, step(0.5, uColorScaleMode));
           vec3 color = temperatureColor(value);
+          float encodedStrength = mix(sampleA.b, sampleB.b, clamp(uPressureMix, 0.0, 1.0));
+          float saturation = mix(1.0, 0.18 + 0.92 * encodedStrength, step(0.5, uSaturationMode));
+          float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+          color = mix(vec3(luminance), color, clamp(saturation, 0.0, 1.0));
           float border = borderAlpha(vUv);
           border = max(border, borderAlpha(vUv + vec2(uBorderTexel.x, 0.0)));
           border = max(border, borderAlpha(vUv - vec2(uBorderTexel.x, 0.0)));
@@ -287,6 +310,7 @@ export default function TemperatureSliceLayer() {
     return () => {
       meshRef.current = null;
       frameEntryRef.current = null;
+      frameVariantRef.current = null;
       globalTemperatureRangeRef.current = null;
       borderTextureUrlRef.current = null;
       mesh.removeFromParent();
@@ -306,14 +330,20 @@ export default function TemperatureSliceLayer() {
 
   const applyCachedPressureTextures = (
     material: THREE.ShaderMaterial,
+    variant: TemperatureSliceVariant,
     pressureHpa: number
   ) => {
     const entry = frameEntryRef.current;
     if (!entry) return false;
+    if (frameVariantRef.current !== variant) return false;
 
     const pair = pressurePairFor(entry, pressureHpa);
-    const lowerTexture = textureCacheRef.current.get(textureCacheKey(pair.lower));
-    const upperTexture = textureCacheRef.current.get(textureCacheKey(pair.upper));
+    const lowerTexture = textureCacheRef.current.get(
+      textureCacheKey(variant, pair.lower)
+    );
+    const upperTexture = textureCacheRef.current.get(
+      textureCacheKey(variant, pair.upper)
+    );
     if (!lowerTexture || !upperTexture) return false;
 
     material.uniforms.uTexA.value = lowerTexture;
@@ -328,8 +358,11 @@ export default function TemperatureSliceLayer() {
     return true;
   };
 
-  const loadTemperatureTexture = (level: TemperatureSliceLevelEntry) => {
-    const key = textureCacheKey(level);
+  const loadTemperatureTexture = (
+    variant: TemperatureSliceVariant,
+    level: TemperatureSliceLevelEntry
+  ) => {
+    const key = textureCacheKey(variant, level);
     const cached = textureCacheRef.current.get(key);
     if (cached) return Promise.resolve(cached);
 
@@ -337,7 +370,7 @@ export default function TemperatureSliceLayer() {
     if (existing) return existing;
 
     const promise = loadDataTextureFromApi({
-      url: temperatureSliceImageUrl(level),
+      url: temperatureSliceImageUrl(variant, level),
       fallbackMessage: "Failed to load temperature slice texture.",
       layerLabel: "Temperature slice",
     }).then((texture) => {
@@ -377,6 +410,7 @@ export default function TemperatureSliceLayer() {
         if (layer.visible && hasContentRef.current) {
           applyCachedPressureTextures(
             mesh.material as THREE.ShaderMaterial,
+            layer.variant,
             layer.pressureHpa
           );
         }
@@ -409,21 +443,36 @@ export default function TemperatureSliceLayer() {
       };
     }
 
-    if (hasContentRef.current && applyCachedPressureTextures(material, layerState.pressureHpa)) {
+    if (
+      hasContentRef.current &&
+      applyCachedPressureTextures(
+        material,
+        layerState.variant,
+        layerState.pressureHpa
+      )
+    ) {
       signalReady(timestamp);
       return () => {
         cancelled = true;
       };
     }
 
-    void fetchTemperatureSliceFrame(timestamp, layerState.pressureHpa)
+    void fetchTemperatureSliceFrame(timestamp, layerState.pressureHpa, {
+      variant: layerState.variant,
+    })
       .then((frame) => {
         frameEntryRef.current = frame.entry;
+        frameVariantRef.current = layerState.variant;
         globalTemperatureRangeRef.current = frame.manifest.temperature_range_k;
+        material.uniforms.uSaturationMode.value = isSaturationEncodedManifest(
+          frame.manifest
+        )
+          ? 1.0
+          : 0.0;
 
         return Promise.all([
-          loadTemperatureTexture(frame.pressurePair.lower),
-          loadTemperatureTexture(frame.pressurePair.upper),
+          loadTemperatureTexture(layerState.variant, frame.pressurePair.lower),
+          loadTemperatureTexture(layerState.variant, frame.pressurePair.upper),
         ]).then(() => ({ frame }));
       })
       .then(async (payload) => {
@@ -434,13 +483,16 @@ export default function TemperatureSliceLayer() {
         const latest =
           pendingRef.current ?? useControls.getState().temperatureSliceLayer;
         applyLayerParams(mesh, material, latest, useControls.getState().verticalExaggeration);
-        applyCachedPressureTextures(material, latest.pressureHpa);
+        applyCachedPressureTextures(material, latest.variant, latest.pressureHpa);
 
         hasContentRef.current = true;
         mesh.visible = latest.visible;
         material.uniforms.uLayerOpacity.value = latest.opacity;
 
-        const borderUrl = temperatureSliceBorderTextureUrl(payload.frame.manifest);
+        const borderUrl = temperatureSliceBorderTextureUrl(
+          latest.variant,
+          payload.frame.manifest
+        );
         if (borderUrl && borderTextureUrlRef.current !== borderUrl) {
           const borderTexture = await loadDataTextureFromApi({
             url: borderUrl,
@@ -472,12 +524,17 @@ export default function TemperatureSliceLayer() {
           previous?.dispose();
         }
 
-        void fetchTemperatureSliceManifest({ notifyOnError: false }).then((manifest) => {
+        void fetchTemperatureSliceManifest({
+          notifyOnError: false,
+          variant: latest.variant,
+        }).then((manifest) => {
           const entry = manifest.timestamps.find(
             (candidate) => candidate.timestamp === payload.frame.entry.timestamp
           );
           if (!entry || isCancelled()) return;
-          void Promise.allSettled(entry.levels.map((level) => loadTemperatureTexture(level)));
+          void Promise.allSettled(
+            entry.levels.map((level) => loadTemperatureTexture(latest.variant, level))
+          );
         });
 
         signalReady(timestamp);
@@ -497,6 +554,7 @@ export default function TemperatureSliceLayer() {
   }, [
     engineReady,
     layerState.pressureHpa,
+    layerState.variant,
     layerState.visible,
     projectionMode,
     signalReady,

@@ -43,3 +43,8 @@ target thermal representation
 - some element of 3d
 
 - maybe show correlated fields like look at pressure at specific level and have pop up that says oh temperature high, divergence low correlated with this field. select area by circling area on screen
+
+
+GOAL: i look at 2d temperature maps, see a warm blob and wonder hm i wonder what that blob looks like at different pressure levels. it is a smooth sphere, tilted, what happens to it? i want to make it easier and better to answer this question for myself.
+
+- currently white part is the middle of the color scale between blue and red. come up with some way to make white the part where genuinely cold and warm air masses collide around mid latitude. NOT temperature gradient or fronts as that happens everywhere but genuinely cold and warm air colliding is where white happens. might be hard to make this a uniform feature across the globe. 

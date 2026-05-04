@@ -5,10 +5,15 @@ import {
   AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS,
   POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
   POTENTIAL_TEMPERATURE_VARIANT_OPTIONS,
+  TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS,
+  TEMPERATURE_SLICE_VARIANT_OPTIONS,
   isSmoothAirMassClassificationVariant,
+  temperatureSliceVariantLabel,
   type AirMassClassificationVariant,
   type PotentialTemperatureColorMode,
   type PotentialTemperatureVariant,
+  type TemperatureSliceColorScaleMode,
+  type TemperatureSliceVariant,
   useControls,
 } from "../../state/controlsStore";
 
@@ -168,6 +173,74 @@ export default function LayerVisibilityPane() {
           accentColor="#ff6f5f"
           onChange={(checked) => setTemperatureSliceLayer({ visible: checked })}
         />
+
+        <div
+          style={{
+            display: temperatureSliceLayer.visible ? "grid" : "none",
+            gap: 12,
+          }}
+        >
+          <label style={{ display: "grid", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                fontWeight: 600,
+              }}
+            >
+              <span>Data Variant</span>
+              <span style={{ opacity: 0.68 }}>
+                {temperatureSliceVariantLabel(temperatureSliceLayer.variant)}
+              </span>
+            </div>
+            <select
+              value={temperatureSliceLayer.variant}
+              onChange={(event) =>
+                setTemperatureSliceLayer({
+                  variant: event.currentTarget.value as TemperatureSliceVariant,
+                })
+              }
+              style={selectStyle()}
+            >
+              {TEMPERATURE_SLICE_VARIANT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "grid", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                fontWeight: 600,
+              }}
+            >
+              <span>Color Scale</span>
+              <span style={{ opacity: 0.68 }}>Blue/cold red/hot</span>
+            </div>
+            <select
+              value={temperatureSliceLayer.colorScaleMode}
+              onChange={(event) =>
+                setTemperatureSliceLayer({
+                  colorScaleMode:
+                    event.currentTarget.value as TemperatureSliceColorScaleMode,
+                })
+              }
+              style={selectStyle()}
+            >
+              {TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <CheckboxRow
           label="Potential Temperature"

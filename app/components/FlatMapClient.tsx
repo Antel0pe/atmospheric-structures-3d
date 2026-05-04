@@ -20,6 +20,7 @@ export default function FlatMapClient() {
       visible: true,
       pressureHpa: 500,
       opacity: 1,
+      variant: "raw-temperature",
       colorScaleMode: "global",
     });
   }, []);

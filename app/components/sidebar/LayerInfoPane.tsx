@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   type AirMassClassificationVariant,
-  type TemperatureSliceColorScaleMode,
+  temperatureSliceColorScaleLabel,
+  temperatureSliceVariantLabel,
   useControls,
 } from "@/app/state/controlsStore";
 import {
@@ -123,10 +124,6 @@ function variantLabel(variant: AirMassClassificationVariant) {
     return "Surface-attached theta + RH";
   }
   return "Temperature + RH anomaly";
-}
-
-function temperatureScaleLabel(mode: TemperatureSliceColorScaleMode) {
-  return mode === "perLevel" ? "Per-level scale" : "Global scale";
 }
 
 function CompactRangeControl({
@@ -329,14 +326,10 @@ function AirMassAltitudeRangeControl({
 
 function TemperaturePressureControl({
   pressureHpa,
-  colorScaleMode,
   onChange,
-  onColorScaleModeChange,
 }: {
   pressureHpa: number;
-  colorScaleMode: TemperatureSliceColorScaleMode;
   onChange: (pressureHpa: number) => void;
-  onColorScaleModeChange: (mode: TemperatureSliceColorScaleMode) => void;
 }) {
   const clampedPressure = Math.min(Math.max(Math.round(pressureHpa), 250), 1000);
   const percent = Math.round(((1000 - clampedPressure) / (1000 - 250)) * 100);
@@ -388,43 +381,7 @@ function TemperaturePressureControl({
           height: 30px;
           background: transparent;
         }
-        .temperature-color-scale-select {
-          width: 100%;
-          border: 1px solid rgba(255,255,255,0.14);
-          border-radius: 8px;
-          background: rgba(6, 10, 18, 0.72);
-          color: #e9eef7;
-          padding: 7px 8px;
-          font: 700 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto;
-        }
       `}</style>
-      <label style={{ display: "grid", gap: 7 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 10,
-            fontWeight: 600,
-          }}
-        >
-          <span>Color Scale</span>
-          <span style={{ opacity: 0.68 }}>
-            {temperatureScaleLabel(colorScaleMode)}
-          </span>
-        </div>
-        <select
-          className="temperature-color-scale-select"
-          value={colorScaleMode}
-          onChange={(event) =>
-            onColorScaleModeChange(
-              event.currentTarget.value as TemperatureSliceColorScaleMode
-            )
-          }
-        >
-          <option value="global">Global 250-1000 hPa</option>
-          <option value="perLevel">Each pressure level</option>
-        </select>
-      </label>
       <div
         style={{
           display: "flex",
@@ -551,16 +508,44 @@ export default function LayerInfoPane() {
     }
 
     if (temperatureSliceLayer.visible) {
+      const isTemperatureAnomaly =
+        temperatureSliceLayer.variant === "temperature-minus-climatology";
+      const isPotentialTemperatureAnomaly =
+        temperatureSliceLayer.variant ===
+        "potential-temperature-minus-climatology";
+      const isVerticalCoherence =
+        temperatureSliceLayer.variant === "raw-temperature-vertical-coherence";
+      const isDualEncoding =
+        temperatureSliceLayer.variant === "raw-temperature-anomaly-strength";
+      const summary = (() => {
+        if (isVerticalCoherence) {
+          return "A raw-temperature pressure slice with saturation increased where the local vertical temperature trend kinks at that level.";
+        }
+        if (isDualEncoding) {
+          return "A raw-temperature pressure slice with saturation increased where matched temperature climatology anomalies are strongest.";
+        }
+        if (isPotentialTemperatureAnomaly) {
+          return "A full-map dry-potential-temperature pressure slice minus matched gridpoint climatology, with cold departures blue and warm departures red.";
+        }
+        if (isTemperatureAnomaly) {
+          return "A full-map raw-temperature pressure slice minus matched gridpoint climatology, with cold departures blue and warm departures red.";
+        }
+        if (temperatureSliceLayer.colorScaleMode === "perLevel") {
+          return "A full-map raw-temperature pressure slice with each pressure level stretched to its own min/max.";
+        }
+        return "A full-map raw-temperature pressure slice colored from the 250-1000 hPa global minimum to maximum.";
+      })();
       layers.push({
         id: "temperatureSliceLayer",
         title: "Temperature Slice",
         tag: `${temperatureSliceLayer.pressureHpa.toFixed(
           0
-        )} hPa / ${temperatureScaleLabel(temperatureSliceLayer.colorScaleMode)}`,
-        summary:
-          temperatureSliceLayer.colorScaleMode === "perLevel"
-            ? "A full-map raw-temperature pressure slice with each pressure level stretched to its own min/max."
-            : "A full-map raw-temperature pressure slice colored from the 250-1000 hPa global minimum to maximum.",
+        )} hPa / ${temperatureSliceVariantLabel(
+          temperatureSliceLayer.variant
+        )} / ${temperatureSliceColorScaleLabel(
+          temperatureSliceLayer.colorScaleMode
+        )}`,
+        summary,
       });
     }
 
@@ -612,6 +597,7 @@ export default function LayerInfoPane() {
     precipitationLayer.visible,
     temperatureSliceLayer.pressureHpa,
     temperatureSliceLayer.colorScaleMode,
+    temperatureSliceLayer.variant,
     temperatureSliceLayer.visible,
     potentialTemperatureLayer.colorMode,
     potentialTemperatureLayer.variant,
@@ -686,12 +672,8 @@ export default function LayerInfoPane() {
       {temperatureSliceLayer.visible ? (
         <TemperaturePressureControl
           pressureHpa={temperatureSliceLayer.pressureHpa}
-          colorScaleMode={temperatureSliceLayer.colorScaleMode}
           onChange={(pressureHpa) =>
             setTemperatureSliceLayer({ pressureHpa })
-          }
-          onColorScaleModeChange={(colorScaleMode) =>
-            setTemperatureSliceLayer({ colorScaleMode })
           }
         />
       ) : null}

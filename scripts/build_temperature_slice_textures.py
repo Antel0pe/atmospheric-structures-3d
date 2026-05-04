@@ -26,7 +26,27 @@ from scripts.simple_voxel_builder import (
 OUTPUT_VERSION = 1
 DATASET_VARIABLE = "t"
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
-DEFAULT_OUTPUT_DIR = Path("public/temperature-slices")
+RAW_TEMPERATURE_FIELD_KIND = "raw-temperature"
+TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND = "temperature-climatology-anomaly"
+POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND = (
+    "potential-temperature-climatology-anomaly"
+)
+RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND = (
+    "raw-temperature-vertical-coherence"
+)
+RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND = (
+    "raw-temperature-anomaly-strength"
+)
+DEFAULT_VARIANT_NAME = "raw-temperature"
+DEFAULT_VARIANT_LABEL = "Raw Temperature"
+DEFAULT_COLOR_SCALE = "global-min-blue-to-global-max-red"
+DEFAULT_OUTPUT_DIR = Path("public/temperature-slices/variants") / DEFAULT_VARIANT_NAME
+DEFAULT_TEMPERATURE_CLIMATOLOGY_PATH = Path(
+    "data/era5_temperature-climatology_1990-2020_11-08_12.nc"
+)
+DEFAULT_THETA_CLIMATOLOGY_PATH = Path(
+    "data/era5_dry-potential-temperature-climatology_1990-2020_11-08_12.nc"
+)
 DEFAULT_PRESSURE_MIN_HPA = 250.0
 DEFAULT_PRESSURE_MAX_HPA = 1000.0
 DEFAULT_INCLUDE_TIMESTAMPS = ("2021-11-08T12:00",)
@@ -46,6 +66,16 @@ class DatasetContents:
     timestamps: list[str]
 
 
+@dataclass(frozen=True)
+class ClimatologyField:
+    dataset_path: Path
+    variable_name: str
+    values: np.ndarray
+    pressure_levels_hpa: np.ndarray
+    latitudes_deg: np.ndarray
+    longitudes_deg: np.ndarray
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -63,7 +93,49 @@ def parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
-        help="Directory where generated temperature textures will be written.",
+        help="Directory where generated temperature variant textures will be written.",
+    )
+    parser.add_argument(
+        "--field-kind",
+        type=str,
+        default=RAW_TEMPERATURE_FIELD_KIND,
+        choices=(
+            RAW_TEMPERATURE_FIELD_KIND,
+            TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
+            POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
+            RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
+            RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
+        ),
+        help="Scalar field exported into the pressure-slice textures.",
+    )
+    parser.add_argument(
+        "--climatology",
+        type=Path,
+        default=None,
+        help="Optional matched-grid climatology NetCDF file for anomaly field kinds.",
+    )
+    parser.add_argument(
+        "--variant-name",
+        type=str,
+        default=DEFAULT_VARIANT_NAME,
+        help="Variant slug written into the manifest and used by the frontend.",
+    )
+    parser.add_argument(
+        "--variant-label",
+        type=str,
+        default=DEFAULT_VARIANT_LABEL,
+        help="Human-readable variant label written into the manifest.",
+    )
+    parser.add_argument(
+        "--color-scale",
+        type=str,
+        default=DEFAULT_COLOR_SCALE,
+        choices=(
+            "global-min-blue-to-global-max-red",
+            "per-level-min-blue-to-per-level-max-red",
+            "global-symmetric-zero-white-blue-red",
+        ),
+        help="Color-scale recipe described by this variant manifest.",
     )
     parser.add_argument(
         "--pressure-min-hpa",
@@ -140,6 +212,72 @@ def load_dataset_contents(dataset_path: Path) -> DatasetContents:
         dataset.close()
 
 
+def load_climatology_field(path: Path, variable_name: str) -> ClimatologyField:
+    dataset = xr.open_dataset(path)
+    try:
+        variable = dataset[variable_name]
+        return ClimatologyField(
+            dataset_path=path,
+            variable_name=variable_name,
+            values=np.asarray(variable.values, dtype=np.float32),
+            pressure_levels_hpa=np.asarray(
+                variable.coords["pressure_level"].values,
+                dtype=np.float32,
+            ),
+            latitudes_deg=np.asarray(variable.coords["latitude"].values, dtype=np.float32),
+            longitudes_deg=np.asarray(
+                variable.coords["longitude"].values,
+                dtype=np.float32,
+            ),
+        )
+    finally:
+        dataset.close()
+
+
+def resolve_climatology(
+    field_kind: str,
+    climatology_path: Path | None,
+) -> ClimatologyField | None:
+    if field_kind in {
+        RAW_TEMPERATURE_FIELD_KIND,
+        RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
+    }:
+        return None
+
+    if field_kind in {
+        TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
+        RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
+    }:
+        path = climatology_path or DEFAULT_TEMPERATURE_CLIMATOLOGY_PATH
+        return load_climatology_field(
+            resolve_dataset_path(path),
+            "temperature_climatology_mean",
+        )
+
+    if field_kind == POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND:
+        path = climatology_path or DEFAULT_THETA_CLIMATOLOGY_PATH
+        return load_climatology_field(
+            resolve_dataset_path(path),
+            "theta_climatology_mean",
+        )
+
+    raise ValueError(f"Unsupported temperature slice field kind: {field_kind}")
+
+
+def validate_climatology_grid(
+    contents: DatasetContents,
+    climatology: ClimatologyField | None,
+) -> None:
+    if climatology is None:
+        return
+    if not np.array_equal(contents.pressure_levels_hpa, climatology.pressure_levels_hpa):
+        raise ValueError("Source temperature and climatology pressure levels do not match.")
+    if not np.array_equal(contents.latitudes_deg, climatology.latitudes_deg):
+        raise ValueError("Source temperature and climatology latitude grids do not match.")
+    if not np.array_equal(contents.longitudes_deg, climatology.longitudes_deg):
+        raise ValueError("Source temperature and climatology longitude grids do not match.")
+
+
 def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -173,14 +311,14 @@ def pressure_level_indices(
     ]
 
 
-def encode_temperature_to_rgba_uint8(
-    temperature_k: np.ndarray,
-    temperature_min_k: float,
-    temperature_max_k: float,
+def encode_field_to_rgba_uint8(
+    values: np.ndarray,
+    value_min: float,
+    value_max: float,
 ) -> np.ndarray:
     normalized = np.clip(
-        (np.asarray(temperature_k, dtype=np.float32) - temperature_min_k)
-        / max(temperature_max_k - temperature_min_k, 1e-6),
+        (np.asarray(values, dtype=np.float32) - value_min)
+        / max(value_max - value_min, 1e-6),
         0.0,
         1.0,
     )
@@ -193,7 +331,163 @@ def encode_temperature_to_rgba_uint8(
     return rgba
 
 
-def compute_temperature_range(
+def encode_temperature_with_strength_to_rgba_uint8(
+    temperature_k: np.ndarray,
+    strength01: np.ndarray,
+    temperature_min_k: float,
+    temperature_max_k: float,
+) -> np.ndarray:
+    normalized_temperature = np.clip(
+        (np.asarray(temperature_k, dtype=np.float32) - temperature_min_k)
+        / max(temperature_max_k - temperature_min_k, 1e-6),
+        0.0,
+        1.0,
+    )
+    encoded16 = np.round(normalized_temperature * 65535.0).astype(np.uint16)
+    strength8 = np.round(np.clip(strength01, 0.0, 1.0) * 255.0).astype(np.uint8)
+    rgba = np.empty((*encoded16.shape, 4), dtype=np.uint8)
+    rgba[..., 0] = (encoded16 >> 8).astype(np.uint8)
+    rgba[..., 1] = (encoded16 & 255).astype(np.uint8)
+    rgba[..., 2] = strength8
+    rgba[..., 3] = 255
+    return rgba
+
+
+def dry_potential_temperature(
+    temperature_k: np.ndarray,
+    pressure_hpa: float,
+) -> np.ndarray:
+    return np.asarray(
+        temperature_k * (1000.0 / pressure_hpa) ** 0.285906374501992,
+        dtype=np.float32,
+    )
+
+
+def build_field(
+    raw_temperature_k: np.ndarray,
+    pressure_hpa: float,
+    level_index: int,
+    field_kind: str,
+    climatology: ClimatologyField | None,
+) -> np.ndarray:
+    if field_kind == RAW_TEMPERATURE_FIELD_KIND:
+        return raw_temperature_k
+    if climatology is None:
+        raise ValueError(f"Missing climatology for field kind: {field_kind}")
+    if field_kind == TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND:
+        return np.asarray(raw_temperature_k - climatology.values[level_index], dtype=np.float32)
+    if field_kind == POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND:
+        theta = dry_potential_temperature(raw_temperature_k, pressure_hpa)
+        return np.asarray(theta - climatology.values[level_index], dtype=np.float32)
+    raise ValueError(f"Unsupported temperature slice field kind: {field_kind}")
+
+
+def is_saturation_encoded_field_kind(field_kind: str) -> bool:
+    return field_kind in {
+        RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
+        RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
+    }
+
+
+def pressure_to_standard_atmosphere_height_m(pressure_hpa: np.ndarray) -> np.ndarray:
+    safe_pressure = np.maximum(np.asarray(pressure_hpa, dtype=np.float32), 1.0)
+    return np.asarray(
+        44330.0 * (1.0 - (safe_pressure / 1013.25) ** 0.1903),
+        dtype=np.float32,
+    )
+
+
+def vertical_coherence_kink_strength(
+    raw_stack_k: np.ndarray,
+    pressure_levels_hpa: np.ndarray,
+) -> np.ndarray:
+    heights_m = pressure_to_standard_atmosphere_height_m(pressure_levels_hpa)
+    strength = np.zeros_like(raw_stack_k, dtype=np.float32)
+
+    for level_index in range(2, raw_stack_k.shape[0] - 2):
+        lower_span_m = heights_m[level_index] - heights_m[level_index - 2]
+        upper_span_m = heights_m[level_index + 2] - heights_m[level_index]
+        if abs(float(lower_span_m)) < 1e-6 or abs(float(upper_span_m)) < 1e-6:
+            continue
+        lower_trend = (
+            raw_stack_k[level_index] - raw_stack_k[level_index - 2]
+        ) / lower_span_m
+        upper_trend = (
+            raw_stack_k[level_index + 2] - raw_stack_k[level_index]
+        ) / upper_span_m
+        strength[level_index] = np.abs(upper_trend - lower_trend)
+
+    return strength
+
+
+def read_raw_temperature_stack(
+    raw_dataset: netCDF4.Dataset,
+    time_index: int,
+    level_indices: list[int],
+) -> np.ndarray:
+    variable = raw_dataset.variables[DATASET_VARIABLE]
+    return np.asarray(variable[time_index, level_indices, :, :], dtype=np.float32)
+
+
+def saturation_strength_stack(
+    raw_stack_k: np.ndarray,
+    pressure_levels_hpa: np.ndarray,
+    level_indices: list[int],
+    field_kind: str,
+    climatology: ClimatologyField | None,
+) -> np.ndarray:
+    if field_kind == RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND:
+        return vertical_coherence_kink_strength(raw_stack_k, pressure_levels_hpa)
+
+    if field_kind == RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND:
+        if climatology is None:
+            raise ValueError(f"Missing climatology for field kind: {field_kind}")
+        climatology_stack = climatology.values[level_indices]
+        return np.abs(raw_stack_k - climatology_stack).astype(np.float32)
+
+    raise ValueError(f"Unsupported saturation field kind: {field_kind}")
+
+
+def compute_field_range(
+    raw_dataset: netCDF4.Dataset,
+    contents: DatasetContents,
+    target_time_indices: list[int],
+    level_indices: list[int],
+    field_kind: str,
+    climatology: ClimatologyField | None,
+) -> tuple[float, float]:
+    variable = raw_dataset.variables[DATASET_VARIABLE]
+    data_min = np.inf
+    data_max = -np.inf
+
+    for time_index in target_time_indices:
+        for level_index in level_indices:
+            pressure_hpa = float(contents.pressure_levels_hpa[level_index])
+            raw_temperature = np.asarray(
+                variable[time_index, level_index, :, :],
+                dtype=np.float32,
+            )
+            field = build_field(
+                raw_temperature,
+                pressure_hpa=pressure_hpa,
+                level_index=level_index,
+                field_kind=field_kind,
+                climatology=climatology,
+            )
+            data_min = min(data_min, float(np.nanmin(field)))
+            data_max = max(data_max, float(np.nanmax(field)))
+
+    if field_kind in {
+        TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
+        POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
+    }:
+        anomaly_abs_max = max(abs(data_min), abs(data_max))
+        return -anomaly_abs_max, anomaly_abs_max
+
+    return data_min, data_max
+
+
+def compute_raw_temperature_range(
     raw_dataset: netCDF4.Dataset,
     target_time_indices: list[int],
     level_indices: list[int],
@@ -203,12 +497,46 @@ def compute_temperature_range(
     data_max = -np.inf
 
     for time_index in target_time_indices:
-        for level_index in level_indices:
-            field = np.asarray(variable[time_index, level_index, :, :], dtype=np.float32)
-            data_min = min(data_min, float(np.nanmin(field)))
-            data_max = max(data_max, float(np.nanmax(field)))
+        raw_stack = np.asarray(variable[time_index, level_indices, :, :], dtype=np.float32)
+        data_min = min(data_min, float(np.nanmin(raw_stack)))
+        data_max = max(data_max, float(np.nanmax(raw_stack)))
 
     return data_min, data_max
+
+
+def compute_saturation_strength_scale(
+    raw_dataset: netCDF4.Dataset,
+    contents: DatasetContents,
+    target_time_indices: list[int],
+    level_indices: list[int],
+    field_kind: str,
+    climatology: ClimatologyField | None,
+) -> float:
+    samples: list[np.ndarray] = []
+    pressure_levels_hpa = contents.pressure_levels_hpa[level_indices]
+
+    for time_index in target_time_indices:
+        raw_stack = read_raw_temperature_stack(raw_dataset, time_index, level_indices)
+        strength = saturation_strength_stack(
+            raw_stack_k=raw_stack,
+            pressure_levels_hpa=pressure_levels_hpa,
+            level_indices=level_indices,
+            field_kind=field_kind,
+            climatology=climatology,
+        )
+        valid = strength[np.isfinite(strength)]
+        if valid.size:
+            samples.append(valid.reshape(-1))
+
+    if not samples:
+        return 1.0
+
+    all_values = np.concatenate(samples)
+    nonzero = all_values[all_values > 0]
+    if nonzero.size == 0:
+        return 1.0
+
+    return float(max(np.nanpercentile(nonzero, 95), 1e-6))
 
 
 def build_timestamp_entry(
@@ -218,8 +546,10 @@ def build_timestamp_entry(
     timestamp: str,
     time_index: int,
     level_indices: list[int],
-    temperature_min_k: float,
-    temperature_max_k: float,
+    field_min: float,
+    field_max: float,
+    field_kind: str,
+    climatology: ClimatologyField | None,
 ) -> dict:
     slug = timestamp_to_slug(timestamp)
     frame_dir = output_dir / slug
@@ -229,11 +559,18 @@ def build_timestamp_entry(
 
     for level_index in level_indices:
         pressure_hpa = float(contents.pressure_levels_hpa[level_index])
-        field = np.asarray(variable[time_index, level_index, :, :], dtype=np.float32)
-        encoded = encode_temperature_to_rgba_uint8(
+        raw_temperature = np.asarray(variable[time_index, level_index, :, :], dtype=np.float32)
+        field = build_field(
+            raw_temperature,
+            pressure_hpa=pressure_hpa,
+            level_index=level_index,
+            field_kind=field_kind,
+            climatology=climatology,
+        )
+        encoded = encode_field_to_rgba_uint8(
             field,
-            temperature_min_k=temperature_min_k,
-            temperature_max_k=temperature_max_k,
+            value_min=field_min,
+            value_max=field_max,
         )
         image_name = f"temperature-{int(round(pressure_hpa))}hpa.png"
         image_path = frame_dir / image_name
@@ -244,6 +581,69 @@ def build_timestamp_entry(
                 "image": str(image_path.relative_to(output_dir)).replace("\\", "/"),
                 "temperature_min_k": float(np.nanmin(field)),
                 "temperature_max_k": float(np.nanmax(field)),
+                "value_min": float(np.nanmin(field)),
+                "value_max": float(np.nanmax(field)),
+            }
+        )
+
+    levels.sort(key=lambda entry: float(entry["pressure_hpa"]))
+    return {
+        "timestamp": timestamp,
+        "levels": levels,
+    }
+
+
+def build_saturation_timestamp_entry(
+    output_dir: Path,
+    raw_dataset: netCDF4.Dataset,
+    contents: DatasetContents,
+    timestamp: str,
+    time_index: int,
+    level_indices: list[int],
+    temperature_min_k: float,
+    temperature_max_k: float,
+    strength_scale: float,
+    field_kind: str,
+    climatology: ClimatologyField | None,
+) -> dict:
+    slug = timestamp_to_slug(timestamp)
+    frame_dir = output_dir / slug
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    pressure_levels_hpa = contents.pressure_levels_hpa[level_indices]
+    raw_stack = read_raw_temperature_stack(raw_dataset, time_index, level_indices)
+    strength = saturation_strength_stack(
+        raw_stack_k=raw_stack,
+        pressure_levels_hpa=pressure_levels_hpa,
+        level_indices=level_indices,
+        field_kind=field_kind,
+        climatology=climatology,
+    )
+    normalized_strength = np.clip(strength / max(strength_scale, 1e-6), 0.0, 1.0)
+
+    levels: list[dict[str, str | float]] = []
+    for stack_index, level_index in enumerate(level_indices):
+        pressure_hpa = float(contents.pressure_levels_hpa[level_index])
+        raw_temperature = raw_stack[stack_index]
+        strength_slice = normalized_strength[stack_index]
+        encoded = encode_temperature_with_strength_to_rgba_uint8(
+            temperature_k=raw_temperature,
+            strength01=strength_slice,
+            temperature_min_k=temperature_min_k,
+            temperature_max_k=temperature_max_k,
+        )
+        image_name = f"temperature-{int(round(pressure_hpa))}hpa.png"
+        image_path = frame_dir / image_name
+        Image.fromarray(encoded, mode="RGBA").save(image_path, optimize=True)
+        levels.append(
+            {
+                "pressure_hpa": pressure_hpa,
+                "image": str(image_path.relative_to(output_dir)).replace("\\", "/"),
+                "temperature_min_k": float(np.nanmin(raw_temperature)),
+                "temperature_max_k": float(np.nanmax(raw_temperature)),
+                "value_min": float(np.nanmin(raw_temperature)),
+                "value_max": float(np.nanmax(raw_temperature)),
+                "saturation_strength_min": float(np.nanmin(strength[stack_index])),
+                "saturation_strength_max": float(np.nanmax(strength[stack_index])),
             }
         )
 
@@ -258,25 +658,43 @@ def build_manifest(
     contents: DatasetContents,
     entries: list[dict],
     level_indices: list[int],
-    temperature_min_k: float,
-    temperature_max_k: float,
+    field_min: float,
+    field_max: float,
+    field_kind: str,
+    climatology: ClimatologyField | None,
+    variant_name: str,
+    variant_label: str,
+    color_scale: str,
+    saturation_strength_scale: float | None = None,
 ) -> dict:
     pressures = sorted(float(contents.pressure_levels_hpa[index]) for index in level_indices)
-    return {
+    manifest = {
         "version": OUTPUT_VERSION,
         "dataset": contents.dataset_path.name,
         "variable": contents.variable_name,
         "units": contents.units,
         "display_units": "K",
+        "variant": variant_name,
+        "variant_label": variant_label,
+        "field_kind": field_kind,
+        "climatology_dataset": climatology.dataset_path.name if climatology else None,
         "rendering": {
             "kind": "full-field-pressure-slice",
             "filtering": "none",
-            "color_scale": "global-min-blue-to-global-max-red",
-            "encoding": "normalized-temperature-uint16-packed-rg",
+            "color_scale": color_scale,
+            "encoding": (
+                "raw-temperature-uint16-rg-saturation-strength-b"
+                if saturation_strength_scale is not None
+                else "normalized-temperature-uint16-packed-rg"
+            ),
         },
         "temperature_range_k": {
-            "min": temperature_min_k,
-            "max": temperature_max_k,
+            "min": field_min,
+            "max": field_max,
+        },
+        "value_range": {
+            "min": field_min,
+            "max": field_max,
         },
         "pressure_window_hpa": {
             "min": min(pressures),
@@ -295,6 +713,15 @@ def build_manifest(
         },
         "timestamps": entries,
     }
+
+    if saturation_strength_scale is not None:
+        manifest["saturation_strength_range"] = {
+            "min": 0.0,
+            "max": saturation_strength_scale,
+        }
+
+    return manifest
+
 
 
 def split_dateline_segments(points: list[tuple[float, float]]) -> Iterable[list[tuple[float, float]]]:
@@ -370,6 +797,8 @@ def main() -> None:
     args = parse_args()
     dataset_path = resolve_dataset_path(args.dataset)
     contents = load_dataset_contents(dataset_path)
+    climatology = resolve_climatology(args.field_kind, args.climatology)
+    validate_climatology_grid(contents, climatology)
     target_timestamps = resolve_target_timestamps(
         contents.timestamps,
         args.include_timestamps,
@@ -393,24 +822,61 @@ def main() -> None:
 
     raw_dataset = netCDF4.Dataset(dataset_path)
     try:
-        temperature_min_k, temperature_max_k = compute_temperature_range(
-            raw_dataset=raw_dataset,
-            target_time_indices=target_time_indices,
-            level_indices=level_indices,
-        )
-        entries = [
-            build_timestamp_entry(
-                output_dir=output_dir,
+        saturation_strength_scale: float | None = None
+        if is_saturation_encoded_field_kind(args.field_kind):
+            field_min, field_max = compute_raw_temperature_range(
+                raw_dataset=raw_dataset,
+                target_time_indices=target_time_indices,
+                level_indices=level_indices,
+            )
+            saturation_strength_scale = compute_saturation_strength_scale(
                 raw_dataset=raw_dataset,
                 contents=contents,
-                timestamp=timestamp,
-                time_index=time_index,
+                target_time_indices=target_time_indices,
                 level_indices=level_indices,
-                temperature_min_k=temperature_min_k,
-                temperature_max_k=temperature_max_k,
+                field_kind=args.field_kind,
+                climatology=climatology,
             )
-            for timestamp, time_index in zip(target_timestamps, target_time_indices)
-        ]
+            entries = [
+                build_saturation_timestamp_entry(
+                    output_dir=output_dir,
+                    raw_dataset=raw_dataset,
+                    contents=contents,
+                    timestamp=timestamp,
+                    time_index=time_index,
+                    level_indices=level_indices,
+                    temperature_min_k=field_min,
+                    temperature_max_k=field_max,
+                    strength_scale=saturation_strength_scale,
+                    field_kind=args.field_kind,
+                    climatology=climatology,
+                )
+                for timestamp, time_index in zip(target_timestamps, target_time_indices)
+            ]
+        else:
+            field_min, field_max = compute_field_range(
+                raw_dataset=raw_dataset,
+                contents=contents,
+                target_time_indices=target_time_indices,
+                level_indices=level_indices,
+                field_kind=args.field_kind,
+                climatology=climatology,
+            )
+            entries = [
+                build_timestamp_entry(
+                    output_dir=output_dir,
+                    raw_dataset=raw_dataset,
+                    contents=contents,
+                    timestamp=timestamp,
+                    time_index=time_index,
+                    level_indices=level_indices,
+                    field_min=field_min,
+                    field_max=field_max,
+                    field_kind=args.field_kind,
+                    climatology=climatology,
+                )
+                for timestamp, time_index in zip(target_timestamps, target_time_indices)
+            ]
     finally:
         raw_dataset.close()
 
@@ -418,8 +884,14 @@ def main() -> None:
         contents=contents,
         entries=entries,
         level_indices=level_indices,
-        temperature_min_k=temperature_min_k,
-        temperature_max_k=temperature_max_k,
+        field_min=field_min,
+        field_max=field_max,
+        field_kind=args.field_kind,
+        climatology=climatology,
+        variant_name=args.variant_name,
+        variant_label=args.variant_label,
+        color_scale=args.color_scale,
+        saturation_strength_scale=saturation_strength_scale,
     )
     border_texture = write_border_texture(
         output_dir=output_dir,
@@ -433,7 +905,8 @@ def main() -> None:
         "Built temperature slice assets:",
         f"{len(entries)} timestamps",
         f"{len(level_indices)} pressure levels",
-        f"{temperature_min_k:.2f}-{temperature_max_k:.2f} K",
+        f"variant={args.variant_name}",
+        f"{field_min:.2f}-{field_max:.2f} K",
         f"-> {format_display_path(output_dir)}",
     )
 

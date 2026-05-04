@@ -133,6 +133,32 @@ export const POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS = [
 export type PotentialTemperatureColorMode =
   (typeof POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS)[number]["value"];
 
+export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
+  {
+    value: "raw-temperature",
+    label: "Raw Temperature",
+  },
+  {
+    value: "raw-temperature-vertical-coherence",
+    label: "Vertical Coherence",
+  },
+  {
+    value: "raw-temperature-anomaly-strength",
+    label: "Dual Encoding",
+  },
+  {
+    value: "temperature-minus-climatology",
+    label: "Temperature - Climatology",
+  },
+  {
+    value: "potential-temperature-minus-climatology",
+    label: "Potential Temperature - Climatology",
+  },
+] as const;
+
+export type TemperatureSliceVariant =
+  (typeof TEMPERATURE_SLICE_VARIANT_OPTIONS)[number]["value"];
+
 export type ExampleShaderMeshLayerState = {
   pressureLevel: ExampleShaderMeshPressure;
   uValueMin: number;
@@ -163,12 +189,36 @@ export type PrecipitableWaterLayerState = {
   opacity: number;
 };
 
-export type TemperatureSliceColorScaleMode = "global" | "perLevel";
+export const TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS = [
+  { value: "global", label: "Global 250-1000 hPa" },
+  { value: "perLevel", label: "Each pressure level" },
+] as const;
+
+export type TemperatureSliceColorScaleMode =
+  (typeof TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS)[number]["value"];
+
+export function temperatureSliceVariantLabel(variant: TemperatureSliceVariant) {
+  return (
+    TEMPERATURE_SLICE_VARIANT_OPTIONS.find((option) => option.value === variant)
+      ?.label ?? variant
+  );
+}
+
+export function temperatureSliceColorScaleLabel(
+  colorScaleMode: TemperatureSliceColorScaleMode
+) {
+  return (
+    TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS.find(
+      (option) => option.value === colorScaleMode
+    )?.label ?? colorScaleMode
+  );
+}
 
 export type TemperatureSliceLayerState = {
   visible: boolean;
   opacity: number;
   pressureHpa: number;
+  variant: TemperatureSliceVariant;
   colorScaleMode: TemperatureSliceColorScaleMode;
 };
 
@@ -257,6 +307,7 @@ export const useControls = create<ControlsState>()(
       visible: false,
       opacity: 1,
       pressureHpa: 500,
+      variant: "raw-temperature",
       colorScaleMode: "global",
     },
     potentialTemperatureLayer: {
@@ -327,6 +378,7 @@ export const useControls = create<ControlsState>()(
             nextLayer.visible === state.temperatureSliceLayer.visible &&
             nextLayer.opacity === state.temperatureSliceLayer.opacity &&
             nextLayer.pressureHpa === state.temperatureSliceLayer.pressureHpa &&
+            nextLayer.variant === state.temperatureSliceLayer.variant &&
             nextLayer.colorScaleMode ===
               state.temperatureSliceLayer.colorScaleMode
           ) {

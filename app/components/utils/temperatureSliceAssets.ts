@@ -1,11 +1,16 @@
 import { snapTimestampToAvailable } from "./ApiResponses";
 import { fetchJsonOrThrow } from "./dataFetchErrors";
+import type { TemperatureSliceVariant } from "../../state/controlsStore";
 
 export type TemperatureSliceLevelEntry = {
   pressure_hpa: number;
   image: string;
   temperature_min_k: number;
   temperature_max_k: number;
+  value_min?: number;
+  value_max?: number;
+  saturation_strength_min?: number;
+  saturation_strength_max?: number;
 };
 
 export type TemperatureSliceManifestTimestamp = {
@@ -19,13 +24,35 @@ export type TemperatureSliceManifest = {
   variable: string;
   units: string;
   display_units: "K";
+  variant?: string;
+  variant_label?: string;
+  field_kind?:
+    | "raw-temperature"
+    | "temperature-climatology-anomaly"
+    | "potential-temperature-climatology-anomaly"
+    | "raw-temperature-vertical-coherence"
+    | "raw-temperature-anomaly-strength";
+  climatology_dataset?: string | null;
   rendering: {
     kind: "full-field-pressure-slice";
     filtering: "none";
-    color_scale: "global-min-blue-to-global-max-red";
-    encoding: "normalized-temperature-uint16-packed-rg";
+    color_scale:
+      | "global-min-blue-to-global-max-red"
+      | "per-level-min-blue-to-per-level-max-red"
+      | "global-symmetric-zero-white-blue-red";
+    encoding:
+      | "normalized-temperature-uint16-packed-rg"
+      | "raw-temperature-uint16-rg-saturation-strength-b";
   };
   temperature_range_k: {
+    min: number;
+    max: number;
+  };
+  value_range?: {
+    min: number;
+    max: number;
+  };
+  saturation_strength_range?: {
     min: number;
     max: number;
   };
@@ -60,50 +87,71 @@ export type TemperatureSliceFrame = {
   pressurePair: TemperatureSlicePressurePair;
 };
 
-const temperatureSliceManifestPromise: {
-  current: Promise<TemperatureSliceManifest> | null;
-} = {
-  current: null,
-};
+const temperatureSliceManifestPromiseCache = new Map<
+  TemperatureSliceVariant,
+  Promise<TemperatureSliceManifest>
+>();
 
-function buildTemperatureSliceUrl(...segments: string[]) {
-  return `/${["temperature-slices", ...segments].join("/")}`;
+const DEFAULT_TEMPERATURE_SLICE_VARIANT: TemperatureSliceVariant =
+  "raw-temperature";
+
+function temperatureSliceBaseSegments(variant: TemperatureSliceVariant) {
+  return ["temperature-slices", "variants", variant];
+}
+
+function buildTemperatureSliceUrl(
+  variant: TemperatureSliceVariant,
+  ...segments: string[]
+) {
+  return `/${[...temperatureSliceBaseSegments(variant), ...segments].join("/")}`;
 }
 
 export async function fetchTemperatureSliceManifest(opts?: {
+  variant?: TemperatureSliceVariant;
   refresh?: boolean;
   notifyOnError?: boolean;
 }) {
+  const variant = opts?.variant ?? DEFAULT_TEMPERATURE_SLICE_VARIANT;
   const refresh = opts?.refresh ?? false;
   const notifyOnError = opts?.notifyOnError ?? true;
 
-  if (!refresh && temperatureSliceManifestPromise.current) {
-    return temperatureSliceManifestPromise.current;
+  if (!refresh) {
+    const cachedPromise = temperatureSliceManifestPromiseCache.get(variant);
+    if (cachedPromise) {
+      return cachedPromise;
+    }
   }
 
-  temperatureSliceManifestPromise.current =
-    fetchJsonOrThrow<TemperatureSliceManifest>(
-      buildTemperatureSliceUrl("index.json"),
-      "Failed to load temperature slice manifest.",
-      {
-        layerLabel: "Temperature slice",
-        notifyOnError,
-      }
-    ).catch((error) => {
-      temperatureSliceManifestPromise.current = null;
-      throw error;
-    });
+  const manifestPromise = fetchJsonOrThrow<TemperatureSliceManifest>(
+    buildTemperatureSliceUrl(variant, "index.json"),
+    "Failed to load temperature slice manifest.",
+    {
+      layerLabel: "Temperature slice",
+      notifyOnError,
+    }
+  ).catch((error) => {
+    temperatureSliceManifestPromiseCache.delete(variant);
+    throw error;
+  });
 
-  return temperatureSliceManifestPromise.current;
+  temperatureSliceManifestPromiseCache.set(variant, manifestPromise);
+  return manifestPromise;
 }
 
 export async function fetchTemperatureSliceFrame(
   datehour: string,
   pressureHpa: number,
-  opts?: { notifyOnError?: boolean }
+  opts?: {
+    notifyOnError?: boolean;
+    variant?: TemperatureSliceVariant;
+  }
 ): Promise<TemperatureSliceFrame> {
   const notifyOnError = opts?.notifyOnError ?? true;
-  const manifest = await fetchTemperatureSliceManifest({ notifyOnError });
+  const variant = opts?.variant ?? DEFAULT_TEMPERATURE_SLICE_VARIANT;
+  const manifest = await fetchTemperatureSliceManifest({
+    notifyOnError,
+    variant,
+  });
   const availableValues = manifest.timestamps.map((item) => item.timestamp);
   const resolvedTimestamp = snapTimestampToAvailable(datehour, availableValues);
   const entry =
@@ -155,14 +203,18 @@ export async function fetchTemperatureSliceFrame(
   };
 }
 
-export function temperatureSliceImageUrl(entry: TemperatureSliceLevelEntry) {
-  return buildTemperatureSliceUrl(entry.image);
+export function temperatureSliceImageUrl(
+  variant: TemperatureSliceVariant,
+  entry: TemperatureSliceLevelEntry
+) {
+  return buildTemperatureSliceUrl(variant, entry.image);
 }
 
 export function temperatureSliceBorderTextureUrl(
+  variant: TemperatureSliceVariant,
   manifest: TemperatureSliceManifest
 ) {
   return manifest.border_texture
-    ? buildTemperatureSliceUrl(manifest.border_texture)
+    ? buildTemperatureSliceUrl(variant, manifest.border_texture)
     : null;
 }
