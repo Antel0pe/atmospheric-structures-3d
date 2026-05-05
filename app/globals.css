@@ -5,6 +5,15 @@
   --foreground: #171717;
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --atm-panel: rgba(5, 11, 19, 0.86);
+  --atm-panel-strong: rgba(6, 13, 22, 0.94);
+  --atm-border: rgba(148, 163, 184, 0.16);
+  --atm-border-strong: rgba(148, 163, 184, 0.26);
+  --atm-text: #e8eef7;
+  --atm-muted: #9aa8ba;
+  --atm-blue: #4f8cff;
+  --atm-green: #2fd17c;
+  --atm-dot-off: #7e8c9d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,4 +29,558 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+select,
+input,
+textarea {
+  font-family: inherit;
+}
+
+.atm-topbar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 120;
+  height: 60px;
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) auto minmax(250px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 0 22px;
+  background:
+    linear-gradient(180deg, rgba(5, 12, 21, 0.98), rgba(5, 12, 21, 0.88)),
+    radial-gradient(circle at 42% 0%, rgba(79, 140, 255, 0.18), transparent 38%);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  color: var(--atm-text);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.28);
+}
+
+.atm-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.atm-brand-mark {
+  width: 22px;
+  height: 22px;
+  color: #35b6ff;
+}
+
+.atm-brand-mark svg,
+.atm-toolbar svg,
+.atm-calendar svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atm-time-jump {
+  height: 40px;
+  min-width: 286px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 9px;
+  background: rgba(7, 14, 24, 0.82);
+  color: #f3f7fd;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.atm-calendar {
+  width: 18px;
+  height: 18px;
+  color: var(--atm-muted);
+}
+
+.atm-step-button,
+.atm-icon-button,
+.atm-floating-tab {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(8, 16, 27, 0.78);
+  color: var(--atm-text);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  backdrop-filter: blur(14px);
+}
+
+.atm-step-button {
+  width: 22px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--atm-muted);
+  font-size: 22px;
+}
+
+.atm-toolbar {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.atm-icon-button {
+  width: 48px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.atm-icon-button svg {
+  width: 19px;
+  height: 19px;
+  color: #d9e4f1;
+}
+
+.atm-user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--atm-muted);
+  font-size: 12px;
+}
+
+.atm-user-menu span:first-child {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #f3f7fd;
+  font-weight: 800;
+}
+
+.atm-side-shell {
+  backdrop-filter: blur(18px);
+  background:
+    linear-gradient(180deg, rgba(7, 14, 24, 0.985), rgba(4, 9, 16, 0.965)),
+    radial-gradient(circle at 60% 0%, rgba(79, 140, 255, 0.13), transparent 36%);
+}
+
+.atm-side-shell-left {
+  border-right: 1px solid rgba(148, 163, 184, 0.17);
+  box-shadow: 22px 0 44px rgba(0, 0, 0, 0.31);
+}
+
+.atm-side-shell-right {
+  border-left: 1px solid rgba(148, 163, 184, 0.17);
+  box-shadow: -22px 0 44px rgba(0, 0, 0, 0.31);
+}
+
+.atm-floating-tab {
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+}
+
+.atm-sidebar,
+.atm-info-pane {
+  width: 100%;
+  height: 100%;
+  color: var(--atm-text);
+}
+
+.atm-info-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.atm-panel-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+  color: var(--atm-text);
+  font: 500 11px var(--font-sans);
+}
+
+.atm-section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.atm-about-copy {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--atm-muted);
+  line-height: 1.45;
+}
+
+.atm-about-copy p {
+  margin: 0;
+}
+
+.atm-about-copy a {
+  color: #6ea6ff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.atm-shortcut-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.atm-shortcut-row {
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--atm-muted);
+}
+
+.atm-shortcut-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.atm-shortcut-keys span {
+  min-width: 24px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 5px;
+  background: rgba(4, 9, 16, 0.9);
+  color: #f3f7fd;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.atm-layer-stack,
+.atm-control-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.atm-layer-row {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 7px;
+  background: rgba(8, 16, 27, 0.58);
+  overflow: hidden;
+}
+
+.atm-layer-row[data-active="true"] {
+  border-color: rgba(79, 140, 255, 0.32);
+  background: rgba(9, 18, 31, 0.82);
+}
+
+.atm-layer-row[data-active="true"] .atm-layer-dot {
+  background: var(--atm-green) !important;
+}
+
+.atm-layer-row-header {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  color: var(--atm-text);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.atm-layer-chevron,
+.atm-layer-grip {
+  color: rgba(148, 163, 184, 0.45);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.atm-layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.atm-layer-controls {
+  display: grid;
+  gap: 8px;
+  padding: 0 8px 9px 24px;
+}
+
+.atm-field {
+  display: grid;
+  gap: 6px;
+}
+
+.atm-field > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--atm-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.atm-field > div:first-child span:last-child {
+  color: #c9d5e3;
+}
+
+.atm-sub-toggle {
+  min-height: 30px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0;
+  color: var(--atm-muted);
+}
+
+.atm-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.atm-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.atm-switch span {
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(99, 116, 136, 0.36);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+}
+
+.atm-switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #dbe8f8;
+  transition: transform 160ms ease;
+}
+
+.atm-switch[data-checked="true"] span::after {
+  transform: translateX(12px);
+}
+
+.atm-switch[data-checked="true"] span {
+  background: var(--atm-green) !important;
+}
+
+.atm-dev-viewer-toggle {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.atm-beta-badge,
+.atm-info-heading span {
+  border-radius: 5px;
+  padding: 3px 7px;
+  background: rgba(79, 140, 255, 0.18);
+  color: #79a9ff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.atm-info-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.atm-info-heading div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.atm-info-heading strong {
+  font-size: 12px;
+}
+
+.atm-info-heading p,
+.atm-muted-copy {
+  margin: 0;
+  color: var(--atm-muted);
+  line-height: 1.55;
+}
+
+.atm-meta-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.atm-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--atm-muted);
+}
+
+.atm-meta-row span:last-child {
+  color: #cfd8e6;
+  text-align: right;
+}
+
+.atm-vertical-level {
+  display: grid;
+  grid-template-columns: 1fr 58px;
+  gap: 12px;
+  align-items: center;
+}
+
+.atm-level-column {
+  display: grid;
+  grid-template-rows: 20px repeat(5, 28px);
+  gap: 6px;
+  color: var(--atm-muted);
+  font-size: 10px;
+}
+
+.atm-level-column div {
+  color: #d9e4f1;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.atm-level-column span[data-active="true"] {
+  color: #4f8cff;
+  font-weight: 850;
+}
+
+.atm-pressure-track {
+  position: relative;
+  height: 188px;
+  display: grid;
+  place-items: center;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+  user-select: none;
+}
+
+.atm-pressure-track:focus-visible {
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.42);
+}
+
+.atm-pressure-track-line {
+  position: absolute;
+  width: 4px;
+  height: 156px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #86aaff, #2975ff);
+}
+
+.atm-pressure-thumb {
+  position: absolute;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 3px solid rgba(226, 237, 255, 0.96);
+  background: #4f8cff;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+  z-index: 1;
+}
+
+.atm-color-scale {
+  display: grid;
+  gap: 8px;
+}
+
+.atm-color-scale > div:first-child {
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1859c8, #1da6e0, #f2ead2, #ff8f1f, #ea1b13);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.atm-color-scale > div:nth-child(2) {
+  display: flex;
+  justify-content: space-between;
+  color: var(--atm-muted);
+}
+
+.atm-color-scale strong {
+  justify-self: center;
+  color: #cfd8e6;
+  font-size: 11px;
+}
+
+.atm-view-3d-link {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(12, 22, 35, 0.78);
+  color: var(--atm-text);
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.atm-time-range {
+  height: 18px;
+}
+
+@media (max-width: 980px) {
+  .atm-topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .atm-time-jump,
+  .atm-toolbar {
+    display: none;
+  }
 }

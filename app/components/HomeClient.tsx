@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import SidebarPane from "./sidebar/SidebarPane";
 import DataNoticeOverlay from "./DataNoticeOverlay";
 import { useViewerStore } from "../state/viewerStore";
@@ -66,6 +66,118 @@ type HomeClientProps = {
   projectionMode?: EarthProjectionMode;
 };
 
+function formatWorkbenchTimestamp(value: string) {
+  const parsed = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!parsed) return `${value} UTC`;
+  return `${parsed[1]}-${parsed[2]}-${parsed[3]}  ${parsed[4]}:${parsed[5]} UTC`;
+}
+
+function stepTimestamp(value: string, hours: number) {
+  const parsed = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!parsed) return value;
+  const next = new Date(
+    Date.UTC(
+      Number(parsed[1]),
+      Number(parsed[2]) - 1,
+      Number(parsed[3]),
+      Number(parsed[4]) + hours,
+      Number(parsed[5])
+    )
+  );
+  const year = next.getUTCFullYear();
+  const month = String(next.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(next.getUTCDate()).padStart(2, "0");
+  const hour = String(next.getUTCHours()).padStart(2, "0");
+  const minute = String(next.getUTCMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function WorkbenchIcon({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" className="atm-icon-button" aria-label={label} title={label}>
+      {children}
+    </button>
+  );
+}
+
+function TopWorkbenchBar({
+  timestamp,
+  onTimestampChange,
+}: {
+  timestamp: string;
+  onTimestampChange: (timestamp: string) => void;
+}) {
+  return (
+    <header className="atm-topbar">
+      <div className="atm-brand">
+        <div className="atm-brand-mark" aria-hidden>
+          <svg viewBox="0 0 32 32">
+            <path d="M16 3.5a12.5 12.5 0 1 1-8.84 3.66" />
+            <path d="M16 7.5a8.5 8.5 0 1 0 6.01 2.49" />
+            <path d="M16 2v8M16 22v8M2 16h8M22 16h8" />
+            <path d="M8.2 8.2l5.6 5.6M18.2 18.2l5.6 5.6M23.8 8.2l-5.6 5.6M13.8 18.2l-5.6 5.6" />
+          </svg>
+        </div>
+        <span>Atmospheric Workbench</span>
+      </div>
+
+      <div className="atm-time-jump" aria-label="Current timestamp">
+        <button
+          type="button"
+          className="atm-step-button"
+          aria-label="Previous time"
+          onClick={() => onTimestampChange(stepTimestamp(timestamp, -3))}
+        >
+          ‹
+        </button>
+        <span className="atm-calendar" aria-hidden>
+          <svg viewBox="0 0 24 24">
+            <path d="M7 3v4M17 3v4M4.5 9h15M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+          </svg>
+        </span>
+        <span>{formatWorkbenchTimestamp(timestamp)}</span>
+        <button
+          type="button"
+          className="atm-step-button"
+          aria-label="Next time"
+          onClick={() => onTimestampChange(stepTimestamp(timestamp, 3))}
+        >
+          ›
+        </button>
+      </div>
+
+      <nav className="atm-toolbar" aria-label="Workbench tools">
+        <WorkbenchIcon label="Globe">
+          <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3.8 12h16.4M12 3c2.2 2.4 3.3 5.4 3.3 9S14.2 18.6 12 21c-2.2-2.4-3.3-5.4-3.3-9S9.8 5.4 12 3Z" /></svg>
+        </WorkbenchIcon>
+        <WorkbenchIcon label="Analyze">
+          <svg viewBox="0 0 24 24"><path d="M4 19h16M6 16l4-5 3 3 5-8M18 6h2v2" /></svg>
+        </WorkbenchIcon>
+        <WorkbenchIcon label="Layers">
+          <svg viewBox="0 0 24 24"><path d="m12 4 8 4-8 4-8-4 8-4Zm-8 8 8 4 8-4M4 16l8 4 8-4" /></svg>
+        </WorkbenchIcon>
+        <WorkbenchIcon label="Capture">
+          <svg viewBox="0 0 24 24"><path d="M8 7h1.5l1-2h3l1 2H16a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Zm4 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /></svg>
+        </WorkbenchIcon>
+        <WorkbenchIcon label="Share">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11M8 8l4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" /></svg>
+        </WorkbenchIcon>
+      </nav>
+
+      <div className="atm-user-menu">
+        <span>MW</span>
+        <span aria-hidden>⌄</span>
+      </div>
+    </header>
+  );
+}
+
 export default function HomeClient({
   projectionMode = "globe",
 }: HomeClientProps = {}) {
@@ -77,8 +189,8 @@ export default function HomeClient({
   const applySavedViewRequest = useViewerStore(
     (state) => state.applySavedViewRequest
   );
-  const sidebarWidth = "max(15vw, 320px)";
-  const layerInfoWidth = sidebarWidth;
+  const sidebarWidth = "288px";
+  const layerInfoWidth = "304px";
 
   useEffect(() => {
     if (!applySavedViewRequest) return;
@@ -109,11 +221,13 @@ export default function HomeClient({
       }}
     >
       <DataNoticeOverlay />
+      <TopWorkbenchBar timestamp={datehour} onTimestampChange={setTimestamp} />
 
       <div
         style={{
           position: "absolute",
           inset: 0,
+          zIndex: 0,
         }}
       >
         <EarthBase
@@ -134,18 +248,19 @@ export default function HomeClient({
       <div
         style={{
           position: "absolute",
-          left: 24,
-          right: 24,
-          bottom: 24,
-          zIndex: 35,
+          left: sidebarOpen ? `calc(${sidebarWidth} + 28px)` : 28,
+          right: layerInfoOpen ? `calc(${layerInfoWidth} + 28px)` : 28,
+          bottom: 14,
+          zIndex: 80,
           display: "flex",
           justifyContent: "center",
           pointerEvents: "none",
+          transition: "left 220ms ease, right 220ms ease",
         }}
       >
         <div
           style={{
-            width: "min(960px, 100%)",
+            width: "min(1080px, 100%)",
             pointerEvents: "auto",
           }}
         >
@@ -161,25 +276,16 @@ export default function HomeClient({
       <button
         onClick={() => setSidebarOpen((value) => !value)}
         aria-label={sidebarOpen ? "Close layers" : "Open layers"}
+        className="atm-floating-tab"
         style={{
           position: "absolute",
-          top: 14,
-          left: sidebarOpen ? `calc(${sidebarWidth} - 48px)` : 14,
-          zIndex: 50,
-          width: sidebarOpen ? 34 : 100,
-          height: sidebarOpen ? 34 : 50,
-          borderRadius: 12,
-          background: "rgba(70, 140, 255, 0.24)",
-          border: "1px solid rgba(140, 190, 255, 0.32)",
-          color: "white",
-          cursor: "pointer",
-          backdropFilter: "blur(10px)",
-          display: "grid",
-          placeItems: "center",
-          userSelect: "none",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+          top: 72,
+          left: sidebarOpen ? `calc(${sidebarWidth} - 46px)` : 14,
+          zIndex: 130,
+          width: sidebarOpen ? 30 : 92,
+          height: 32,
           transition:
-            "left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), width 220ms cubic-bezier(0.2, 0.8, 0.2, 1), height 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+            "left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), width 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
         }}
       >
         <span
@@ -195,23 +301,20 @@ export default function HomeClient({
       </button>
 
       <aside
+        className="atm-side-shell atm-side-shell-left"
         style={{
           position: "absolute",
-          top: 0,
+          top: 60,
           left: 0,
           bottom: 0,
           width: sidebarWidth,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          backdropFilter: "blur(6px)",
-          background: "transparent",
-          borderRight: "1px solid rgba(255,255,255,0.12)",
-          boxShadow: "20px 0 40px rgba(0,0,0,0.25)",
           transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
           opacity: sidebarOpen ? 1 : 0,
           transition: "transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease",
-          zIndex: 45,
+          zIndex: 110,
           pointerEvents: sidebarOpen ? "auto" : "none",
         }}
       >
@@ -221,25 +324,16 @@ export default function HomeClient({
       <button
         onClick={() => setLayerInfoOpen((value) => !value)}
         aria-label={layerInfoOpen ? "Close layer info" : "Open layer info"}
+        className="atm-floating-tab"
         style={{
           position: "absolute",
-          top: 14,
+          top: 72,
           right: 14,
-          zIndex: 50,
-          width: layerInfoOpen ? 34 : 114,
-          height: layerInfoOpen ? 34 : 50,
-          borderRadius: 12,
-          background: "rgba(70, 140, 255, 0.24)",
-          border: "1px solid rgba(140, 190, 255, 0.32)",
-          color: "white",
-          cursor: "pointer",
-          backdropFilter: "blur(10px)",
-          display: "grid",
-          placeItems: "center",
-          userSelect: "none",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+          zIndex: 130,
+          width: layerInfoOpen ? 30 : 110,
+          height: 32,
           transition:
-            "width 220ms cubic-bezier(0.2, 0.8, 0.2, 1), height 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+            "right 220ms cubic-bezier(0.2, 0.8, 0.2, 1), width 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
         }}
       >
         <span
@@ -255,23 +349,20 @@ export default function HomeClient({
       </button>
 
       <aside
+        className="atm-side-shell atm-side-shell-right"
         style={{
           position: "absolute",
-          top: 0,
+          top: 60,
           right: 0,
           bottom: 0,
           width: layerInfoWidth,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          backdropFilter: "blur(6px)",
-          background: "transparent",
-          borderLeft: "1px solid rgba(255,255,255,0.12)",
-          boxShadow: "-20px 0 40px rgba(0,0,0,0.25)",
           transform: layerInfoOpen ? "translateX(0)" : "translateX(100%)",
           opacity: layerInfoOpen ? 1 : 0,
           transition: "transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 180ms ease",
-          zIndex: 45,
+          zIndex: 110,
           pointerEvents: layerInfoOpen ? "auto" : "none",
         }}
       >

@@ -94,7 +94,7 @@ export default function TimeSlider({
   const clampedValue = useMemo(() => clampValueToRange(value, start, end), [value, start, end]);
   const [stepHours, setStepHours] = useState<number>(3);
   const stepHoursRef = useRef<number>(3);
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   useEffect(() => { stepHoursRef.current = stepHours; }, [stepHours]);
 
   useEffect(() => {
@@ -282,11 +282,11 @@ export default function TimeSlider({
 
   const clamp = (v: number) => Math.max(1, Math.min(24, v));
   const chromeButtonStyle: React.CSSProperties = {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.25)",
-    background: "rgba(0,0,0,0.35)",
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    border: "1px solid rgba(148,163,184,0.22)",
+    background: "rgba(8,14,24,0.76)",
     color: "white",
     display: "inline-flex",
     alignItems: "center",
@@ -306,17 +306,18 @@ export default function TimeSlider({
         display: "flex",
         flexDirection: "column",
         gap: collapsed ? 0 : 8,
-        padding: collapsed ? "14px 18px 12px" : "14px 18px",
+        padding: collapsed ? "12px 16px" : "12px 14px",
         width: collapsed ? "fit-content" : "100%",
         maxWidth: "100%",
         margin: "0 auto",
         justifyContent: "center",
-        borderRadius: 22,
-        border: "1px solid rgba(255,255,255,0.2)",
-        background: "rgba(6,10,18,0.14)",
-        backdropFilter: "blur(14px)",
-        boxShadow: "0 18px 40px rgba(0,0,0,0.22)",
+        borderRadius: 8,
+        border: "1px solid rgba(148,163,184,0.20)",
+        background: "rgba(6,11,20,0.82)",
+        backdropFilter: "blur(18px)",
+        boxShadow: "0 18px 44px rgba(0,0,0,0.32)",
         color: "rgba(255,255,255,0.96)",
+        fontSize: 11,
       }}
     >
       {collapsed ? (
@@ -406,11 +407,11 @@ export default function TimeSlider({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              fontSize: 12,
+              gap: 12,
+              fontSize: 11,
             }}
           >
-            <div style={{ flex: 1, textAlign: "left" }}>
+            <div style={{ flex: 1, textAlign: "left", color: "var(--atm-muted)" }}>
               {prettyFromValueStrUTC(startDate)} UTC
             </div>
 
@@ -455,7 +456,7 @@ export default function TimeSlider({
               </button>
             </div>
 
-            <div style={{ flex: 1, textAlign: "right" }}>
+            <div style={{ flex: 1, textAlign: "right", color: "var(--atm-muted)" }}>
               {prettyFromValueStrUTC(endDate)} UTC
             </div>
           </div>
@@ -472,11 +473,12 @@ export default function TimeSlider({
               setDraftHours(h);
               scheduleCommit(h);
             }}
-            style={{ width: "100%", accentColor: "#9fc8ff" }}
+            className="atm-time-range"
+            style={{ width: "100%", accentColor: "#4f8cff" }}
           />
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 160, display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+            <div style={{ width: 160, display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
               <div style={{ opacity: 0.85, whiteSpace: "nowrap" }}>Step (hours)</div>
 
               <input
@@ -506,7 +508,7 @@ export default function TimeSlider({
               <div style={{ opacity: 0.75, whiteSpace: "nowrap" }}>h</div>
             </div>
 
-            <div style={{ flex: 1, textAlign: "center", fontSize: 12 }}>
+            <div style={{ flex: 1, textAlign: "center", fontSize: 11 }}>
               {formatPrettyUTC(parseDateTimeUTC(displayValueStr))} UTC
             </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import {
   AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS,
   POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS,
@@ -17,63 +17,6 @@ import {
   useControls,
 } from "../../state/controlsStore";
 
-function sectionStyle() {
-  return {
-    margin: 8,
-    padding: 12,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    color: "#e9eef7",
-    font: "500 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
-  } as const;
-}
-
-function rowStyle() {
-  return {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  } as const;
-}
-
-function selectStyle() {
-  return {
-    width: "100%",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(6, 10, 18, 0.88)",
-    color: "#e9eef7",
-    padding: "10px 12px",
-    outline: "none",
-  } as const;
-}
-
-function CheckboxRow({
-  label,
-  checked,
-  accentColor,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  accentColor: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label style={rowStyle()}>
-      <span style={{ fontWeight: 700 }}>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        style={{ accentColor }}
-      />
-    </label>
-  );
-}
-
 function subscribeToHydrationStore() {
   return () => {};
 }
@@ -84,6 +27,155 @@ function getClientHydrationSnapshot() {
 
 function getServerHydrationSnapshot() {
   return false;
+}
+
+function panelSectionStyle() {
+  return {
+    padding: "14px 18px",
+    borderTop: "1px solid rgba(148, 163, 184, 0.14)",
+    color: "var(--atm-text)",
+    font: "500 11px var(--font-sans)",
+  } as const;
+}
+
+function sectionHeadingStyle() {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+    color: "var(--atm-text)",
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase" as const,
+  };
+}
+
+function selectStyle() {
+  return {
+    width: "100%",
+    minHeight: 30,
+    borderRadius: 7,
+    border: "1px solid rgba(148, 163, 184, 0.23)",
+    background: "rgba(4, 9, 16, 0.88)",
+    color: "var(--atm-text)",
+    padding: "5px 8px",
+    outline: "none",
+    fontFamily: "var(--font-sans)",
+    fontSize: 10,
+    fontWeight: 600,
+    lineHeight: 1.2,
+  } as const;
+}
+
+function ToggleSwitch({
+  checked,
+  accentColor,
+  onChange,
+}: {
+  checked: boolean;
+  accentColor: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <span className="atm-switch" data-checked={checked}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        style={{ accentColor }}
+      />
+      <span aria-hidden style={{ background: checked ? accentColor : undefined }} />
+    </span>
+  );
+}
+
+function LayerRow({
+  label,
+  checked,
+  onChange,
+  children,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="atm-layer-row" data-active={checked}>
+      <label className="atm-layer-row-header">
+        <span className="atm-layer-chevron" aria-hidden>⌄</span>
+        <span
+          className="atm-layer-dot"
+          aria-hidden
+          style={{ background: checked ? "var(--atm-green)" : "var(--atm-dot-off)" }}
+        />
+        <span>{label}</span>
+        <ToggleSwitch checked={checked} accentColor="var(--atm-green)" onChange={onChange} />
+      </label>
+      {checked && children ? <div className="atm-layer-controls">{children}</div> : null}
+    </div>
+  );
+}
+
+function FieldLabel({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="atm-field">
+      <div>
+        <span>{label}</span>
+        {value ? <span>{value}</span> : null}
+      </div>
+      {children}
+    </label>
+  );
+}
+
+function SliderField({
+  label,
+  value,
+  valueLabel,
+  min,
+  max,
+  step,
+  accent,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  valueLabel: string;
+  min: number;
+  max: number;
+  step: number;
+  accent: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="atm-field">
+      <div>
+        <span>{label}</span>
+        <span>{valueLabel}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        style={{ width: "100%", accentColor: accent }}
+      />
+    </label>
+  );
 }
 
 export default function LayerVisibilityPane() {
@@ -122,278 +214,195 @@ export default function LayerVisibilityPane() {
   const setAirMassLayer = useControls((state) => state.setAirMassLayer);
 
   return (
-    <section style={sectionStyle()}>
-      <div
-        style={{
-          fontWeight: 800,
-          letterSpacing: ".02em",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        Quick Layers
-      </div>
+    <>
+      <section style={panelSectionStyle()}>
+        <div style={sectionHeadingStyle()}>
+          <span>Layers</span>
+        </div>
 
-      <div style={{ display: "grid", gap: 12 }}>
-        <label style={{ display: "grid", gap: 8 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 8,
-              fontWeight: 600,
-            }}
+        <div className="atm-layer-stack">
+          <LayerRow
+            label="Temperature Slice"
+            checked={temperatureSliceLayer.visible}
+            onChange={(checked) => setTemperatureSliceLayer({ visible: checked })}
           >
-            <span>Vertical Exaggeration</span>
-            <span>{verticalExaggeration.toFixed(1)}x</span>
-          </div>
-          <input
-            type="range"
+            <FieldLabel
+              label="Data Variant"
+              value={temperatureSliceVariantLabel(temperatureSliceLayer.variant)}
+            >
+              <select
+                value={temperatureSliceLayer.variant}
+                onChange={(event) =>
+                  setTemperatureSliceLayer({
+                    variant: event.currentTarget.value as TemperatureSliceVariant,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {TEMPERATURE_SLICE_VARIANT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FieldLabel>
+
+            <FieldLabel label="Color Scale Mode" value="Air Pressure Levels">
+              <select
+                value={temperatureSliceLayer.colorScaleMode}
+                onChange={(event) =>
+                  setTemperatureSliceLayer({
+                    colorScaleMode:
+                      event.currentTarget.value as TemperatureSliceColorScaleMode,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FieldLabel>
+          </LayerRow>
+
+          <LayerRow
+            label="Potential Temperature"
+            checked={potentialTemperatureLayer.visible}
+            onChange={(checked) => setPotentialTemperatureLayer({ visible: checked })}
+          >
+            <FieldLabel label="Structure Recipe">
+              <select
+                value={potentialTemperatureLayer.variant}
+                onChange={(event) =>
+                  setPotentialTemperatureLayer({
+                    variant: event.currentTarget.value as PotentialTemperatureVariant,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {POTENTIAL_TEMPERATURE_VARIANT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FieldLabel>
+
+            <FieldLabel label="Color Mode">
+              <select
+                value={potentialTemperatureLayer.colorMode}
+                onChange={(event) =>
+                  setPotentialTemperatureLayer({
+                    colorMode:
+                      event.currentTarget.value as PotentialTemperatureColorMode,
+                  })
+                }
+                style={selectStyle()}
+              >
+                {POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FieldLabel>
+
+            <label className="atm-layer-row-header atm-sub-toggle">
+              <span>Show Cell Grid</span>
+              <ToggleSwitch
+                checked={potentialTemperatureLayer.showCellGrid}
+                accentColor="#cfe0ff"
+                onChange={(checked) =>
+                  setPotentialTemperatureLayer({ showCellGrid: checked })
+                }
+              />
+            </label>
+          </LayerRow>
+
+          <LayerRow
+            label="Precipitable Water"
+            checked={precipitableWaterLayer.visible}
+            onChange={(checked) => setPrecipitableWaterLayer({ visible: checked })}
+          />
+
+          <LayerRow
+            label="Air Mass Classification"
+            checked={airMassLayer.visible}
+            onChange={(checked) => setAirMassLayer({ visible: checked })}
+          >
+            <FieldLabel label="Proxy Recipe">
+              <select
+                value={airMassLayer.variant}
+                onChange={(event) => {
+                  const variant = event.currentTarget
+                    .value as AirMassClassificationVariant;
+                  setAirMassLayer({
+                    variant,
+                    showCellGrid:
+                      airMassLayer.showCellGrid ||
+                      isSmoothAirMassClassificationVariant(variant),
+                    hiddenClassKeys: [],
+                  });
+                }}
+                style={selectStyle()}
+              >
+                {AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FieldLabel>
+
+            {mounted ? (
+              <label className="atm-layer-row-header atm-sub-toggle">
+                <span>Show Cell Grid</span>
+                <ToggleSwitch
+                  checked={airMassLayer.showCellGrid}
+                  accentColor="#cfe0ff"
+                  onChange={(checked) => setAirMassLayer({ showCellGrid: checked })}
+                />
+              </label>
+            ) : null}
+          </LayerRow>
+
+          <LayerRow
+            label="Precipitation Radar"
+            checked={precipitationLayer.visible}
+            onChange={(checked) => setPrecipitationRadarLayer({ visible: checked })}
+          />
+        </div>
+      </section>
+
+      <section style={panelSectionStyle()}>
+        <div style={sectionHeadingStyle()}>
+          <span>General Controls</span>
+        </div>
+        <div className="atm-control-stack">
+          <SliderField
+            label="Opacity"
+            value={temperatureSliceLayer.opacity}
+            valueLabel={`${Math.round(temperatureSliceLayer.opacity * 100)}%`}
+            min={0}
+            max={1}
+            step={0.01}
+            accent="#4f8cff"
+            onChange={(opacity) => setTemperatureSliceLayer({ opacity })}
+          />
+          <SliderField
+            label="Vertical Exaggeration"
+            value={verticalExaggeration}
+            valueLabel={`${verticalExaggeration.toFixed(1)}x`}
             min={1}
             max={8}
             step={0.5}
-            value={verticalExaggeration}
-            onChange={(event) =>
-              setVerticalExaggeration(Number(event.currentTarget.value))
-            }
-            style={{ width: "100%", accentColor: "#9ebcff" }}
-          />
-        </label>
-
-        <CheckboxRow
-          label="Precipitable Water Proxy"
-          checked={precipitableWaterLayer.visible}
-          accentColor="#f3de6f"
-          onChange={(checked) => setPrecipitableWaterLayer({ visible: checked })}
-        />
-
-        <CheckboxRow
-          label="Temperature Slice"
-          checked={temperatureSliceLayer.visible}
-          accentColor="#ff6f5f"
-          onChange={(checked) => setTemperatureSliceLayer({ visible: checked })}
-        />
-
-        <div
-          style={{
-            display: temperatureSliceLayer.visible ? "grid" : "none",
-            gap: 12,
-          }}
-        >
-          <label style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                fontWeight: 600,
-              }}
-            >
-              <span>Data Variant</span>
-              <span style={{ opacity: 0.68 }}>
-                {temperatureSliceVariantLabel(temperatureSliceLayer.variant)}
-              </span>
-            </div>
-            <select
-              value={temperatureSliceLayer.variant}
-              onChange={(event) =>
-                setTemperatureSliceLayer({
-                  variant: event.currentTarget.value as TemperatureSliceVariant,
-                })
-              }
-              style={selectStyle()}
-            >
-              {TEMPERATURE_SLICE_VARIANT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                fontWeight: 600,
-              }}
-            >
-              <span>Color Scale</span>
-              <span style={{ opacity: 0.68 }}>Blue/cold red/hot</span>
-            </div>
-            <select
-              value={temperatureSliceLayer.colorScaleMode}
-              onChange={(event) =>
-                setTemperatureSliceLayer({
-                  colorScaleMode:
-                    event.currentTarget.value as TemperatureSliceColorScaleMode,
-                })
-              }
-              style={selectStyle()}
-            >
-              {TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <CheckboxRow
-          label="Potential Temperature"
-          checked={potentialTemperatureLayer.visible}
-          accentColor="#ff9b7d"
-          onChange={(checked) => setPotentialTemperatureLayer({ visible: checked })}
-        />
-
-        <div
-          style={{
-            display: potentialTemperatureLayer.visible ? "grid" : "none",
-            gap: 12,
-          }}
-        >
-          <label style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                fontWeight: 600,
-              }}
-            >
-              <span>Structure Recipe</span>
-              <span style={{ opacity: 0.68 }}>
-                {potentialTemperatureLayer.variant ===
-                "raw-temperature-midpoint-cold-side"
-                  ? "Raw temperature midpoint"
-                  : "Climatology anomaly"}
-              </span>
-            </div>
-            <select
-              value={potentialTemperatureLayer.variant}
-              onChange={(event) =>
-                setPotentialTemperatureLayer({
-                  variant: event.currentTarget.value as PotentialTemperatureVariant,
-                })
-              }
-              style={selectStyle()}
-            >
-              {POTENTIAL_TEMPERATURE_VARIANT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                fontWeight: 600,
-              }}
-            >
-              <span>Color Mode</span>
-              <span style={{ opacity: 0.68 }}>Warm/cold shell</span>
-            </div>
-            <select
-              value={potentialTemperatureLayer.colorMode}
-              onChange={(event) =>
-                setPotentialTemperatureLayer({
-                  colorMode:
-                    event.currentTarget.value as PotentialTemperatureColorMode,
-                })
-              }
-              style={selectStyle()}
-            >
-              {POTENTIAL_TEMPERATURE_COLOR_MODE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <CheckboxRow
-            label="Show Cell Grid"
-            checked={potentialTemperatureLayer.showCellGrid}
-            accentColor="#cfe0ff"
-            onChange={(checked) =>
-              setPotentialTemperatureLayer({ showCellGrid: checked })
-            }
+            accent="#8fb6ff"
+            onChange={setVerticalExaggeration}
           />
         </div>
-
-        <CheckboxRow
-          label="Air Mass Classification"
-          checked={airMassLayer.visible}
-          accentColor="#8fe7c7"
-          onChange={(checked) => setAirMassLayer({ visible: checked })}
-        />
-
-        <div
-          style={{
-            display: airMassLayer.visible ? "grid" : "none",
-            gap: 12,
-          }}
-        >
-          <label style={{ display: "grid", gap: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-                fontWeight: 600,
-              }}
-            >
-              <span>Proxy Recipe</span>
-              <span style={{ opacity: 0.68 }}>Warm/cold + moist/dry</span>
-            </div>
-            <select
-              value={airMassLayer.variant}
-              onChange={(event) => {
-                const variant = event.currentTarget
-                  .value as AirMassClassificationVariant;
-                setAirMassLayer({
-                  variant,
-                  showCellGrid:
-                    airMassLayer.showCellGrid ||
-                    isSmoothAirMassClassificationVariant(variant),
-                  hiddenClassKeys: [],
-                });
-              }}
-              style={selectStyle()}
-            >
-              {AIR_MASS_CLASSIFICATION_VARIANT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {mounted ? (
-            <CheckboxRow
-              label="Show Cell Grid"
-              checked={airMassLayer.showCellGrid}
-              accentColor="#cfe0ff"
-              onChange={(checked) => setAirMassLayer({ showCellGrid: checked })}
-            />
-          ) : null}
-        </div>
-
-        <CheckboxRow
-          label="Precipitation Radar"
-          checked={precipitationLayer.visible}
-          accentColor="#8dff75"
-          onChange={(checked) => setPrecipitationRadarLayer({ visible: checked })}
-        />
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

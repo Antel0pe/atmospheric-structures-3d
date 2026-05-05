@@ -147,6 +147,10 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Dual Encoding",
   },
   {
+    value: "raw-temperature-anomaly-agreement",
+    label: "Anomaly Agreement",
+  },
+  {
     value: "temperature-minus-climatology",
     label: "Temperature - Climatology",
   },

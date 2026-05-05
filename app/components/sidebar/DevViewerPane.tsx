@@ -8,13 +8,14 @@ import { useViewerStore } from "../../state/viewerStore";
 
 function sectionStyle() {
   return {
-    margin: 8,
-    padding: 12,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    color: "#e9eef7",
-    font: "500 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
+    margin: "10px 18px 18px",
+    padding: 0,
+    borderRadius: 8,
+    background: "rgba(17, 28, 43, 0.78)",
+    border: "1px solid rgba(148, 163, 184, 0.15)",
+    color: "var(--atm-text)",
+    font: "500 12px var(--font-sans)",
+    overflow: "hidden",
   } as const;
 }
 
@@ -114,6 +115,7 @@ export default function DevViewerPane() {
 }
 
 function DevViewerPaneInner() {
+  const [open, setOpen] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const requestNavigationCommand = useViewerStore(
@@ -145,22 +147,25 @@ function DevViewerPaneInner() {
       data-testid="dev-viewer-pane"
       style={sectionStyle()}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 8,
-          marginBottom: 12,
-        }}
+      <button
+        type="button"
+        className="atm-dev-viewer-toggle"
+        onClick={() => setOpen((value) => !value)}
       >
-        <div style={{ fontWeight: 800, letterSpacing: ".02em", textTransform: "uppercase" }}>
+        <span className="atm-layer-grip" aria-hidden>⋮⋮</span>
+        <span
+          style={{ fontWeight: 800, letterSpacing: ".02em", textTransform: "uppercase" }}
+        >
           Dev Viewer
-        </div>
-        <div data-testid="viewer-current-zoom" style={{ opacity: 0.65 }}>
-          Zoom {zoom01.toFixed(3)}
-        </div>
-      </div>
+        </span>
+        <span className="atm-beta-badge">Beta</span>
+        <span data-testid="viewer-current-zoom" style={{ marginLeft: "auto", opacity: 0.65 }}>
+          {open ? `Zoom ${zoom01.toFixed(3)}` : "›"}
+        </span>
+      </button>
+
+      {open ? (
+        <div style={{ padding: 12 }}>
 
       <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
         <div style={{ opacity: 0.72 }}>Timestamp</div>
@@ -299,6 +304,8 @@ function DevViewerPaneInner() {
           </div>
         </div>
       </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -31,7 +31,8 @@ export type TemperatureSliceManifest = {
     | "temperature-climatology-anomaly"
     | "potential-temperature-climatology-anomaly"
     | "raw-temperature-vertical-coherence"
-    | "raw-temperature-anomaly-strength";
+    | "raw-temperature-anomaly-strength"
+    | "raw-temperature-anomaly-agreement";
   climatology_dataset?: string | null;
   rendering: {
     kind: "full-field-pressure-slice";
@@ -42,7 +43,8 @@ export type TemperatureSliceManifest = {
       | "global-symmetric-zero-white-blue-red";
     encoding:
       | "normalized-temperature-uint16-packed-rg"
-      | "raw-temperature-uint16-rg-saturation-strength-b";
+      | "raw-temperature-uint16-rg-saturation-strength-b"
+      | "raw-temperature-uint16-rg-signed-saturation-b";
   };
   temperature_range_k: {
     min: number;

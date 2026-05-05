@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import ControlsHelp from "./ControlsHelp";
-import ExplainerCard from "./ExplainerCard";
 
 const DevViewerPane = dynamic(() => import("./DevViewerPane"), {
   ssr: false,
@@ -14,14 +13,10 @@ const LayerVisibilityPane = dynamic(() => import("./LayerVisibilityPane"), {
   loading: () => null,
 });
 
-const TweakpaneControls = dynamic(() => import("@/app/state/TweakpaneControls"), {
-  ssr: false,
-  loading: () => null,
-});
-
 export default function SidebarPane() {
   return (
     <aside
+      className="atm-sidebar"
       style={{
         position: "relative",
         top: 0,
@@ -30,9 +25,6 @@ export default function SidebarPane() {
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        backdropFilter: "blur(6px)",
-        background: "transparent",
-        borderRight: "1px solid rgba(255,255,255,0.08)",
         zIndex: 1000,
         overflow: "hidden",
       }}
@@ -45,11 +37,9 @@ export default function SidebarPane() {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <ExplainerCard />
         <ControlsHelp />
-        <DevViewerPane />
         <LayerVisibilityPane />
-        <TweakpaneControls />
+        <DevViewerPane />
       </div>
     </aside>
   );

@@ -1,327 +1,59 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, type KeyboardEvent, type PointerEvent } from "react";
 import {
-  type AirMassClassificationVariant,
   temperatureSliceColorScaleLabel,
+  type TemperatureSliceVariant,
   temperatureSliceVariantLabel,
   useControls,
 } from "@/app/state/controlsStore";
-import {
-  fetchAirMassStructureManifest,
-  type AirMassStructureClassKey,
-} from "../utils/airMassStructureAssets";
 
-type ActiveLayerId =
-  | "precipitableWaterLayer"
-  | "temperatureSliceLayer"
-  | "potentialTemperatureLayer"
-  | "airMassLayer"
-  | "precipitationRadarLayer";
-
-type LayerInfoEntry = {
-  id: ActiveLayerId;
+type ActiveLayerInfo = {
   title: string;
+  badge?: string;
   tag: string;
-  summary: string;
+  description: string;
 };
 
-type AirMassComponentEntry = {
-  key: AirMassStructureClassKey;
-  label: string;
-  color: string;
-  voxelCount: number;
-  componentCount: number;
-};
+const PRESSURE_LEVELS = [250, 500, 700, 850, 1000];
 
-type AirMassPressureWindow = {
-  min: number;
-  max: number;
-};
-
-const AIR_MASS_MIN_ALTITUDE_RANGE_SPAN = 0.01;
-
-function sectionStyle() {
+function panelSectionStyle() {
   return {
-    margin: 8,
-    padding: 12,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    color: "#e9eef7",
-    font: "500 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
+    padding: "15px 18px",
+    borderBottom: "1px solid rgba(148, 163, 184, 0.13)",
+    color: "var(--atm-text)",
+    font: "500 11px var(--font-sans)",
   } as const;
 }
 
-function actionButtonStyle() {
+function titleStyle() {
   return {
-    borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.08)",
-    color: "#e9eef7",
-    padding: "5px 9px",
-    cursor: "pointer",
-    font: "700 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
-  } as const;
-}
-
-function airMassFallbackColor(classKey: AirMassStructureClassKey, index: number) {
-  if (classKey.includes("warm")) return "#ff9b63";
-  if (classKey.includes("cold")) return "#66b7ff";
-  const fallback = ["#7fe7c7", "#ffb86b", "#8fb7ff", "#e58bff"];
-  return fallback[index % fallback.length];
-}
-
-function normalizeAirMassAltitudeRange(range: { min: number; max: number }) {
-  const min = Math.max(0, Math.min(1, range.min));
-  const max = Math.max(0, Math.min(1, range.max));
-  if (max >= min) return { min, max };
-  return { min: max, max: min };
-}
-
-function pressureToStandardAtmosphereHeightM(pressureHpa: number) {
-  const safePressure = Math.max(pressureHpa, 1);
-  return 44330.0 * (1.0 - (safePressure / 1013.25) ** 0.1903);
-}
-
-function standardAtmosphereHeightMToPressure(heightM: number) {
-  const normalized = Math.min(Math.max(1.0 - heightM / 44330.0, 1e-6), 1);
-  return 1013.25 * normalized ** (1 / 0.1903);
-}
-
-function pressureForAltitudeMix(
-  pressureWindow: AirMassPressureWindow,
-  altitudeMix: number
-) {
-  const lowerPressure = Math.max(pressureWindow.min, pressureWindow.max);
-  const upperPressure = Math.min(pressureWindow.min, pressureWindow.max);
-  const lowerHeight = pressureToStandardAtmosphereHeightM(lowerPressure);
-  const upperHeight = pressureToStandardAtmosphereHeightM(upperPressure);
-  return standardAtmosphereHeightMToPressure(
-    lowerHeight +
-      Math.min(Math.max(altitudeMix, 0), 1) * (upperHeight - lowerHeight)
-  );
-}
-
-function formatAirMassAltitudeRangeLabel(
-  pressureWindow: AirMassPressureWindow,
-  range: { min: number; max: number }
-) {
-  const normalized = normalizeAirMassAltitudeRange(range);
-  return `${pressureForAltitudeMix(pressureWindow, normalized.min).toFixed(
-    0
-  )}-${pressureForAltitudeMix(
-    pressureWindow,
-    normalized.max
-  ).toFixed(0)} hPa`;
-}
-
-function variantLabel(variant: AirMassClassificationVariant) {
-  if (variant.startsWith("theta-anomaly-")) return "Theta anomaly buckets";
-  if (variant === "theta-q-latmean") return "Theta + q anomaly";
-  if (variant === "theta-rh-latmean") return "Theta + RH anomaly";
-  if (variant === "surface-attached-theta-rh-latmean") {
-    return "Surface-attached theta + RH";
-  }
-  return "Temperature + RH anomaly";
-}
-
-function CompactRangeControl({
-  label,
-  value,
-  valueLabel,
-  min,
-  max,
-  step,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  valueLabel: string;
-  min: number;
-  max: number;
-  step: number;
-  disabled?: boolean;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label
-      style={{
-        display: "grid",
-        gap: 7,
-        opacity: disabled ? 0.48 : 1,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          fontWeight: 600,
-        }}
-      >
-        <span>{label}</span>
-        <span style={{ opacity: 0.68 }}>{valueLabel}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-        style={{ width: "100%", accentColor: "#8fe7c7" }}
-      />
-    </label>
-  );
-}
-
-function AirMassAltitudeRangeControl({
-  pressureWindow,
-  range,
-  onChange,
-}: {
-  pressureWindow: AirMassPressureWindow;
-  range: { min: number; max: number };
-  onChange: (range: { min: number; max: number }) => void;
-}) {
-  const normalizedRange = normalizeAirMassAltitudeRange(range);
-  const minPercent = Math.round(normalizedRange.min * 100);
-  const maxPercent = Math.round(normalizedRange.max * 100);
-  const updateMin = (percent: number) => {
-    const min = Math.min(
-      percent / 100,
-      Math.max(
-        0,
-        normalizedRange.max - AIR_MASS_MIN_ALTITUDE_RANGE_SPAN
-      )
-    );
-    onChange({ min, max: normalizedRange.max });
+    marginBottom: 12,
+    color: "var(--atm-text)",
+    fontSize: 11,
+    fontWeight: 850,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase" as const,
   };
-  const updateMax = (percent: number) => {
-    const max = Math.max(
-      percent / 100,
-      Math.min(
-        1,
-        normalizedRange.min + AIR_MASS_MIN_ALTITUDE_RANGE_SPAN
-      )
-    );
-    onChange({ min: normalizedRange.min, max });
-  };
+}
 
+function metaRow(label: string, value: string) {
   return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <style>{`
-        .air-mass-altitude-range {
-          position: relative;
-          height: 30px;
-        }
-        .air-mass-altitude-range input[type="range"] {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 30px;
-          margin: 0;
-          pointer-events: none;
-          appearance: none;
-          background: transparent;
-        }
-        .air-mass-altitude-range input[type="range"]::-webkit-slider-thumb {
-          pointer-events: auto;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 999px;
-          border: 2px solid rgba(255, 255, 255, 0.92);
-          background: #8fe7c7;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
-        }
-        .air-mass-altitude-range input[type="range"]::-moz-range-thumb {
-          pointer-events: auto;
-          width: 16px;
-          height: 16px;
-          border-radius: 999px;
-          border: 2px solid rgba(255, 255, 255, 0.92);
-          background: #8fe7c7;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
-        }
-        .air-mass-altitude-range input[type="range"]::-webkit-slider-runnable-track {
-          appearance: none;
-          height: 30px;
-          background: transparent;
-        }
-        .air-mass-altitude-range input[type="range"]::-moz-range-track {
-          height: 30px;
-          background: transparent;
-        }
-      `}</style>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          fontWeight: 600,
-        }}
-      >
-        <span>Altitude Range</span>
-        <span style={{ opacity: 0.68 }}>
-          {formatAirMassAltitudeRangeLabel(pressureWindow, normalizedRange)}
-        </span>
-      </div>
-      <div className="air-mass-altitude-range">
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 13,
-            height: 4,
-            borderRadius: 999,
-            background: "rgba(255,255,255,0.16)",
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: `${minPercent}%`,
-            right: `${100 - maxPercent}%`,
-            top: 13,
-            height: 4,
-            borderRadius: 999,
-            background: "linear-gradient(90deg, #5e86ff, #8fe7c7)",
-          }}
-        />
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={minPercent}
-          aria-label="Air mass lower altitude bound"
-          onChange={(event) => updateMin(Number(event.currentTarget.value))}
-        />
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={maxPercent}
-          aria-label="Air mass upper altitude bound"
-          onChange={(event) => updateMax(Number(event.currentTarget.value))}
-        />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", opacity: 0.62 }}>
-        <span>1000 hPa</span>
-        <span>250 hPa</span>
-      </div>
+    <div className="atm-meta-row" key={label}>
+      <span>{label}</span>
+      <span>{value}</span>
     </div>
   );
+}
+
+function temperatureSliceDescription(variant: TemperatureSliceVariant) {
+  if (variant === "raw-temperature-anomaly-agreement") {
+    return "A full-map raw-temperature pressure slice. Climatology departure adjusts saturation by sign agreement: same-side anomalies get vivid, opposite-side anomalies get muted.";
+  }
+  if (variant === "raw-temperature-anomaly-strength") {
+    return "A full-map raw-temperature pressure slice. Climatology-departure magnitude makes unusual cells more vivid without changing their raw-temperature hue.";
+  }
+  return "A full-map pressure slice of the selected temperature field. Cold values render blue and warm values render red.";
 }
 
 function TemperaturePressureControl({
@@ -332,107 +64,70 @@ function TemperaturePressureControl({
   onChange: (pressureHpa: number) => void;
 }) {
   const clampedPressure = Math.min(Math.max(Math.round(pressureHpa), 250), 1000);
-  const percent = Math.round(((1000 - clampedPressure) / (1000 - 250)) * 100);
+  const pressurePercent = ((clampedPressure - 250) / (1000 - 250)) * 100;
+  const updateFromClientY = (element: HTMLElement, clientY: number) => {
+    const rect = element.getBoundingClientRect();
+    const mix = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
+    onChange(Math.round(250 + mix * (1000 - 250)));
+  };
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateFromClientY(event.currentTarget, event.clientY);
+  };
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    updateFromClientY(event.currentTarget, event.clientY);
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 25 : 10;
+    if (event.key === "ArrowUp") {
+      onChange(Math.max(250, clampedPressure - step));
+      event.preventDefault();
+    } else if (event.key === "ArrowDown") {
+      onChange(Math.min(1000, clampedPressure + step));
+      event.preventDefault();
+    } else if (event.key === "Home") {
+      onChange(250);
+      event.preventDefault();
+    } else if (event.key === "End") {
+      onChange(1000);
+      event.preventDefault();
+    }
+  };
 
   return (
-    <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
-      <style>{`
-        .temperature-pressure-range {
-          position: relative;
-          height: 30px;
-        }
-        .temperature-pressure-range input[type="range"] {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 30px;
-          margin: 0;
-          pointer-events: none;
-          appearance: none;
-          background: transparent;
-        }
-        .temperature-pressure-range input[type="range"]::-webkit-slider-thumb {
-          pointer-events: auto;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 999px;
-          border: 2px solid rgba(255, 255, 255, 0.92);
-          background: #ff6f5f;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
-        }
-        .temperature-pressure-range input[type="range"]::-moz-range-thumb {
-          pointer-events: auto;
-          width: 16px;
-          height: 16px;
-          border-radius: 999px;
-          border: 2px solid rgba(255, 255, 255, 0.92);
-          background: #ff6f5f;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
-        }
-        .temperature-pressure-range input[type="range"]::-webkit-slider-runnable-track {
-          appearance: none;
-          height: 30px;
-          background: transparent;
-        }
-        .temperature-pressure-range input[type="range"]::-moz-range-track {
-          height: 30px;
-          background: transparent;
-        }
-      `}</style>
+    <div className="atm-vertical-level">
+      <div className="atm-level-column">
+        <div>Pressure</div>
+        {PRESSURE_LEVELS.map((level) => (
+          <span
+            key={level}
+            data-active={Math.abs(clampedPressure - level) < 75}
+          >
+            {level} hPa
+          </span>
+        ))}
+      </div>
+
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          fontWeight: 600,
-        }}
+        className="atm-pressure-track"
+        role="slider"
+        tabIndex={0}
+        aria-label="Temperature slice pressure"
+        aria-valuemin={250}
+        aria-valuemax={1000}
+        aria-valuenow={clampedPressure}
+        aria-valuetext={`${clampedPressure} hPa`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onKeyDown={handleKeyDown}
       >
-        <span>Pressure</span>
-        <span style={{ opacity: 0.68 }}>{clampedPressure.toFixed(0)} hPa</span>
-      </div>
-      <div className="temperature-pressure-range">
+        <div className="atm-pressure-track-line" aria-hidden />
         <div
+          className="atm-pressure-thumb"
           aria-hidden
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 13,
-            height: 4,
-            borderRadius: 999,
-            background: "rgba(255,255,255,0.16)",
-          }}
+          style={{ top: `${pressurePercent}%` }}
         />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: 0,
-            right: `${100 - percent}%`,
-            top: 13,
-            height: 4,
-            borderRadius: 999,
-            background: "linear-gradient(90deg, #5e86ff, #ff6f5f)",
-          }}
-        />
-        <input
-          type="range"
-          min={250}
-          max={1000}
-          step={1}
-          value={clampedPressure}
-          aria-label="Temperature slice pressure"
-          onInput={(event) => onChange(Number(event.currentTarget.value))}
-          onChange={(event) => onChange(Number(event.currentTarget.value))}
-          style={{ direction: "rtl" }}
-        />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", opacity: 0.62 }}>
-        <span>1000 hPa</span>
-        <span>250 hPa</span>
       </div>
     </div>
   );
@@ -453,350 +148,133 @@ export default function LayerInfoPane() {
   const setTemperatureSliceLayer = useControls(
     (state) => state.setTemperatureSliceLayer
   );
-  const setAirMassLayer = useControls((state) => state.setAirMassLayer);
-  const [airMassComponentState, setAirMassComponentState] = useState<{
-    variant: AirMassClassificationVariant;
-    entries: AirMassComponentEntry[];
-    pressureWindow: AirMassPressureWindow;
-  } | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchAirMassStructureManifest({
-      variant: airMassLayer.variant,
-      notifyOnError: false,
-    })
-      .then((manifest) => {
-        if (cancelled) return;
-        const timestampSummary = manifest.timestamps[0];
-        const entries = manifest.classification.classes.map((entry, index) => {
-          const counts = timestampSummary?.class_counts?.[entry.key];
-          return {
-            key: entry.key,
-            label: entry.label,
-            color: entry.color ?? airMassFallbackColor(entry.key, index),
-            voxelCount: counts?.voxel_count ?? 0,
-            componentCount: counts?.component_count ?? 0,
-          };
-        });
-        setAirMassComponentState({
-          variant: manifest.variant,
-          entries,
-          pressureWindow: manifest.pressure_window_hpa,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setAirMassComponentState(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [airMassLayer.variant]);
-
-  const activeLayers = useMemo(() => {
-    const layers: LayerInfoEntry[] = [];
-
-    if (precipitableWaterLayer.visible) {
-      layers.push({
-        id: "precipitableWaterLayer",
-        title: "Precipitable Water Proxy",
-        tag: "500-1000 hPa",
-        summary:
-          "A low-level proxy shell built from high specific humidity, high RH, and multi-level depth gates.",
-      });
-    }
-
+  const primaryLayer = useMemo<ActiveLayerInfo | null>(() => {
     if (temperatureSliceLayer.visible) {
-      const isTemperatureAnomaly =
-        temperatureSliceLayer.variant === "temperature-minus-climatology";
-      const isPotentialTemperatureAnomaly =
-        temperatureSliceLayer.variant ===
-        "potential-temperature-minus-climatology";
-      const isVerticalCoherence =
-        temperatureSliceLayer.variant === "raw-temperature-vertical-coherence";
-      const isDualEncoding =
-        temperatureSliceLayer.variant === "raw-temperature-anomaly-strength";
-      const summary = (() => {
-        if (isVerticalCoherence) {
-          return "A raw-temperature pressure slice with saturation increased where the local vertical temperature trend kinks at that level.";
-        }
-        if (isDualEncoding) {
-          return "A raw-temperature pressure slice with saturation increased where matched temperature climatology anomalies are strongest.";
-        }
-        if (isPotentialTemperatureAnomaly) {
-          return "A full-map dry-potential-temperature pressure slice minus matched gridpoint climatology, with cold departures blue and warm departures red.";
-        }
-        if (isTemperatureAnomaly) {
-          return "A full-map raw-temperature pressure slice minus matched gridpoint climatology, with cold departures blue and warm departures red.";
-        }
-        if (temperatureSliceLayer.colorScaleMode === "perLevel") {
-          return "A full-map raw-temperature pressure slice with each pressure level stretched to its own min/max.";
-        }
-        return "A full-map raw-temperature pressure slice colored from the 250-1000 hPa global minimum to maximum.";
-      })();
-      layers.push({
-        id: "temperatureSliceLayer",
+      return {
         title: "Temperature Slice",
+        badge: "Active",
         tag: `${temperatureSliceLayer.pressureHpa.toFixed(
           0
-        )} hPa / ${temperatureSliceVariantLabel(
+        )} hPa • ${temperatureSliceVariantLabel(
           temperatureSliceLayer.variant
-        )} / ${temperatureSliceColorScaleLabel(
+        )} • ${temperatureSliceColorScaleLabel(
           temperatureSliceLayer.colorScaleMode
         )}`,
-        summary,
-      });
-    }
-
-    if (potentialTemperatureLayer.visible) {
-      layers.push({
-        id: "potentialTemperatureLayer",
-        title: "Potential Temperature",
-        tag: `${potentialTemperatureLayer.variant} / ${potentialTemperatureLayer.colorMode}`,
-        summary:
-          "Thermal structure shells derived from potential-temperature or raw-temperature recipes.",
-      });
-    }
-
-    if (airMassLayer.visible) {
-      const pressureWindow = airMassComponentState?.pressureWindow ?? {
-        min: 250,
-        max: 1000,
+        description: temperatureSliceDescription(temperatureSliceLayer.variant),
       };
-      layers.push({
-        id: "airMassLayer",
-        title: airMassLayer.variant.startsWith("theta-anomaly-")
-          ? "Theta Anomaly Bucket Layer"
-          : "Air Mass Classification",
-        tag: `${variantLabel(airMassLayer.variant)} / ${formatAirMassAltitudeRangeLabel(
-          pressureWindow,
-          airMassLayer.altitudeRange01
-        )}`,
-        summary:
-          "Proxy-classified thermodynamic shells. The theta-anomaly variants show dry-theta tail buckets rather than source-region air masses.",
-      });
     }
-
+    if (potentialTemperatureLayer.visible) {
+      return {
+        title: "Potential Temperature",
+        badge: "Active",
+        tag: `${potentialTemperatureLayer.variant} • ${potentialTemperatureLayer.colorMode}`,
+        description:
+          "Thermal structure shells derived from potential-temperature or raw-temperature recipes.",
+      };
+    }
+    if (airMassLayer.visible) {
+      return {
+        title: "Air Mass Classification",
+        badge: "Active",
+        tag: airMassLayer.variant,
+        description:
+          "Proxy-classified thermodynamic shells for comparing warm, cold, moist, and dry bodies.",
+      };
+    }
+    if (precipitableWaterLayer.visible) {
+      return {
+        title: "Precipitable Water Proxy",
+        badge: "Active",
+        tag: "500-1000 hPa",
+        description:
+          "A low-level proxy shell built from humidity, RH, and multi-level depth gates.",
+      };
+    }
     if (precipitationLayer.visible) {
-      layers.push({
-        id: "precipitationRadarLayer",
+      return {
         title: "Precipitation Radar",
+        badge: "Active",
         tag: "Surface overlay",
-        summary: "Static radar texture overlay for precipitation context.",
-      });
+        description: "Static radar texture overlay for precipitation context.",
+      };
     }
-
-    return layers;
+    return null;
   }, [
-    airMassComponentState?.pressureWindow,
-    airMassLayer.altitudeRange01,
     airMassLayer.variant,
     airMassLayer.visible,
     precipitableWaterLayer.visible,
     precipitationLayer.visible,
-    temperatureSliceLayer.pressureHpa,
-    temperatureSliceLayer.colorScaleMode,
-    temperatureSliceLayer.variant,
-    temperatureSliceLayer.visible,
     potentialTemperatureLayer.colorMode,
     potentialTemperatureLayer.variant,
     potentialTemperatureLayer.visible,
+    temperatureSliceLayer.colorScaleMode,
+    temperatureSliceLayer.pressureHpa,
+    temperatureSliceLayer.variant,
+    temperatureSliceLayer.visible,
   ]);
 
-  const hiddenAirMassClassKeys = useMemo(
-    () => new Set(airMassLayer.hiddenClassKeys),
-    [airMassLayer.hiddenClassKeys]
-  );
-  const airMassComponents =
-    airMassComponentState?.variant === airMassLayer.variant
-      ? airMassComponentState.entries
-      : [];
-  const airMassPressureWindow =
-    airMassComponentState?.variant === airMassLayer.variant
-      ? airMassComponentState.pressureWindow
-      : { min: 250, max: 1000 };
-
-  const setAirMassClassVisible = (
-    classKey: AirMassStructureClassKey,
-    visible: boolean
-  ) => {
-    const nextHidden = new Set(airMassLayer.hiddenClassKeys);
-    if (visible) {
-      nextHidden.delete(classKey);
-    } else {
-      nextHidden.add(classKey);
-    }
-    setAirMassLayer({ hiddenClassKeys: Array.from(nextHidden) });
-  };
-
   return (
-    <section style={sectionStyle()}>
-      <div
-        style={{
-          fontWeight: 800,
-          letterSpacing: ".02em",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        Layer Info
-      </div>
+    <aside className="atm-info-pane">
+      <div className="atm-info-scroll">
+        <section style={panelSectionStyle()}>
+          <div style={titleStyle()}>Layer Info</div>
 
-      {activeLayers.length === 0 ? (
-        <div style={{ lineHeight: 1.45, opacity: 0.72 }}>
-          Enable a layer from the left sidebar to inspect its current recipe.
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {activeLayers.map((layer) => (
-            <article
-              key={layer.id}
-              style={{
-                display: "grid",
-                gap: 8,
-                paddingBottom: 12,
-                borderBottom: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
-              <div style={{ display: "grid", gap: 3 }}>
-                <div style={{ fontWeight: 800 }}>{layer.title}</div>
-                <div style={{ opacity: 0.65, fontSize: 11 }}>{layer.tag}</div>
+          {primaryLayer ? (
+            <div className="atm-info-heading">
+              <div>
+                <strong>{primaryLayer.title}</strong>
+                {primaryLayer.badge ? <span>{primaryLayer.badge}</span> : null}
               </div>
-              <div style={{ opacity: 0.8, lineHeight: 1.45 }}>{layer.summary}</div>
-            </article>
-          ))}
-        </div>
-      )}
+              <p>{primaryLayer.tag}</p>
+            </div>
+          ) : (
+            <p className="atm-muted-copy">
+              Enable a layer from the left sidebar to inspect its current recipe.
+            </p>
+          )}
+        </section>
 
-      {temperatureSliceLayer.visible ? (
-        <TemperaturePressureControl
-          pressureHpa={temperatureSliceLayer.pressureHpa}
-          onChange={(pressureHpa) =>
-            setTemperatureSliceLayer({ pressureHpa })
-          }
-        />
-      ) : null}
+        {primaryLayer ? (
+          <section style={panelSectionStyle()}>
+            <div style={titleStyle()}>Description</div>
+            <p className="atm-muted-copy">{primaryLayer.description}</p>
+          </section>
+        ) : null}
 
-      {airMassLayer.visible && airMassComponents.length > 0 ? (
-        <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-          <AirMassAltitudeRangeControl
-            pressureWindow={airMassPressureWindow}
-            range={airMassLayer.altitudeRange01}
-            onChange={(altitudeRange01) =>
-              setAirMassLayer({ altitudeRange01 })
-            }
-          />
+        {temperatureSliceLayer.visible ? (
+          <>
+            <section style={panelSectionStyle()}>
+              <div style={titleStyle()}>Metadata</div>
+              <div className="atm-meta-stack">
+                {metaRow("Parameter", "Temperature")}
+                {metaRow("Pressure Level", `${temperatureSliceLayer.pressureHpa.toFixed(0)} hPa`)}
+                {metaRow("Data Variant", temperatureSliceVariantLabel(temperatureSliceLayer.variant))}
+                {metaRow("Units", "°C")}
+                {metaRow("Source", "Reanalysis")}
+              </div>
+            </section>
 
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              paddingTop: 10,
-              borderTop: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-              }}
-            >
-              <span style={{ fontWeight: 700 }}>Camera Cutaway</span>
-              <input
-                type="checkbox"
-                checked={airMassLayer.cameraCutawayEnabled}
-                onChange={(event) =>
-                  setAirMassLayer({
-                    cameraCutawayEnabled: event.currentTarget.checked,
-                  })
+            <section style={panelSectionStyle()}>
+              <div style={titleStyle()}>Vertical Level</div>
+              <TemperaturePressureControl
+                pressureHpa={temperatureSliceLayer.pressureHpa}
+                onChange={(pressureHpa) =>
+                  setTemperatureSliceLayer({ pressureHpa })
                 }
-                style={{ accentColor: "#8fe7c7" }}
               />
-            </label>
-            <CompactRangeControl
-              label="Cutaway Radius"
-              value={airMassLayer.cameraCutawayRadius}
-              valueLabel={airMassLayer.cameraCutawayRadius.toFixed(0)}
-              min={8}
-              max={120}
-              step={1}
-              disabled={!airMassLayer.cameraCutawayEnabled}
-              onChange={(cameraCutawayRadius) =>
-                setAirMassLayer({ cameraCutawayRadius })
-              }
-            />
-          </div>
+            </section>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              style={actionButtonStyle()}
-              onClick={() => setAirMassLayer({ hiddenClassKeys: [] })}
-            >
-              Show all
-            </button>
-            <button
-              type="button"
-              style={actionButtonStyle()}
-              onClick={() =>
-                setAirMassLayer({
-                  hiddenClassKeys: airMassComponents.map((entry) => entry.key),
-                })
-              }
-            >
-              Hide all
-            </button>
-          </div>
-
-          {airMassComponents.map((component) => {
-            const checked = !hiddenAirMassClassKeys.has(component.key);
-            return (
-              <label
-                key={component.key}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "auto 1fr auto",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) =>
-                    setAirMassClassVisible(
-                      component.key,
-                      event.currentTarget.checked
-                    )
-                  }
-                  style={{ accentColor: component.color }}
-                />
-                <span>
-                  <span style={{ fontWeight: 700 }}>{component.label}</span>
-                  <span style={{ opacity: 0.65 }}>
-                    {" "}
-                    {component.componentCount} comps /{" "}
-                    {component.voxelCount.toLocaleString()} cells
-                  </span>
-                </span>
-                <span
-                  aria-hidden
-                  style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 4,
-                    background: component.color,
-                    boxShadow: "0 0 0 1px rgba(255,255,255,0.18) inset",
-                  }}
-                />
-              </label>
-            );
-          })}
-        </div>
-      ) : null}
-    </section>
+            <section style={panelSectionStyle()}>
+              <a className="atm-view-3d-link" href="/3d">
+                <span>◎</span>
+                <span>View in 3D</span>
+                <span aria-hidden>↗</span>
+              </a>
+            </section>
+          </>
+        ) : null}
+      </div>
+    </aside>
   );
 }

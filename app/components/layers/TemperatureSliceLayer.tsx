@@ -142,6 +142,19 @@ function isSaturationEncodedManifest(manifest: TemperatureSliceManifest) {
   );
 }
 
+function saturationModeForManifest(manifest: TemperatureSliceManifest) {
+  if (
+    manifest.rendering.encoding ===
+    "raw-temperature-uint16-rg-signed-saturation-b"
+  ) {
+    return 2.0;
+  }
+  if (isSaturationEncodedManifest(manifest)) {
+    return 1.0;
+  }
+  return 0.0;
+}
+
 export default function TemperatureSliceLayer() {
   const {
     engineReady,
@@ -280,7 +293,17 @@ export default function TemperatureSliceLayer() {
           float value = mix(globalValue, levelValue, step(0.5, uColorScaleMode));
           vec3 color = temperatureColor(value);
           float encodedStrength = mix(sampleA.b, sampleB.b, clamp(uPressureMix, 0.0, 1.0));
-          float saturation = mix(1.0, 0.18 + 0.92 * encodedStrength, step(0.5, uSaturationMode));
+          float saturation = 1.0;
+          if (uSaturationMode > 1.5) {
+            float signedAnomaly = encodedStrength * 2.0 - 1.0;
+            float rawTemperatureSide = value < 0.5 ? -1.0 : 1.0;
+            float agreement = rawTemperatureSide * signedAnomaly;
+            saturation = agreement >= 0.0
+              ? 0.18 + 0.82 * agreement
+              : 0.18 * (1.0 + agreement);
+          } else if (uSaturationMode > 0.5) {
+            saturation = 0.18 + 0.92 * encodedStrength;
+          }
           float luminance = dot(color, vec3(0.299, 0.587, 0.114));
           color = mix(vec3(luminance), color, clamp(saturation, 0.0, 1.0));
           float border = borderAlpha(vUv);
@@ -464,11 +487,9 @@ export default function TemperatureSliceLayer() {
         frameEntryRef.current = frame.entry;
         frameVariantRef.current = layerState.variant;
         globalTemperatureRangeRef.current = frame.manifest.temperature_range_k;
-        material.uniforms.uSaturationMode.value = isSaturationEncodedManifest(
+        material.uniforms.uSaturationMode.value = saturationModeForManifest(
           frame.manifest
-        )
-          ? 1.0
-          : 0.0;
+        );
 
         return Promise.all([
           loadTemperatureTexture(layerState.variant, frame.pressurePair.lower),

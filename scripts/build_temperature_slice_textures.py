@@ -37,6 +37,9 @@ RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND = (
 RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND = (
     "raw-temperature-anomaly-strength"
 )
+RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND = (
+    "raw-temperature-anomaly-agreement"
+)
 DEFAULT_VARIANT_NAME = "raw-temperature"
 DEFAULT_VARIANT_LABEL = "Raw Temperature"
 DEFAULT_COLOR_SCALE = "global-min-blue-to-global-max-red"
@@ -105,6 +108,7 @@ def parse_args() -> argparse.Namespace:
             POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
             RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
             RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
+            RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
         ),
         help="Scalar field exported into the pressure-slice textures.",
     )
@@ -247,6 +251,7 @@ def resolve_climatology(
     if field_kind in {
         TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
         RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
+        RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
     }:
         path = climatology_path or DEFAULT_TEMPERATURE_CLIMATOLOGY_PATH
         return load_climatology_field(
@@ -353,6 +358,10 @@ def encode_temperature_with_strength_to_rgba_uint8(
     return rgba
 
 
+def is_signed_saturation_field_kind(field_kind: str) -> bool:
+    return field_kind == RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND
+
+
 def dry_potential_temperature(
     temperature_k: np.ndarray,
     pressure_hpa: float,
@@ -386,6 +395,7 @@ def is_saturation_encoded_field_kind(field_kind: str) -> bool:
     return field_kind in {
         RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
         RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
+        RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
     }
 
 
@@ -444,6 +454,12 @@ def saturation_strength_stack(
             raise ValueError(f"Missing climatology for field kind: {field_kind}")
         climatology_stack = climatology.values[level_indices]
         return np.abs(raw_stack_k - climatology_stack).astype(np.float32)
+
+    if field_kind == RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND:
+        if climatology is None:
+            raise ValueError(f"Missing climatology for field kind: {field_kind}")
+        climatology_stack = climatology.values[level_indices]
+        return (raw_stack_k - climatology_stack).astype(np.float32)
 
     raise ValueError(f"Unsupported saturation field kind: {field_kind}")
 
@@ -531,7 +547,7 @@ def compute_saturation_strength_scale(
     if not samples:
         return 1.0
 
-    all_values = np.concatenate(samples)
+    all_values = np.abs(np.concatenate(samples))
     nonzero = all_values[all_values > 0]
     if nonzero.size == 0:
         return 1.0
@@ -618,7 +634,14 @@ def build_saturation_timestamp_entry(
         field_kind=field_kind,
         climatology=climatology,
     )
-    normalized_strength = np.clip(strength / max(strength_scale, 1e-6), 0.0, 1.0)
+    if is_signed_saturation_field_kind(field_kind):
+        normalized_strength = np.clip(
+            0.5 + 0.5 * strength / max(strength_scale, 1e-6),
+            0.0,
+            1.0,
+        )
+    else:
+        normalized_strength = np.clip(strength / max(strength_scale, 1e-6), 0.0, 1.0)
 
     levels: list[dict[str, str | float]] = []
     for stack_index, level_index in enumerate(level_indices):
@@ -683,7 +706,9 @@ def build_manifest(
             "filtering": "none",
             "color_scale": color_scale,
             "encoding": (
-                "raw-temperature-uint16-rg-saturation-strength-b"
+                "raw-temperature-uint16-rg-signed-saturation-b"
+                if is_signed_saturation_field_kind(field_kind)
+                else "raw-temperature-uint16-rg-saturation-strength-b"
                 if saturation_strength_scale is not None
                 else "normalized-temperature-uint16-packed-rg"
             ),
@@ -716,7 +741,9 @@ def build_manifest(
 
     if saturation_strength_scale is not None:
         manifest["saturation_strength_range"] = {
-            "min": 0.0,
+            "min": -saturation_strength_scale
+            if is_signed_saturation_field_kind(field_kind)
+            else 0.0,
             "max": saturation_strength_scale,
         }
 
