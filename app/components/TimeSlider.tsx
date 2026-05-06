@@ -3,27 +3,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAppConfig } from "../lib/appConfig";
 
-// -----------------------------
-// Constants
-// -----------------------------
 const MS_PER_HOUR = 3_600_000;
 const COMMIT_DELAY_MS = 100;
 
-// -----------------------------
-// Date helpers (UTC-only)
-// -----------------------------
 function parseDateTimeUTC(value: string): Date {
-  // Expect "YYYY-MM-DDTHH:mm" interpreted as UTC
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
   if (!m) throw new Error("Invalid datetime format. Expected YYYY-MM-DDTHH:mm");
 
-  const y = Number(m[1]);
-  const mo = Number(m[2]) - 1;
-  const d = Number(m[3]);
-  const h = Number(m[4]);
-  const min = Number(m[5]);
-
-  return new Date(Date.UTC(y, mo, d, h, min, 0));
+  return new Date(
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), 0)
+  );
 }
 
 function formatDateTimeUTC(dt: Date): string {
@@ -46,20 +35,12 @@ function formatPrettyUTC(dt: Date): string {
   }).format(dt);
 }
 
-function formatCompactUTC(dt: Date): string {
-  const mo = String(dt.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(dt.getUTCDate()).padStart(2, "0");
-  const y = String(dt.getUTCFullYear()).slice(-2);
-  const rawHour = dt.getUTCHours();
-  const hour = rawHour % 12 || 12;
-  const suffix = rawHour >= 12 ? "PM" : "AM";
-  const min = dt.getUTCMinutes();
-  const minutePart = min === 0 ? "" : `:${String(min).padStart(2, "0")}`;
-  return `${mo}/${d}/${y} ${hour}${minutePart} ${suffix}`;
-}
-
-function prettyFromValueStrUTC(valueStr: string): string {
-  return formatPrettyUTC(parseDateTimeUTC(valueStr));
+function formatDayLabelUTC(dt: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+  }).format(dt);
 }
 
 function clampValueToRange(value: string, start: Date, end: Date) {
@@ -74,28 +55,26 @@ function clampValueToRange(value: string, start: Date, end: Date) {
   return formatDateTimeUTC(new Date(clampedMs));
 }
 
-// -----------------------------
-// Component
-// -----------------------------
 export interface TimeSliderProps {
-  value: string; // "YYYY-MM-DDTHH:mm" (UTC)
+  value: string;
   onChange: (next: string) => void;
   allReady: boolean;
 }
 
-export default function TimeSlider({
-  value,
-  onChange,
-  allReady,
-}: TimeSliderProps) {
+export default function TimeSlider({ value, onChange, allReady }: TimeSliderProps) {
   const { startDate, endDate } = getAppConfig().sliderDateRange;
   const start = useMemo(() => parseDateTimeUTC(startDate), [startDate]);
   const end = useMemo(() => parseDateTimeUTC(endDate), [endDate]);
-  const clampedValue = useMemo(() => clampValueToRange(value, start, end), [value, start, end]);
+  const clampedValue = useMemo(
+    () => clampValueToRange(value, start, end),
+    [value, start, end]
+  );
   const [stepHours, setStepHours] = useState<number>(3);
   const stepHoursRef = useRef<number>(3);
-  const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => { stepHoursRef.current = stepHours; }, [stepHours]);
+
+  useEffect(() => {
+    stepHoursRef.current = stepHours;
+  }, [stepHours]);
 
   useEffect(() => {
     if (clampedValue !== value) {
@@ -103,26 +82,25 @@ export default function TimeSlider({
     }
   }, [clampedValue, onChange, value]);
 
-  // Total slider span in whole hours
   const totalHours = useMemo(() => {
     const spanMs = end.getTime() - start.getTime();
     return Math.max(0, Math.floor(spanMs / MS_PER_HOUR));
   }, [start, end]);
 
-  // Clamp incoming prop value into [start, end], then convert to hour offset
   const currentHours = useMemo(() => {
     const clampedMs = parseDateTimeUTC(clampedValue).getTime();
     const hrs = Math.floor((clampedMs - start.getTime()) / MS_PER_HOUR);
     return Math.max(0, Math.min(totalHours, hrs));
   }, [clampedValue, start, totalHours]);
 
-  // Draft (UI) state
   const [draftHours, setDraftHours] = useState<number>(currentHours);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  // Refs to avoid stale closures in event handlers / timers
   const totalHoursRef = useRef<number>(totalHours);
   const draftHoursRef = useRef<number>(draftHours);
   const commitTimerRef = useRef<number | null>(null);
+  const playTimerRef = useRef<number | null>(null);
+  const currentHoursRef = useRef(currentHours);
 
   useEffect(() => {
     totalHoursRef.current = totalHours;
@@ -132,7 +110,10 @@ export default function TimeSlider({
     draftHoursRef.current = draftHours;
   }, [draftHours]);
 
-  // Commit draft -> onChange (UTC string)
+  useEffect(() => {
+    currentHoursRef.current = currentHours;
+  }, [currentHours]);
+
   const commitHours = useCallback(
     (hours: number) => {
       const dt = new Date(start.getTime() + hours * MS_PER_HOUR);
@@ -141,7 +122,6 @@ export default function TimeSlider({
     [onChange, start]
   );
 
-  // Debounced commit while dragging / holding keys
   const scheduleCommit = useCallback(
     (hours: number) => {
       if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
@@ -154,7 +134,6 @@ export default function TimeSlider({
     [commitHours]
   );
 
-  // One helper for “update UI + schedule commit”
   const setDraftAndSchedule = useCallback(
     (hours: number) => {
       const clamped = Math.max(0, Math.min(totalHoursRef.current, hours));
@@ -164,7 +143,6 @@ export default function TimeSlider({
     [scheduleCommit]
   );
 
-  // Keyboard stepping
   const step = useCallback(
     (delta: -1 | 1) => {
       setDraftAndSchedule(draftHoursRef.current + delta * stepHoursRef.current);
@@ -172,8 +150,6 @@ export default function TimeSlider({
     [setDraftAndSchedule]
   );
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const playTimerRef = useRef<number | null>(null);
   const nudgeByStep = useCallback(
     (delta: -1 | 1) => {
       setIsPlaying(false);
@@ -193,13 +169,12 @@ export default function TimeSlider({
     [commitHours]
   );
 
-  // Keyboard listeners (ArrowLeft/ArrowRight)
   useEffect(() => {
     const isTypingTarget = (el: Element | null) => {
       if (!el) return false;
       const node = el as HTMLElement;
       const tag = node.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || node.isContentEditable;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || node.isContentEditable;
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -218,7 +193,7 @@ export default function TimeSlider({
 
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        commitHours(draftHoursRef.current); // commit immediately on release
+        commitHours(draftHoursRef.current);
       }
     };
 
@@ -230,29 +205,19 @@ export default function TimeSlider({
     };
   }, [step, commitHours]);
 
-  const currentHoursRef = useRef(currentHours);
-  useEffect(() => { currentHoursRef.current = currentHours; }, [currentHours]);
-
   useEffect(() => {
     if (!isPlaying) return;
-
-    // Don't advance until the scene reports ready for the current timestamp
     if (!allReady) return;
 
-    // After ready, wait 200ms, then advance by 1 hour
     playTimerRef.current = window.setTimeout(() => {
       const next = Math.min(totalHoursRef.current, currentHoursRef.current + stepHoursRef.current);
 
-      // stop at end
       if (next === currentHoursRef.current) {
         setIsPlaying(false);
         return;
       }
 
-      // advance UI immediately so slider moves
       setDraftHours(next);
-
-      // commit the timestamp change (this will flip allReady false in HomeClient per your wiring)
       commitHours(next);
     }, 700);
 
@@ -264,267 +229,365 @@ export default function TimeSlider({
     };
   }, [allReady, isPlaying, commitHours]);
 
-
-  // Cleanup any pending timer on unmount
   useEffect(() => {
     return () => {
       if (commitTimerRef.current !== null) window.clearTimeout(commitTimerRef.current);
+      if (playTimerRef.current !== null) window.clearTimeout(playTimerRef.current);
     };
   }, []);
 
-  // Display value (based on draftHours)
   const displayDate = useMemo(
     () => new Date(start.getTime() + draftHours * MS_PER_HOUR),
     [start, draftHours]
   );
-  const displayValueStr = useMemo(() => formatDateTimeUTC(displayDate), [displayDate]);
-  const compactDisplayValue = useMemo(() => formatCompactUTC(displayDate), [displayDate]);
+  const currentPercent = totalHours > 0 ? (draftHours / totalHours) * 100 : 0;
+  const tickMarks = useMemo(() => {
+    if (totalHours <= 0) {
+      return [{ label: formatDayLabelUTC(start), position: 0 }];
+    }
 
-  const clamp = (v: number) => Math.max(1, Math.min(24, v));
-  const chromeButtonStyle: React.CSSProperties = {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    border: "1px solid rgba(148,163,184,0.22)",
-    background: "rgba(8,14,24,0.76)",
-    color: "white",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    opacity: 1,
-    userSelect: "none",
+    const maxTicks = 7;
+    const spanDays = Math.max(1, Math.ceil(totalHours / 24));
+    const intervalDays = Math.max(1, Math.ceil(spanDays / maxTicks));
+    const ticks: { label: string; position: number }[] = [];
+    const firstTick = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate())
+    );
+
+    if (firstTick.getTime() < start.getTime()) {
+      firstTick.setUTCDate(firstTick.getUTCDate() + 1);
+    }
+
+    for (
+      const tickDate = new Date(firstTick);
+      tickDate.getTime() <= end.getTime();
+      tickDate.setUTCDate(tickDate.getUTCDate() + intervalDays)
+    ) {
+      const hours = (tickDate.getTime() - start.getTime()) / MS_PER_HOUR;
+      ticks.push({
+        label: formatDayLabelUTC(tickDate),
+        position: Math.max(0, Math.min(100, (hours / totalHours) * 100)),
+      });
+    }
+
+    if (ticks.length === 0 || ticks[0].position > 4) {
+      ticks.unshift({ label: formatDayLabelUTC(start), position: 0 });
+    }
+
+    const endLabel = formatDayLabelUTC(end);
+    if (ticks[ticks.length - 1].position < 96 && ticks[ticks.length - 1].label !== endLabel) {
+      ticks.push({ label: endLabel, position: 100 });
+    }
+
+    return ticks;
+  }, [end, start, totalHours]);
+
+  const timebarStyle: React.CSSProperties = {
+    width: "100%",
+    height: 128,
+    display: "grid",
+    gridTemplateRows: "50px 56px",
+    gap: 5,
+    boxSizing: "border-box",
+    padding: "15px 20px 12px",
+    border: "1px solid rgba(48, 62, 78, 0.7)",
+    borderRadius: 4,
+    background: "rgba(4, 10, 17, 0.94)",
+    color: "rgba(226, 235, 248, 0.94)",
+    boxShadow: "0 16px 34px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.04)",
+    backdropFilter: "blur(18px)",
+    fontSize: 11,
     lineHeight: 1,
+  };
+
+  const headerStyle: React.CSSProperties = {
+    position: "relative",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+    alignItems: "start",
+    columnGap: 16,
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    width: 32,
+    height: 30,
+    display: "inline-grid",
+    placeItems: "center",
+    border: "1px solid rgba(76, 93, 114, 0.48)",
+    borderRadius: 5,
+    background: "rgba(7, 15, 26, 0.82)",
+    color: "rgba(204, 218, 237, 0.88)",
+    cursor: "pointer",
     padding: 0,
-    flex: "0 0 auto",
+    boxShadow: "0 5px 14px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.04)",
+  };
+
+  const primaryButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    width: 38,
+    height: 34,
+    color: "#3f8fff",
+    borderColor: "rgba(67, 119, 198, 0.56)",
+    background: "rgba(18, 36, 61, 0.92)",
+  };
+
+  const iconStyle: React.CSSProperties = {
+    width: 15,
+    height: 15,
+    display: "block",
+    fill: "currentColor",
   };
 
   return (
-    <div
-      style={{
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        gap: collapsed ? 0 : 8,
-        padding: collapsed ? "12px 16px" : "12px 14px",
-        width: collapsed ? "fit-content" : "100%",
-        maxWidth: "100%",
-        margin: "0 auto",
-        justifyContent: "center",
-        borderRadius: 8,
-        border: "1px solid rgba(148,163,184,0.20)",
-        background: "rgba(6,11,20,0.82)",
-        backdropFilter: "blur(18px)",
-        boxShadow: "0 18px 44px rgba(0,0,0,0.32)",
-        color: "rgba(255,255,255,0.96)",
-        fontSize: 11,
-      }}
-    >
-      {collapsed ? (
+    <div className="atm-timebar" style={timebarStyle}>
+      <div className="atm-timebar-header" style={headerStyle}>
         <div
+          className="atm-timebar-current"
+          title={`${formatPrettyUTC(displayDate)} UTC`}
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 8,
-            minWidth: 180,
-            paddingTop: 4,
+            minWidth: 0,
+            overflow: "hidden",
+            color: "rgba(220, 229, 243, 0.88)",
+            fontSize: 13,
+            fontWeight: 700,
+            lineHeight: "34px",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
+          {formatPrettyUTC(displayDate)} UTC
+        </div>
+
+        <div
+          className="atm-timebar-controls"
+          aria-label="Time controls"
+          style={{ display: "inline-flex", alignItems: "center", gap: 12 }}
+        >
           <button
-            onClick={() => setCollapsed(false)}
-            aria-label="Expand time slider"
-            title="Expand time slider"
-            style={{
-              ...chromeButtonStyle,
-              position: "absolute",
-              top: 14,
-              right: 10,
-              width: 28,
-              height: 28,
-            }}
+            type="button"
+            onClick={() => nudgeByStep(-1)}
+            aria-label="Step backward time"
+            data-testid="time-step-backward"
+            title={`Step backward ${stepHours} hours`}
+            className="atm-timebar-button"
+            style={buttonStyle}
           >
-            <span style={{ fontSize: 16, transform: "translateY(-1px)" }}>▴</span>
+            <svg viewBox="0 0 24 24" aria-hidden style={iconStyle}>
+              <path d="M11 7 6 12l5 5V7Z" />
+              <path d="M18 7l-5 5 5 5V7Z" />
+            </svg>
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={() => nudgeByStep(-1)}
-              aria-label="Step backward time"
-              data-testid="time-step-backward"
-              title={`Step backward ${stepHours} hours`}
-              style={chromeButtonStyle}
-            >
-              <span style={{ fontSize: 16, transform: "translateX(-1px)" }}>←</span>
-            </button>
-
-            <button
-              onClick={() => setIsPlaying((p) => !p)}
-              title={
-                isPlaying
-                  ? allReady
-                    ? "Pause"
-                    : "Pause (waiting for render...)"
-                  : allReady
-                    ? "Play"
-                    : "Play (will resume when ready)"
-              }
-              aria-label={isPlaying ? "Pause" : "Play"}
-              style={chromeButtonStyle}
-            >
-              <span style={{ fontSize: 14, transform: isPlaying ? "none" : "translateX(1px)" }}>
-                {isPlaying ? "❚❚" : "▶"}
-              </span>
-            </button>
-
-            <button
-              onClick={() => nudgeByStep(1)}
-              aria-label="Step forward time"
-              data-testid="time-step-forward"
-              title={`Step forward ${stepHours} hours`}
-              style={chromeButtonStyle}
-            >
-              <span style={{ fontSize: 16, transform: "translateX(1px)" }}>→</span>
-            </button>
-          </div>
-
-          <div
-            style={{
-              textAlign: "center",
-              fontSize: 14,
-              fontWeight: 600,
-              letterSpacing: 0.2,
-              whiteSpace: "nowrap",
-            }}
-            title={`${formatPrettyUTC(displayDate)} UTC`}
+          <button
+            type="button"
+            onClick={() => setIsPlaying((p) => !p)}
+            title={
+              isPlaying
+                ? allReady
+                  ? "Pause"
+                  : "Pause (waiting for render...)"
+                : allReady
+                  ? "Play"
+                  : "Play (will resume when ready)"
+            }
+            aria-label={isPlaying ? "Pause" : "Play"}
+            className="atm-timebar-button atm-timebar-button-primary"
+            data-playing={isPlaying}
+            style={primaryButtonStyle}
           >
-            {compactDisplayValue}
-          </div>
+            {isPlaying ? (
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden
+                style={{ ...iconStyle, fill: "none", stroke: "currentColor", strokeWidth: 2.4 }}
+              >
+                <path d="M8 6v12M16 6v12" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden style={{ ...iconStyle, width: 17, height: 17 }}>
+                <path d="m9 6 9 6-9 6V6Z" />
+              </svg>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => nudgeByStep(1)}
+            aria-label="Step forward time"
+            data-testid="time-step-forward"
+            title={`Step forward ${stepHours} hours`}
+            className="atm-timebar-button"
+            style={buttonStyle}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden style={iconStyle}>
+              <path d="m13 7 5 5-5 5V7Z" />
+              <path d="m6 7 5 5-5 5V7Z" />
+            </svg>
+          </button>
         </div>
-      ) : (
-        <>
-          <div
+
+        <label
+          className="atm-timebar-step"
+          style={{
+            justifySelf: "end",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            color: "rgba(202, 213, 228, 0.82)",
+            fontSize: 11,
+            fontWeight: 760,
+            lineHeight: "34px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span>Step:</span>
+          <select
+            aria-label="Time step"
+            value={stepHours}
+            onChange={(e) => setStepHours(Number(e.target.value))}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              fontSize: 11,
+              width: 66,
+              height: 34,
+              border: 0,
+              appearance: "none",
+              background: "transparent",
+              color: "rgba(225, 234, 247, 0.92)",
+              cursor: "pointer",
+              font: "inherit",
+              fontWeight: 800,
+              outline: "none",
+              padding: "0 16px 0 0",
             }}
           >
-            <div style={{ flex: 1, textAlign: "left", color: "var(--atm-muted)" }}>
-              {prettyFromValueStrUTC(startDate)} UTC
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                onClick={() => nudgeByStep(-1)}
-                aria-label="Step backward time"
-                data-testid="time-step-backward"
-                title={`Step backward ${stepHours} hours`}
-                style={chromeButtonStyle}
-              >
-                <span style={{ fontSize: 16, transform: "translateX(-1px)" }}>←</span>
-              </button>
-
-              <button
-                onClick={() => setIsPlaying((p) => !p)}
-                title={
-                  isPlaying
-                    ? allReady
-                      ? "Pause"
-                      : "Pause (waiting for render...)"
-                    : allReady
-                      ? "Play"
-                      : "Play (will resume when ready)"
-                }
-                aria-label={isPlaying ? "Pause" : "Play"}
-                style={chromeButtonStyle}
-              >
-                <span style={{ fontSize: 14, transform: isPlaying ? "none" : "translateX(1px)" }}>
-                  {isPlaying ? "❚❚" : "▶"}
-                </span>
-              </button>
-
-              <button
-                onClick={() => nudgeByStep(1)}
-                aria-label="Step forward time"
-                data-testid="time-step-forward"
-                title={`Step forward ${stepHours} hours`}
-                style={chromeButtonStyle}
-              >
-                <span style={{ fontSize: 16, transform: "translateX(1px)" }}>→</span>
-              </button>
-            </div>
-
-            <div style={{ flex: 1, textAlign: "right", color: "var(--atm-muted)" }}>
-              {prettyFromValueStrUTC(endDate)} UTC
-            </div>
-          </div>
-
-          <input
-            type="range"
-            min={0}
-            max={totalHours}
-            step={1}
-            value={draftHours}
-            onChange={(e) => {
-              setIsPlaying(false);
-              const h = Number(e.target.value);
-              setDraftHours(h);
-              scheduleCommit(h);
+            {[1, 3, 6, 12, 24].map((hours) => (
+              <option key={hours} value={hours}>
+                {hours} {hours === 1 ? "hour" : "hours"}
+              </option>
+            ))}
+          </select>
+          <svg
+            aria-hidden
+            viewBox="0 0 16 16"
+            style={{
+              width: 12,
+              height: 12,
+              marginLeft: -13,
+              color: "rgba(188, 201, 219, 0.88)",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 2,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              pointerEvents: "none",
             }}
-            className="atm-time-range"
-            style={{ width: "100%", accentColor: "#4f8cff" }}
+          >
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </label>
+      </div>
+
+      <div
+        className="atm-timebar-rail"
+        style={{ position: "relative", minHeight: 56, paddingTop: 11 }}
+      >
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 13,
+            height: 2,
+            borderRadius: 999,
+            background: "rgba(72, 86, 104, 0.52)",
+            boxShadow: "0 0 0 1px rgba(10, 17, 27, 0.72)",
+          }}
+        >
+          <div
+            style={{
+              width: `${currentPercent}%`,
+              height: "100%",
+              borderRadius: 999,
+              background: "rgba(62, 124, 216, 0.34)",
+            }}
           />
+        </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 160, display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
-              <div style={{ opacity: 0.85, whiteSpace: "nowrap" }}>Step (hours)</div>
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: `${currentPercent}%`,
+            top: 6,
+            width: 14,
+            height: 14,
+            transform: "translateX(-50%)",
+            border: "2px solid rgba(126, 142, 168, 0.98)",
+            borderRadius: 999,
+            background: "#050b13",
+            boxShadow: "0 0 0 2px rgba(5, 10, 18, 0.92), 0 2px 8px rgba(0, 0, 0, 0.52)",
+          }}
+        />
 
-              <input
-                type="number"
-                min={1}
-                max={24}
-                step={1}
-                value={stepHours}
-                onChange={(e) => setStepHours(clamp(Number(e.target.value)))}
-                onWheel={(e) => {
-                  e.preventDefault();
-                  const dir = e.deltaY > 0 ? -1 : 1;
-                  setStepHours((s) => clamp(s + dir));
-                }}
-                style={{
-                  width: 64,
-                  padding: "6px 8px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(255,255,255,0.25)",
-                  background: "rgba(0,0,0,0.35)",
-                  color: "white",
-                  outline: "none",
-                  textAlign: "center",
-                }}
-              />
+        <input
+          type="range"
+          min={0}
+          max={totalHours}
+          step={1}
+          value={draftHours}
+          onChange={(e) => {
+            setIsPlaying(false);
+            const h = Number(e.target.value);
+            setDraftHours(h);
+            scheduleCommit(h);
+          }}
+          className="atm-time-range"
+          style={{
+            position: "absolute",
+            inset: "0 0 auto",
+            zIndex: 2,
+            width: "100%",
+            height: 20,
+            margin: 0,
+            opacity: 0,
+            cursor: "pointer",
+          }}
+        />
 
-              <div style={{ opacity: 0.75, whiteSpace: "nowrap" }}>h</div>
-            </div>
-
-            <div style={{ flex: 1, textAlign: "center", fontSize: 11 }}>
-              {formatPrettyUTC(parseDateTimeUTC(displayValueStr))} UTC
-            </div>
-
-            <div style={{ width: 160, display: "flex", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setCollapsed(true)}
-                aria-label="Collapse time slider"
-                title="Collapse time slider"
-                style={chromeButtonStyle}
-              >
-                <span style={{ fontSize: 16, transform: "translateY(1px)" }}>▾</span>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+        <div
+          className="atm-timebar-ticks"
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: "34px 0 auto",
+            height: 13,
+            color: "rgba(157, 172, 193, 0.78)",
+            fontSize: 10,
+            fontWeight: 760,
+            pointerEvents: "none",
+          }}
+        >
+          {tickMarks.map((tick) => (
+            <span
+              key={`${tick.label}-${tick.position}`}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: `${tick.position}%`,
+                transform:
+                  tick.position <= 0
+                    ? "translateX(0)"
+                    : tick.position >= 100
+                      ? "translateX(-100%)"
+                      : "translateX(-50%)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {tick.label}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

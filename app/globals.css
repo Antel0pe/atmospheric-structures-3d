@@ -570,8 +570,218 @@ textarea {
   font-weight: 800;
 }
 
+.atm-timebar {
+  width: 100%;
+  min-height: 82px;
+  display: grid;
+  grid-template-rows: 38px 34px;
+  padding: 11px 18px 10px;
+  border: 1px solid rgba(64, 82, 103, 0.56);
+  border-radius: 6px;
+  background: rgba(4, 10, 17, 0.92);
+  color: rgba(226, 235, 248, 0.95);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+}
+
+.atm-timebar-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.atm-timebar-current {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(217, 227, 241, 0.82);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atm-timebar-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.atm-timebar-button {
+  width: 31px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(96, 113, 137, 0.36);
+  border-radius: 6px;
+  background: rgba(7, 15, 26, 0.78);
+  color: rgba(209, 222, 240, 0.88);
+  cursor: pointer;
+  box-shadow:
+    0 5px 14px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.atm-timebar-button:hover {
+  border-color: rgba(94, 131, 190, 0.62);
+  color: #f5f8ff;
+}
+
+.atm-timebar-button:focus-visible,
+.atm-timebar-step select:focus-visible,
+.atm-time-range:focus-visible {
+  outline: 2px solid rgba(79, 140, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.atm-timebar-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.atm-timebar-button-primary {
+  width: 35px;
+  height: 32px;
+  color: #3d8dff;
+  background: rgba(17, 35, 61, 0.88);
+  border-color: rgba(67, 119, 198, 0.48);
+}
+
+.atm-timebar-button-primary svg {
+  width: 17px;
+  height: 17px;
+}
+
+.atm-timebar-button-primary[data-playing="true"] svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.atm-timebar-step {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(183, 197, 215, 0.76);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 28px;
+  white-space: nowrap;
+}
+
+.atm-timebar-step select {
+  max-width: 92px;
+  border: 0;
+  background: transparent;
+  color: rgba(217, 227, 241, 0.9);
+  cursor: pointer;
+  font: inherit;
+}
+
+.atm-timebar-step option {
+  background: #08111d;
+  color: #e8eef7;
+}
+
+.atm-timebar-rail {
+  position: relative;
+  min-height: 34px;
+  padding-top: 5px;
+}
+
 .atm-time-range {
-  height: 18px;
+  --atm-time-progress: 0%;
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 15px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.atm-time-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(63, 122, 215, 0.34) 0%,
+      rgba(63, 122, 215, 0.34) var(--atm-time-progress),
+      rgba(75, 91, 111, 0.44) var(--atm-time-progress),
+      rgba(75, 91, 111, 0.44) 100%
+    );
+  box-shadow: 0 0 0 1px rgba(12, 19, 29, 0.8);
+}
+
+.atm-time-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(75, 91, 111, 0.44);
+  box-shadow: 0 0 0 1px rgba(12, 19, 29, 0.8);
+}
+
+.atm-time-range::-moz-range-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(63, 122, 215, 0.34);
+}
+
+.atm-time-range::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  appearance: none;
+  border: 2px solid rgba(138, 155, 181, 0.96);
+  border-radius: 999px;
+  background: #050b13;
+  box-shadow:
+    0 0 0 2px rgba(6, 12, 21, 0.92),
+    0 2px 8px rgba(0, 0, 0, 0.52);
+}
+
+.atm-time-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(138, 155, 181, 0.96);
+  border-radius: 999px;
+  background: #050b13;
+  box-shadow:
+    0 0 0 2px rgba(6, 12, 21, 0.92),
+    0 2px 8px rgba(0, 0, 0, 0.52);
+}
+
+.atm-timebar-ticks {
+  position: absolute;
+  inset: 18px 0 auto;
+  z-index: 1;
+  height: 16px;
+  color: rgba(155, 170, 191, 0.78);
+  font-size: 10px;
+  font-weight: 760;
+  pointer-events: none;
+}
+
+.atm-timebar-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.atm-timebar-ticks span:first-child {
+  transform: translateX(0);
+}
+
+.atm-timebar-ticks span:last-child {
+  transform: translateX(-100%);
 }
 
 @media (max-width: 980px) {
@@ -582,5 +792,25 @@ textarea {
   .atm-time-jump,
   .atm-toolbar {
     display: none;
+  }
+
+  .atm-timebar {
+    min-height: 94px;
+    grid-template-rows: auto 34px;
+    padding-inline: 14px;
+  }
+
+  .atm-timebar-header {
+    grid-template-columns: 1fr auto;
+    row-gap: 7px;
+  }
+
+  .atm-timebar-current {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  .atm-timebar-controls {
+    justify-self: start;
   }
 }
