@@ -54,3 +54,5 @@ finding meridional value
 - median is better than mean but not significantly
 - isotherms pretty good at least at higher levels, lower levels are a mess. maybe smoothing first?
 - my assumption is there should be a broadly connected line across the globe (obviously not straight, but generally connected) - this assumption might be wrong
+- good idea of not needing to identify coherent path but can identify high collision regions then connecting line between them
+- raw temp seems to show straight line while climatology methods find more curving areas. raw temp might find general region and anomaly the specific air mass contours?
