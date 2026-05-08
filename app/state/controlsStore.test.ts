@@ -5,6 +5,8 @@ import { describe, expect, test } from "bun:test";
 import {
   AIR_MASS_STDDEV_SIDE_TAIL_SMOOTH_VARIANT,
   AIR_MASS_STDDEV_SIDE_TAIL_VARIANT,
+  temperatureSliceColorScaleLabel,
+  temperatureSliceVariantLabel,
   useControls,
 } from "./controlsStore";
 
@@ -55,7 +57,7 @@ describe("controls store", () => {
     controls.setTemperatureSliceLayer({
       visible: true,
       variant: "temperature-minus-climatology",
-      colorScaleMode: "perLevel",
+      colorScaleMode: "perLevelDiscrete",
     });
     controls.setPotentialTemperatureLayer({
       visible: true,
@@ -80,7 +82,7 @@ describe("controls store", () => {
       opacity: 1,
       pressureHpa: 500,
       variant: "temperature-minus-climatology",
-      colorScaleMode: "perLevel",
+      colorScaleMode: "perLevelDiscrete",
     });
     expect(nextState.potentialTemperatureLayer).toMatchObject({
       visible: true,
@@ -115,5 +117,20 @@ describe("controls store", () => {
 
     controls.setAirMassLayer({ showCellGrid: false });
     expect(useControls.getState().airMassLayer.showCellGrid).toBe(false);
+  });
+
+  test("temperature slice color-scale labels include discrete per-level mode", () => {
+    expect(temperatureSliceColorScaleLabel("perLevelDiscrete")).toBe(
+      "Each pressure level discrete"
+    );
+  });
+
+  test("temperature slice variant labels include thermal displacement", () => {
+    expect(temperatureSliceVariantLabel("thermal-displacement-latitude")).toBe(
+      "Thermal Displacement"
+    );
+    expect(
+      temperatureSliceVariantLabel("thermal-displacement-latitude-smoothed")
+    ).toBe("Thermal Displacement Smooth");
   });
 });

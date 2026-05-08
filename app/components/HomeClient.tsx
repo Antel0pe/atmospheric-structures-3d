@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState, type ReactNode } from "react";
 import SidebarPane from "./sidebar/SidebarPane";
 import DataNoticeOverlay from "./DataNoticeOverlay";
+import TemperatureSliceColorScaleLegend from "./TemperatureSliceColorScaleLegend";
 import { useViewerStore } from "../state/viewerStore";
 import type { EarthProjectionMode } from "./layers/EarthBase";
 
@@ -244,6 +245,14 @@ export default function HomeClient({
           <AirMassClassificationLayer />
         </EarthBase>
       </div>
+
+      <TemperatureSliceColorScaleLegend
+        timestamp={datehour}
+        sidebarOpen={sidebarOpen}
+        sidebarWidth={sidebarWidth}
+        layerInfoOpen={layerInfoOpen}
+        layerInfoWidth={layerInfoWidth}
+      />
 
       <div
         style={{

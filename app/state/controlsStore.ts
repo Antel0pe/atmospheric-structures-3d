@@ -139,6 +139,10 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Raw Temperature",
   },
   {
+    value: "temperature-minus-climatology",
+    label: "Temperature - Climatology",
+  },
+  {
     value: "raw-temperature-vertical-coherence",
     label: "Vertical Coherence",
   },
@@ -151,8 +155,12 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Anomaly Agreement",
   },
   {
-    value: "temperature-minus-climatology",
-    label: "Temperature - Climatology",
+    value: "thermal-displacement-latitude",
+    label: "Thermal Displacement",
+  },
+  {
+    value: "thermal-displacement-latitude-smoothed",
+    label: "Thermal Displacement Smooth",
   },
   {
     value: "potential-temperature-minus-climatology",
@@ -196,6 +204,7 @@ export type PrecipitableWaterLayerState = {
 export const TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS = [
   { value: "global", label: "Global 250-1000 hPa" },
   { value: "perLevel", label: "Each pressure level" },
+  { value: "perLevelDiscrete", label: "Each pressure level discrete" },
 ] as const;
 
 export type TemperatureSliceColorScaleMode =

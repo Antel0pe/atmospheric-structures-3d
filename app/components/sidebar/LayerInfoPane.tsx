@@ -47,6 +47,12 @@ function metaRow(label: string, value: string) {
 }
 
 function temperatureSliceDescription(variant: TemperatureSliceVariant) {
+  if (variant === "thermal-displacement-latitude-smoothed") {
+    return "A full-map pressure slice colored by closest climatology latitude after smoothing the raw temperature map at a 20-cell scale.";
+  }
+  if (variant === "thermal-displacement-latitude") {
+    return "A full-map pressure slice colored by the climatology latitude whose temperature is closest to each raw cell at the same longitude.";
+  }
   if (variant === "raw-temperature-anomaly-agreement") {
     return "A full-map raw-temperature pressure slice. Climatology departure adjusts saturation by sign agreement: same-side anomalies get vivid, opposite-side anomalies get muted.";
   }
@@ -54,6 +60,16 @@ function temperatureSliceDescription(variant: TemperatureSliceVariant) {
     return "A full-map raw-temperature pressure slice. Climatology-departure magnitude makes unusual cells more vivid without changing their raw-temperature hue.";
   }
   return "A full-map pressure slice of the selected temperature field. Cold values render blue and warm values render red.";
+}
+
+function temperatureSliceUnits(variant: TemperatureSliceVariant) {
+  if (
+    variant === "thermal-displacement-latitude" ||
+    variant === "thermal-displacement-latitude-smoothed"
+  ) {
+    return "Matched latitude";
+  }
+  return "°C";
 }
 
 function TemperaturePressureControl({
@@ -250,7 +266,7 @@ export default function LayerInfoPane() {
                 {metaRow("Parameter", "Temperature")}
                 {metaRow("Pressure Level", `${temperatureSliceLayer.pressureHpa.toFixed(0)} hPa`)}
                 {metaRow("Data Variant", temperatureSliceVariantLabel(temperatureSliceLayer.variant))}
-                {metaRow("Units", "°C")}
+                {metaRow("Units", temperatureSliceUnits(temperatureSliceLayer.variant))}
                 {metaRow("Source", "Reanalysis")}
               </div>
             </section>

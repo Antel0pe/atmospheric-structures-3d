@@ -47,6 +47,18 @@ function pressureToFlatHeight(pressureHpa: number, verticalExaggeration: number)
   return LAYER_LIFT + mix * VERTICAL_SPAN * verticalExaggeration;
 }
 
+function colorScaleModeUniformValue(
+  colorScaleMode: TemperatureSliceLayerParams["colorScaleMode"]
+) {
+  if (colorScaleMode === "perLevelDiscrete") {
+    return 2.0;
+  }
+  if (colorScaleMode === "perLevel") {
+    return 1.0;
+  }
+  return 0.0;
+}
+
 function applyLayerParams(
   mesh: THREE.Mesh,
   material: THREE.ShaderMaterial,
@@ -54,8 +66,9 @@ function applyLayerParams(
   verticalExaggeration: number
 ) {
   material.uniforms.uLayerOpacity.value = params.opacity;
-  material.uniforms.uColorScaleMode.value =
-    params.colorScaleMode === "perLevel" ? 1.0 : 0.0;
+  material.uniforms.uColorScaleMode.value = colorScaleModeUniformValue(
+    params.colorScaleMode
+  );
   mesh.position.y = pressureToFlatHeight(params.pressureHpa, verticalExaggeration);
 }
 
@@ -213,8 +226,9 @@ export default function TemperatureSliceLayer() {
         uPressureMix: { value: 0.0 },
         uLayerOpacity: { value: state.temperatureSliceLayer.opacity },
         uColorScaleMode: {
-          value:
-            state.temperatureSliceLayer.colorScaleMode === "perLevel" ? 1.0 : 0.0,
+          value: colorScaleModeUniformValue(
+            state.temperatureSliceLayer.colorScaleMode
+          ),
         },
         uSaturationMode: { value: 0.0 },
       },
@@ -266,6 +280,29 @@ export default function TemperatureSliceLayer() {
           return mix(orange, red, smoothstep(0.75, 1.0, t));
         }
 
+        vec3 discreteTemperatureColor(float t) {
+          t = clamp(t, 0.0, 1.0);
+          if (t < 1.0 / 7.0) {
+            return vec3(0.045, 0.130, 0.600);
+          }
+          if (t < 2.0 / 7.0) {
+            return vec3(0.055, 0.265, 0.820);
+          }
+          if (t < 3.0 / 7.0) {
+            return vec3(0.410, 0.710, 0.960);
+          }
+          if (t < 4.0 / 7.0) {
+            return vec3(0.965, 0.970, 0.940);
+          }
+          if (t < 5.0 / 7.0) {
+            return vec3(0.985, 0.625, 0.565);
+          }
+          if (t < 6.0 / 7.0) {
+            return vec3(0.890, 0.210, 0.155);
+          }
+          return vec3(0.620, 0.020, 0.025);
+        }
+
         float borderAlpha(vec2 uv) {
           vec2 clampedUv = clamp(uv, vec2(0.0), vec2(1.0));
           return texture2D(uBorderTex, clampedUv).a;
@@ -290,8 +327,10 @@ export default function TemperatureSliceLayer() {
           );
           float globalValue = mix(valueA, valueB, clamp(uPressureMix, 0.0, 1.0));
           float levelValue = mix(levelValueA, levelValueB, clamp(uPressureMix, 0.0, 1.0));
-          float value = mix(globalValue, levelValue, step(0.5, uColorScaleMode));
-          vec3 color = temperatureColor(value);
+          float value = uColorScaleMode > 0.5 ? levelValue : globalValue;
+          vec3 color = uColorScaleMode > 1.5
+            ? discreteTemperatureColor(value)
+            : temperatureColor(value);
           float encodedStrength = mix(sampleA.b, sampleB.b, clamp(uPressureMix, 0.0, 1.0));
           float saturation = 1.0;
           if (uSaturationMode > 1.5) {

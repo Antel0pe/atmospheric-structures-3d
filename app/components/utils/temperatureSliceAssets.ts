@@ -23,7 +23,7 @@ export type TemperatureSliceManifest = {
   dataset: string;
   variable: string;
   units: string;
-  display_units: "K";
+  display_units: "K" | "equator-to-pole latitude match";
   variant?: string;
   variant_label?: string;
   field_kind?:
@@ -32,7 +32,9 @@ export type TemperatureSliceManifest = {
     | "potential-temperature-climatology-anomaly"
     | "raw-temperature-vertical-coherence"
     | "raw-temperature-anomaly-strength"
-    | "raw-temperature-anomaly-agreement";
+    | "raw-temperature-anomaly-agreement"
+    | "thermal-displacement-latitude"
+    | "thermal-displacement-latitude-smoothed";
   climatology_dataset?: string | null;
   rendering: {
     kind: "full-field-pressure-slice";

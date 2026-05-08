@@ -11,6 +11,7 @@ import netCDF4
 import numpy as np
 import xarray as xr
 from PIL import Image, ImageDraw
+from scipy.ndimage import gaussian_filter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -40,6 +41,11 @@ RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND = (
 RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND = (
     "raw-temperature-anomaly-agreement"
 )
+THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND = "thermal-displacement-latitude"
+THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND = (
+    "thermal-displacement-latitude-smoothed"
+)
+THERMAL_DISPLACEMENT_SMOOTH_SIGMA_CELLS = 20.0
 DEFAULT_VARIANT_NAME = "raw-temperature"
 DEFAULT_VARIANT_LABEL = "Raw Temperature"
 DEFAULT_COLOR_SCALE = "global-min-blue-to-global-max-red"
@@ -109,6 +115,8 @@ def parse_args() -> argparse.Namespace:
             RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
             RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
             RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
+            THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND,
+            THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
         ),
         help="Scalar field exported into the pressure-slice textures.",
     )
@@ -252,6 +260,8 @@ def resolve_climatology(
         TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
         RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
         RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
+        THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND,
+        THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
     }:
         path = climatology_path or DEFAULT_TEMPERATURE_CLIMATOLOGY_PATH
         return load_climatology_field(
@@ -362,6 +372,13 @@ def is_signed_saturation_field_kind(field_kind: str) -> bool:
     return field_kind == RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND
 
 
+def is_thermal_displacement_field_kind(field_kind: str) -> bool:
+    return field_kind in {
+        THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND,
+        THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
+    }
+
+
 def dry_potential_temperature(
     temperature_k: np.ndarray,
     pressure_hpa: float,
@@ -372,12 +389,72 @@ def dry_potential_temperature(
     )
 
 
+def thermal_displacement_latitude_score(
+    raw_temperature_k: np.ndarray,
+    climatology_temperature_k: np.ndarray,
+    latitudes_deg: np.ndarray,
+) -> np.ndarray:
+    raw = np.asarray(raw_temperature_k, dtype=np.float32)
+    climatology = np.asarray(climatology_temperature_k, dtype=np.float32)
+    latitudes = np.asarray(latitudes_deg, dtype=np.float32)
+    result = np.zeros_like(raw, dtype=np.float32)
+    max_abs_latitude = max(float(np.nanmax(np.abs(latitudes))), 1e-6)
+
+    for lon_index in range(raw.shape[1]):
+        climatology_column = climatology[:, lon_index]
+        valid = np.isfinite(climatology_column)
+        if not np.any(valid):
+            result[:, lon_index] = np.nan
+            continue
+
+        valid_indices = np.flatnonzero(valid)
+        order = valid_indices[np.argsort(climatology_column[valid], kind="mergesort")]
+        sorted_temperatures = climatology_column[order]
+        source_temperatures = raw[:, lon_index]
+        insert_positions = np.searchsorted(sorted_temperatures, source_temperatures)
+        right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
+        left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
+
+        right_indices = order[right_positions]
+        left_indices = order[left_positions]
+        right_diffs = np.abs(sorted_temperatures[right_positions] - source_temperatures)
+        left_diffs = np.abs(sorted_temperatures[left_positions] - source_temperatures)
+
+        row_indices = np.arange(raw.shape[0])
+        right_lat_distance = np.abs(right_indices - row_indices)
+        left_lat_distance = np.abs(left_indices - row_indices)
+        use_left = (left_diffs < right_diffs) | (
+            (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
+        )
+        matched_indices = np.where(use_left, left_indices, right_indices)
+        matched_latitudes = latitudes[matched_indices]
+        result[:, lon_index] = 1.0 - np.abs(matched_latitudes) / max_abs_latitude
+        result[~np.isfinite(source_temperatures), lon_index] = np.nan
+
+    return np.asarray(np.clip(result, 0.0, 1.0), dtype=np.float32)
+
+
+def smooth_raw_temperature_for_thermal_displacement(
+    raw_temperature_k: np.ndarray,
+) -> np.ndarray:
+    return np.asarray(
+        gaussian_filter(
+            np.asarray(raw_temperature_k, dtype=np.float32),
+            sigma=(THERMAL_DISPLACEMENT_SMOOTH_SIGMA_CELLS,) * 2,
+            mode=("nearest", "wrap"),
+            truncate=3.0,
+        ),
+        dtype=np.float32,
+    )
+
+
 def build_field(
     raw_temperature_k: np.ndarray,
     pressure_hpa: float,
     level_index: int,
     field_kind: str,
     climatology: ClimatologyField | None,
+    latitudes_deg: np.ndarray | None = None,
 ) -> np.ndarray:
     if field_kind == RAW_TEMPERATURE_FIELD_KIND:
         return raw_temperature_k
@@ -388,6 +465,19 @@ def build_field(
     if field_kind == POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND:
         theta = dry_potential_temperature(raw_temperature_k, pressure_hpa)
         return np.asarray(theta - climatology.values[level_index], dtype=np.float32)
+    if is_thermal_displacement_field_kind(field_kind):
+        if latitudes_deg is None:
+            raise ValueError("Missing latitudes for thermal displacement field.")
+        source_temperature = (
+            smooth_raw_temperature_for_thermal_displacement(raw_temperature_k)
+            if field_kind == THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND
+            else raw_temperature_k
+        )
+        return thermal_displacement_latitude_score(
+            raw_temperature_k=source_temperature,
+            climatology_temperature_k=climatology.values[level_index],
+            latitudes_deg=latitudes_deg,
+        )
     raise ValueError(f"Unsupported temperature slice field kind: {field_kind}")
 
 
@@ -472,6 +562,9 @@ def compute_field_range(
     field_kind: str,
     climatology: ClimatologyField | None,
 ) -> tuple[float, float]:
+    if is_thermal_displacement_field_kind(field_kind):
+        return 0.0, 1.0
+
     variable = raw_dataset.variables[DATASET_VARIABLE]
     data_min = np.inf
     data_max = -np.inf
@@ -489,6 +582,7 @@ def compute_field_range(
                 level_index=level_index,
                 field_kind=field_kind,
                 climatology=climatology,
+                latitudes_deg=contents.latitudes_deg,
             )
             data_min = min(data_min, float(np.nanmin(field)))
             data_max = max(data_max, float(np.nanmax(field)))
@@ -582,6 +676,7 @@ def build_timestamp_entry(
             level_index=level_index,
             field_kind=field_kind,
             climatology=climatology,
+            latitudes_deg=contents.latitudes_deg,
         )
         encoded = encode_field_to_rgba_uint8(
             field,
@@ -595,8 +690,12 @@ def build_timestamp_entry(
             {
                 "pressure_hpa": pressure_hpa,
                 "image": str(image_path.relative_to(output_dir)).replace("\\", "/"),
-                "temperature_min_k": float(np.nanmin(field)),
-                "temperature_max_k": float(np.nanmax(field)),
+                "temperature_min_k": 0.0
+                if is_thermal_displacement_field_kind(field_kind)
+                else float(np.nanmin(field)),
+                "temperature_max_k": 1.0
+                if is_thermal_displacement_field_kind(field_kind)
+                else float(np.nanmax(field)),
                 "value_min": float(np.nanmin(field)),
                 "value_max": float(np.nanmax(field)),
             }
@@ -691,12 +790,17 @@ def build_manifest(
     saturation_strength_scale: float | None = None,
 ) -> dict:
     pressures = sorted(float(contents.pressure_levels_hpa[index]) for index in level_indices)
+    display_units = (
+        "equator-to-pole latitude match"
+        if is_thermal_displacement_field_kind(field_kind)
+        else "K"
+    )
     manifest = {
         "version": OUTPUT_VERSION,
         "dataset": contents.dataset_path.name,
         "variable": contents.variable_name,
         "units": contents.units,
-        "display_units": "K",
+        "display_units": display_units,
         "variant": variant_name,
         "variant_label": variant_label,
         "field_kind": field_kind,
