@@ -157,6 +157,11 @@ function isSaturationEncodedManifest(manifest: TemperatureSliceManifest) {
 
 function saturationModeForManifest(manifest: TemperatureSliceManifest) {
   if (
+    manifest.rendering.encoding === "raw-temperature-uint16-rg-front-mask-b"
+  ) {
+    return 3.0;
+  }
+  if (
     manifest.rendering.encoding ===
     "raw-temperature-uint16-rg-signed-saturation-b"
   ) {
@@ -333,7 +338,9 @@ export default function TemperatureSliceLayer() {
             : temperatureColor(value);
           float encodedStrength = mix(sampleA.b, sampleB.b, clamp(uPressureMix, 0.0, 1.0));
           float saturation = 1.0;
-          if (uSaturationMode > 1.5) {
+          if (uSaturationMode > 2.5) {
+            saturation = 1.0;
+          } else if (uSaturationMode > 1.5) {
             float signedAnomaly = encodedStrength * 2.0 - 1.0;
             float rawTemperatureSide = value < 0.5 ? -1.0 : 1.0;
             float agreement = rawTemperatureSide * signedAnomaly;
@@ -345,6 +352,10 @@ export default function TemperatureSliceLayer() {
           }
           float luminance = dot(color, vec3(0.299, 0.587, 0.114));
           color = mix(vec3(luminance), color, clamp(saturation, 0.0, 1.0));
+          if (uSaturationMode > 2.5) {
+            float frontStrength = smoothstep(0.12, 0.72, encodedStrength);
+            color = mix(color, vec3(0.030, 0.940, 0.360), frontStrength * 0.88);
+          }
           float border = borderAlpha(vUv);
           border = max(border, borderAlpha(vUv + vec2(uBorderTexel.x, 0.0)));
           border = max(border, borderAlpha(vUv - vec2(uBorderTexel.x, 0.0)));

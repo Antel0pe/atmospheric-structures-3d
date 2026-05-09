@@ -11,6 +11,7 @@ import netCDF4
 import numpy as np
 import xarray as xr
 from PIL import Image, ImageDraw
+from scipy import ndimage
 from scipy.ndimage import gaussian_filter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -41,11 +42,24 @@ RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND = (
 RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND = (
     "raw-temperature-anomaly-agreement"
 )
+RAW_TEMPERATURE_FRONT_OVERLAY_FIELD_KIND = "raw-temperature-front-overlay"
 THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND = "thermal-displacement-latitude"
 THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND = (
     "thermal-displacement-latitude-smoothed"
 )
+THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND = (
+    "thermal-displacement-zonal-mean-latitude"
+)
+THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND = (
+    "thermal-displacement-zonal-trimmed-mean-latitude"
+)
 THERMAL_DISPLACEMENT_SMOOTH_SIGMA_CELLS = 20.0
+FRONT_OVERLAY_ENCODING = "raw-temperature-uint16-rg-front-mask-b"
+DEFAULT_FRONT_SMOOTH_SIGMA_CELLS = 2.0
+DEFAULT_FRONT_GRADIENT_PERCENTILE = 96.0
+DEFAULT_FRONT_EXCLUDE_TROPICS_ABS_LAT = 20.0
+DEFAULT_FRONT_DILATION_ITERATIONS = 1
+DEFAULT_FRONT_MIN_CELLS = 16
 DEFAULT_VARIANT_NAME = "raw-temperature"
 DEFAULT_VARIANT_LABEL = "Raw Temperature"
 DEFAULT_COLOR_SCALE = "global-min-blue-to-global-max-red"
@@ -115,8 +129,11 @@ def parse_args() -> argparse.Namespace:
             RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
             RAW_TEMPERATURE_ANOMALY_STRENGTH_FIELD_KIND,
             RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
+            RAW_TEMPERATURE_FRONT_OVERLAY_FIELD_KIND,
             THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND,
             THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
+            THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND,
+            THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND,
         ),
         help="Scalar field exported into the pressure-slice textures.",
     )
@@ -166,6 +183,36 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=",".join(DEFAULT_INCLUDE_TIMESTAMPS),
         help="Comma-separated ISO minute timestamps to build.",
+    )
+    parser.add_argument(
+        "--front-smooth-sigma-cells",
+        type=float,
+        default=DEFAULT_FRONT_SMOOTH_SIGMA_CELLS,
+        help="Gaussian smoothing sigma used before front detection.",
+    )
+    parser.add_argument(
+        "--front-gradient-percentile",
+        type=float,
+        default=DEFAULT_FRONT_GRADIENT_PERCENTILE,
+        help="Per-level horizontal temperature-gradient percentile used as the front-candidate support mask.",
+    )
+    parser.add_argument(
+        "--front-exclude-tropics-abs-lat",
+        type=float,
+        default=DEFAULT_FRONT_EXCLUDE_TROPICS_ABS_LAT,
+        help="Exclude front candidates equatorward of this absolute latitude.",
+    )
+    parser.add_argument(
+        "--front-dilation-iterations",
+        type=int,
+        default=DEFAULT_FRONT_DILATION_ITERATIONS,
+        help="Number of 3x3 dilation passes applied to the detected front line mask.",
+    )
+    parser.add_argument(
+        "--front-min-cells",
+        type=int,
+        default=DEFAULT_FRONT_MIN_CELLS,
+        help="Drop connected front-mask fragments smaller than this many grid cells.",
     )
     return parser.parse_args()
 
@@ -253,6 +300,7 @@ def resolve_climatology(
     if field_kind in {
         RAW_TEMPERATURE_FIELD_KIND,
         RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
+        RAW_TEMPERATURE_FRONT_OVERLAY_FIELD_KIND,
     }:
         return None
 
@@ -262,6 +310,8 @@ def resolve_climatology(
         RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND,
         THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND,
         THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
+        THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND,
+        THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND,
     }:
         path = climatology_path or DEFAULT_TEMPERATURE_CLIMATOLOGY_PATH
         return load_climatology_field(
@@ -368,6 +418,10 @@ def encode_temperature_with_strength_to_rgba_uint8(
     return rgba
 
 
+def is_front_overlay_field_kind(field_kind: str) -> bool:
+    return field_kind == RAW_TEMPERATURE_FRONT_OVERLAY_FIELD_KIND
+
+
 def is_signed_saturation_field_kind(field_kind: str) -> bool:
     return field_kind == RAW_TEMPERATURE_ANOMALY_AGREEMENT_FIELD_KIND
 
@@ -376,6 +430,8 @@ def is_thermal_displacement_field_kind(field_kind: str) -> bool:
     return field_kind in {
         THERMAL_DISPLACEMENT_LATITUDE_FIELD_KIND,
         THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
+        THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND,
+        THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND,
     }
 
 
@@ -434,6 +490,68 @@ def thermal_displacement_latitude_score(
     return np.asarray(np.clip(result, 0.0, 1.0), dtype=np.float32)
 
 
+def climatology_zonal_profile(
+    climatology_temperature_k: np.ndarray,
+    trim_fraction: float = 0.0,
+) -> np.ndarray:
+    climatology = np.asarray(climatology_temperature_k, dtype=np.float32)
+    if trim_fraction <= 0.0:
+        return np.asarray(np.nanmean(climatology, axis=1), dtype=np.float32)
+
+    lower = np.nanquantile(climatology, trim_fraction, axis=1)
+    upper = np.nanquantile(climatology, 1.0 - trim_fraction, axis=1)
+    middle = np.where(
+        (climatology >= lower[:, None]) & (climatology <= upper[:, None]),
+        climatology,
+        np.nan,
+    )
+    return np.asarray(np.nanmean(middle, axis=1), dtype=np.float32)
+
+
+def thermal_displacement_zonal_profile_score(
+    raw_temperature_k: np.ndarray,
+    climatology_latitude_profile_k: np.ndarray,
+    latitudes_deg: np.ndarray,
+) -> np.ndarray:
+    raw = np.asarray(raw_temperature_k, dtype=np.float32)
+    profile = np.asarray(climatology_latitude_profile_k, dtype=np.float32)
+    latitudes = np.asarray(latitudes_deg, dtype=np.float32)
+    result = np.zeros_like(raw, dtype=np.float32)
+    max_abs_latitude = max(float(np.nanmax(np.abs(latitudes))), 1e-6)
+
+    valid = np.isfinite(profile)
+    if not np.any(valid):
+        result[:] = np.nan
+        return result
+
+    valid_indices = np.flatnonzero(valid)
+    order = valid_indices[np.argsort(profile[valid], kind="mergesort")]
+    sorted_temperatures = profile[order]
+    flat_raw = raw.reshape(-1)
+    insert_positions = np.searchsorted(sorted_temperatures, flat_raw)
+    right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
+    left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
+
+    right_indices = order[right_positions]
+    left_indices = order[left_positions]
+    right_diffs = np.abs(sorted_temperatures[right_positions] - flat_raw)
+    left_diffs = np.abs(sorted_temperatures[left_positions] - flat_raw)
+
+    row_indices = np.repeat(np.arange(raw.shape[0]), raw.shape[1])
+    right_lat_distance = np.abs(right_indices - row_indices)
+    left_lat_distance = np.abs(left_indices - row_indices)
+    use_left = (left_diffs < right_diffs) | (
+        (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
+    )
+    matched_indices = np.where(use_left, left_indices, right_indices)
+    matched_latitudes = latitudes[matched_indices]
+    flat_result = 1.0 - np.abs(matched_latitudes) / max_abs_latitude
+    flat_result[~np.isfinite(flat_raw)] = np.nan
+    result = flat_result.reshape(raw.shape)
+
+    return np.asarray(np.clip(result, 0.0, 1.0), dtype=np.float32)
+
+
 def smooth_raw_temperature_for_thermal_displacement(
     raw_temperature_k: np.ndarray,
 ) -> np.ndarray:
@@ -448,6 +566,126 @@ def smooth_raw_temperature_for_thermal_displacement(
     )
 
 
+def smooth_lat_lon(values: np.ndarray, sigma_cells: float) -> np.ndarray:
+    sigma = max(float(sigma_cells), 0.0)
+    if sigma <= 0.0:
+        return np.asarray(values, dtype=np.float32)
+    return np.asarray(
+        gaussian_filter(
+            np.asarray(values, dtype=np.float32),
+            sigma=(sigma, sigma),
+            mode=("nearest", "wrap"),
+            truncate=3.0,
+        ),
+        dtype=np.float32,
+    )
+
+
+def horizontal_derivatives_per_km(
+    values: np.ndarray,
+    latitudes_deg: np.ndarray,
+    longitudes_deg: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    lat_rad = np.deg2rad(np.asarray(latitudes_deg, dtype=np.float64))
+    lon_rad = np.deg2rad(np.asarray(longitudes_deg, dtype=np.float64))
+    dlat = float(np.mean(np.abs(np.diff(lat_rad))))
+    dlon = float(np.mean(np.abs(np.diff(lon_rad))))
+    earth_radius_km = 6371.0
+
+    grad_north = (
+        np.gradient(values.astype(np.float64), dlat, axis=0, edge_order=1)
+        / earth_radius_km
+    )
+    east = np.roll(values, -1, axis=1)
+    west = np.roll(values, 1, axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        dvalue_dlon = (east - west) / (2.0 * dlon)
+        cos_lat = np.cos(lat_rad)[:, None]
+        safe_cos_lat = np.where(np.abs(cos_lat) < 1.0e-6, np.nan, cos_lat)
+        grad_east = dvalue_dlon / (earth_radius_km * safe_cos_lat)
+
+    return grad_east.astype(np.float32), grad_north.astype(np.float32)
+
+
+def temperature_front_mask(
+    raw_temperature_k: np.ndarray,
+    latitudes_deg: np.ndarray,
+    longitudes_deg: np.ndarray,
+    smooth_sigma_cells: float,
+    gradient_percentile: float,
+    exclude_tropics_abs_lat: float,
+    dilation_iterations: int,
+    min_cells: int,
+) -> tuple[np.ndarray, float]:
+    smoothed = smooth_lat_lon(raw_temperature_k, smooth_sigma_cells)
+    grad_east, grad_north = horizontal_derivatives_per_km(
+        smoothed,
+        latitudes_deg,
+        longitudes_deg,
+    )
+    gradient_mag = np.sqrt(np.square(grad_east) + np.square(grad_north))
+    mag_east, mag_north = horizontal_derivatives_per_km(
+        gradient_mag,
+        latitudes_deg,
+        longitudes_deg,
+    )
+    with np.errstate(invalid="ignore", divide="ignore"):
+        tfp = -((mag_east * grad_east) + (mag_north * grad_north)) / np.maximum(
+            gradient_mag,
+            1.0e-6,
+        )
+
+    gradient_k_per_100km = gradient_mag * 100.0
+    finite_gradient = gradient_k_per_100km[np.isfinite(gradient_k_per_100km)]
+    threshold = (
+        float(np.nanpercentile(finite_gradient, gradient_percentile))
+        if finite_gradient.size
+        else float("nan")
+    )
+    strong = gradient_k_per_100km >= threshold
+    strong &= np.abs(latitudes_deg[:, None]) >= float(exclude_tropics_abs_lat)
+    finite_tfp = np.isfinite(tfp)
+
+    east_crossing = finite_tfp & np.roll(finite_tfp, -1, axis=1)
+    east_crossing &= (tfp <= 0.0) != (np.roll(tfp, -1, axis=1) <= 0.0)
+    west_crossing = finite_tfp & np.roll(finite_tfp, 1, axis=1)
+    west_crossing &= (tfp <= 0.0) != (np.roll(tfp, 1, axis=1) <= 0.0)
+
+    north_crossing = np.zeros_like(strong, dtype=bool)
+    south_crossing = np.zeros_like(strong, dtype=bool)
+    north_crossing[1:, :] = (
+        finite_tfp[1:, :]
+        & finite_tfp[:-1, :]
+        & ((tfp[1:, :] <= 0.0) != (tfp[:-1, :] <= 0.0))
+    )
+    south_crossing[:-1, :] = (
+        finite_tfp[:-1, :]
+        & finite_tfp[1:, :]
+        & ((tfp[:-1, :] <= 0.0) != (tfp[1:, :] <= 0.0))
+    )
+
+    front = strong & (east_crossing | west_crossing | north_crossing | south_crossing)
+    for _ in range(max(int(dilation_iterations), 0)):
+        padded = np.pad(front, ((1, 1), (1, 1)), mode="constant", constant_values=False)
+        padded[1:-1, 0] = front[:, -1]
+        padded[1:-1, -1] = front[:, 0]
+        front = ndimage.binary_dilation(
+            padded,
+            structure=np.ones((3, 3), dtype=bool),
+        )[1:-1, 1:-1]
+
+    if min_cells > 1 and np.any(front):
+        labels, label_count = ndimage.label(front)
+        cleaned = np.zeros_like(front, dtype=bool)
+        for label_id in range(1, label_count + 1):
+            component = labels == label_id
+            if int(np.count_nonzero(component)) >= min_cells:
+                cleaned |= component
+        front = cleaned
+
+    return front.astype(np.float32), threshold
+
+
 def build_field(
     raw_temperature_k: np.ndarray,
     pressure_hpa: float,
@@ -457,6 +695,8 @@ def build_field(
     latitudes_deg: np.ndarray | None = None,
 ) -> np.ndarray:
     if field_kind == RAW_TEMPERATURE_FIELD_KIND:
+        return raw_temperature_k
+    if is_front_overlay_field_kind(field_kind):
         return raw_temperature_k
     if climatology is None:
         raise ValueError(f"Missing climatology for field kind: {field_kind}")
@@ -473,6 +713,21 @@ def build_field(
             if field_kind == THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND
             else raw_temperature_k
         )
+        if field_kind in {
+            THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND,
+            THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND,
+        }:
+            profile = climatology_zonal_profile(
+                climatology.values[level_index],
+                trim_fraction=0.1
+                if field_kind == THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND
+                else 0.0,
+            )
+            return thermal_displacement_zonal_profile_score(
+                raw_temperature_k=source_temperature,
+                climatology_latitude_profile_k=profile,
+                latitudes_deg=latitudes_deg,
+            )
         return thermal_displacement_latitude_score(
             raw_temperature_k=source_temperature,
             climatology_temperature_k=climatology.values[level_index],
@@ -776,6 +1031,69 @@ def build_saturation_timestamp_entry(
     }
 
 
+def build_front_overlay_timestamp_entry(
+    output_dir: Path,
+    raw_dataset: netCDF4.Dataset,
+    contents: DatasetContents,
+    timestamp: str,
+    time_index: int,
+    level_indices: list[int],
+    temperature_min_k: float,
+    temperature_max_k: float,
+    front_smooth_sigma_cells: float,
+    front_gradient_percentile: float,
+    front_exclude_tropics_abs_lat: float,
+    front_dilation_iterations: int,
+    front_min_cells: int,
+) -> dict:
+    slug = timestamp_to_slug(timestamp)
+    frame_dir = output_dir / slug
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    variable = raw_dataset.variables[DATASET_VARIABLE]
+    levels: list[dict[str, str | float]] = []
+
+    for level_index in level_indices:
+        pressure_hpa = float(contents.pressure_levels_hpa[level_index])
+        raw_temperature = np.asarray(variable[time_index, level_index, :, :], dtype=np.float32)
+        front_mask, gradient_threshold = temperature_front_mask(
+            raw_temperature_k=raw_temperature,
+            latitudes_deg=contents.latitudes_deg,
+            longitudes_deg=contents.longitudes_deg,
+            smooth_sigma_cells=front_smooth_sigma_cells,
+            gradient_percentile=front_gradient_percentile,
+            exclude_tropics_abs_lat=front_exclude_tropics_abs_lat,
+            dilation_iterations=front_dilation_iterations,
+            min_cells=front_min_cells,
+        )
+        encoded = encode_temperature_with_strength_to_rgba_uint8(
+            temperature_k=raw_temperature,
+            strength01=front_mask,
+            temperature_min_k=temperature_min_k,
+            temperature_max_k=temperature_max_k,
+        )
+        image_name = f"temperature-{int(round(pressure_hpa))}hpa.png"
+        image_path = frame_dir / image_name
+        Image.fromarray(encoded, mode="RGBA").save(image_path, optimize=True)
+        levels.append(
+            {
+                "pressure_hpa": pressure_hpa,
+                "image": str(image_path.relative_to(output_dir)).replace("\\", "/"),
+                "temperature_min_k": float(np.nanmin(raw_temperature)),
+                "temperature_max_k": float(np.nanmax(raw_temperature)),
+                "value_min": float(np.nanmin(raw_temperature)),
+                "value_max": float(np.nanmax(raw_temperature)),
+                "front_mask_fraction": float(np.count_nonzero(front_mask) / front_mask.size),
+                "front_gradient_threshold_k_per_100km": gradient_threshold,
+            }
+        )
+
+    levels.sort(key=lambda entry: float(entry["pressure_hpa"]))
+    return {
+        "timestamp": timestamp,
+        "levels": levels,
+    }
+
+
 def build_manifest(
     contents: DatasetContents,
     entries: list[dict],
@@ -788,6 +1106,7 @@ def build_manifest(
     variant_label: str,
     color_scale: str,
     saturation_strength_scale: float | None = None,
+    front_detection: dict | None = None,
 ) -> dict:
     pressures = sorted(float(contents.pressure_levels_hpa[index]) for index in level_indices)
     display_units = (
@@ -795,6 +1114,15 @@ def build_manifest(
         if is_thermal_displacement_field_kind(field_kind)
         else "K"
     )
+    if is_front_overlay_field_kind(field_kind):
+        encoding = FRONT_OVERLAY_ENCODING
+    elif is_signed_saturation_field_kind(field_kind):
+        encoding = "raw-temperature-uint16-rg-signed-saturation-b"
+    elif saturation_strength_scale is not None:
+        encoding = "raw-temperature-uint16-rg-saturation-strength-b"
+    else:
+        encoding = "normalized-temperature-uint16-packed-rg"
+
     manifest = {
         "version": OUTPUT_VERSION,
         "dataset": contents.dataset_path.name,
@@ -809,13 +1137,7 @@ def build_manifest(
             "kind": "full-field-pressure-slice",
             "filtering": "none",
             "color_scale": color_scale,
-            "encoding": (
-                "raw-temperature-uint16-rg-signed-saturation-b"
-                if is_signed_saturation_field_kind(field_kind)
-                else "raw-temperature-uint16-rg-saturation-strength-b"
-                if saturation_strength_scale is not None
-                else "normalized-temperature-uint16-packed-rg"
-            ),
+            "encoding": encoding,
         },
         "temperature_range_k": {
             "min": field_min,
@@ -850,6 +1172,9 @@ def build_manifest(
             else 0.0,
             "max": saturation_strength_scale,
         }
+
+    if front_detection is not None:
+        manifest["front_detection"] = front_detection
 
     return manifest
 
@@ -891,7 +1216,7 @@ def draw_border_ring(
     points = [(float(lon), float(lat)) for lon, lat, *_ in ring]
     for segment in split_dateline_segments(points):
         pixels = [lon_lat_to_pixel(lon, lat, width, height) for lon, lat in segment]
-        draw.line(pixels, fill=(255, 255, 255, 220), width=2, joint="curve")
+        draw.line(pixels, fill=(255, 255, 255, 220), width=1, joint="curve")
 
 
 def write_border_texture(output_dir: Path, width: int, height: int) -> str | None:
@@ -954,7 +1279,41 @@ def main() -> None:
     raw_dataset = netCDF4.Dataset(dataset_path)
     try:
         saturation_strength_scale: float | None = None
-        if is_saturation_encoded_field_kind(args.field_kind):
+        front_detection: dict | None = None
+        if is_front_overlay_field_kind(args.field_kind):
+            field_min, field_max = compute_raw_temperature_range(
+                raw_dataset=raw_dataset,
+                target_time_indices=target_time_indices,
+                level_indices=level_indices,
+            )
+            entries = [
+                build_front_overlay_timestamp_entry(
+                    output_dir=output_dir,
+                    raw_dataset=raw_dataset,
+                    contents=contents,
+                    timestamp=timestamp,
+                    time_index=time_index,
+                    level_indices=level_indices,
+                    temperature_min_k=field_min,
+                    temperature_max_k=field_max,
+                    front_smooth_sigma_cells=args.front_smooth_sigma_cells,
+                    front_gradient_percentile=args.front_gradient_percentile,
+                    front_exclude_tropics_abs_lat=args.front_exclude_tropics_abs_lat,
+                    front_dilation_iterations=args.front_dilation_iterations,
+                    front_min_cells=args.front_min_cells,
+                )
+                for timestamp, time_index in zip(target_timestamps, target_time_indices)
+            ]
+            front_detection = {
+                "method": "TFP-style zero crossing inside the strongest smoothed horizontal raw-temperature gradients",
+                "smooth_sigma_cells": float(args.front_smooth_sigma_cells),
+                "gradient_percentile": float(args.front_gradient_percentile),
+                "exclude_tropics_abs_lat": float(args.front_exclude_tropics_abs_lat),
+                "dilation_iterations": int(args.front_dilation_iterations),
+                "min_cells": int(args.front_min_cells),
+                "limitation": "This is a temperature-structure proxy for frontal zones, not a synoptic front analysis with winds or time evolution.",
+            }
+        elif is_saturation_encoded_field_kind(args.field_kind):
             field_min, field_max = compute_raw_temperature_range(
                 raw_dataset=raw_dataset,
                 target_time_indices=target_time_indices,
@@ -1023,6 +1382,7 @@ def main() -> None:
         variant_label=args.variant_label,
         color_scale=args.color_scale,
         saturation_strength_scale=saturation_strength_scale,
+        front_detection=front_detection,
     )
     border_texture = write_border_texture(
         output_dir=output_dir,

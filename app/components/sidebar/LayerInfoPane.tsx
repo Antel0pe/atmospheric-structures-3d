@@ -47,6 +47,15 @@ function metaRow(label: string, value: string) {
 }
 
 function temperatureSliceDescription(variant: TemperatureSliceVariant) {
+  if (variant === "raw-temperature-front-overlay") {
+    return "A full-map raw-temperature pressure slice with green overlays marking TFP-style front candidates from smoothed horizontal temperature gradients.";
+  }
+  if (variant === "thermal-displacement-zonal-trimmed-mean-latitude") {
+    return "A full-map pressure slice colored by the latitude whose middle-80% global climatology average is closest to each raw cell.";
+  }
+  if (variant === "thermal-displacement-zonal-mean-latitude") {
+    return "A full-map pressure slice colored by the latitude whose global climatology average is closest to each raw cell.";
+  }
   if (variant === "thermal-displacement-latitude-smoothed") {
     return "A full-map pressure slice colored by closest climatology latitude after smoothing the raw temperature map at a 20-cell scale.";
   }
@@ -65,7 +74,9 @@ function temperatureSliceDescription(variant: TemperatureSliceVariant) {
 function temperatureSliceUnits(variant: TemperatureSliceVariant) {
   if (
     variant === "thermal-displacement-latitude" ||
-    variant === "thermal-displacement-latitude-smoothed"
+    variant === "thermal-displacement-latitude-smoothed" ||
+    variant === "thermal-displacement-zonal-mean-latitude" ||
+    variant === "thermal-displacement-zonal-trimmed-mean-latitude"
   ) {
     return "Matched latitude";
   }

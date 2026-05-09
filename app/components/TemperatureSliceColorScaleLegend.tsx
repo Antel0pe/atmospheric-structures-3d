@@ -73,6 +73,7 @@ function isAbsoluteTemperatureFrame(frame: TemperatureSliceFrame) {
   return (
     frame.manifest.field_kind === undefined ||
     frame.manifest.field_kind === "raw-temperature" ||
+    frame.manifest.field_kind === "raw-temperature-front-overlay" ||
     frame.manifest.field_kind === "raw-temperature-vertical-coherence" ||
     frame.manifest.field_kind === "raw-temperature-anomaly-strength" ||
     frame.manifest.field_kind === "raw-temperature-anomaly-agreement"
@@ -82,7 +83,10 @@ function isAbsoluteTemperatureFrame(frame: TemperatureSliceFrame) {
 function isThermalDisplacementFrame(frame: TemperatureSliceFrame) {
   return (
     frame.manifest.field_kind === "thermal-displacement-latitude" ||
-    frame.manifest.field_kind === "thermal-displacement-latitude-smoothed"
+    frame.manifest.field_kind === "thermal-displacement-latitude-smoothed" ||
+    frame.manifest.field_kind === "thermal-displacement-zonal-mean-latitude" ||
+    frame.manifest.field_kind ===
+      "thermal-displacement-zonal-trimmed-mean-latitude"
   );
 }
 

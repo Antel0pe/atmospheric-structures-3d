@@ -139,6 +139,14 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Raw Temperature",
   },
   {
+    value: "raw-temperature-front-overlay",
+    label: "Raw Temperature + Fronts",
+  },
+  {
+    value: "thermal-displacement-latitude",
+    label: "Thermal Displacement",
+  },
+  {
     value: "temperature-minus-climatology",
     label: "Temperature - Climatology",
   },
@@ -155,12 +163,16 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Anomaly Agreement",
   },
   {
-    value: "thermal-displacement-latitude",
-    label: "Thermal Displacement",
-  },
-  {
     value: "thermal-displacement-latitude-smoothed",
     label: "Thermal Displacement Smooth",
+  },
+  {
+    value: "thermal-displacement-zonal-mean-latitude",
+    label: "Thermal Displacement Zonal Mean",
+  },
+  {
+    value: "thermal-displacement-zonal-trimmed-mean-latitude",
+    label: "Thermal Displacement Middle 80%",
   },
   {
     value: "potential-temperature-minus-climatology",

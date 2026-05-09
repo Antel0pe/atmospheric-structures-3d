@@ -126,11 +126,22 @@ describe("controls store", () => {
   });
 
   test("temperature slice variant labels include thermal displacement", () => {
+    expect(temperatureSliceVariantLabel("raw-temperature-front-overlay")).toBe(
+      "Raw Temperature + Fronts"
+    );
     expect(temperatureSliceVariantLabel("thermal-displacement-latitude")).toBe(
       "Thermal Displacement"
     );
     expect(
       temperatureSliceVariantLabel("thermal-displacement-latitude-smoothed")
     ).toBe("Thermal Displacement Smooth");
+    expect(
+      temperatureSliceVariantLabel("thermal-displacement-zonal-mean-latitude")
+    ).toBe("Thermal Displacement Zonal Mean");
+    expect(
+      temperatureSliceVariantLabel(
+        "thermal-displacement-zonal-trimmed-mean-latitude"
+      )
+    ).toBe("Thermal Displacement Middle 80%");
   });
 });
