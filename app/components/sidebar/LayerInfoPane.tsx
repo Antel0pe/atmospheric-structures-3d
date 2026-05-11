@@ -47,6 +47,9 @@ function metaRow(label: string, value: string) {
 }
 
 function temperatureSliceDescription(variant: TemperatureSliceVariant) {
+  if (variant === "thermal-conflict-neighborhood") {
+    return "A thermal-displacement conflict view: red and blue show warm-side versus cold-side air-mass character, while white/yellow marks nearby warm/cold opposition with local sharpness.";
+  }
   if (variant === "raw-temperature-front-overlay") {
     return "A full-map raw-temperature pressure slice with green overlays marking TFP-style front candidates from smoothed horizontal temperature gradients.";
   }
@@ -76,7 +79,8 @@ function temperatureSliceUnits(variant: TemperatureSliceVariant) {
     variant === "thermal-displacement-latitude" ||
     variant === "thermal-displacement-latitude-smoothed" ||
     variant === "thermal-displacement-zonal-mean-latitude" ||
-    variant === "thermal-displacement-zonal-trimmed-mean-latitude"
+    variant === "thermal-displacement-zonal-trimmed-mean-latitude" ||
+    variant === "thermal-conflict-neighborhood"
   ) {
     return "Matched latitude";
   }

@@ -175,6 +175,10 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Thermal Displacement Middle 80%",
   },
   {
+    value: "thermal-conflict-neighborhood",
+    label: "Thermal Conflict",
+  },
+  {
     value: "potential-temperature-minus-climatology",
     label: "Potential Temperature - Climatology",
   },
@@ -216,6 +220,7 @@ export type PrecipitableWaterLayerState = {
 export const TEMPERATURE_SLICE_COLOR_SCALE_OPTIONS = [
   { value: "global", label: "Global 250-1000 hPa" },
   { value: "perLevel", label: "Each pressure level" },
+  { value: "perLevelInferno", label: "Each pressure level inferno" },
   { value: "perLevelDiscrete", label: "Each pressure level discrete" },
 ] as const;
 

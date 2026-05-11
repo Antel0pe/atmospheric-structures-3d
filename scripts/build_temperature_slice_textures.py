@@ -53,8 +53,10 @@ THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND = (
 THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND = (
     "thermal-displacement-zonal-trimmed-mean-latitude"
 )
+THERMAL_CONFLICT_NEIGHBORHOOD_FIELD_KIND = "thermal-conflict-neighborhood"
 THERMAL_DISPLACEMENT_SMOOTH_SIGMA_CELLS = 20.0
 FRONT_OVERLAY_ENCODING = "raw-temperature-uint16-rg-front-mask-b"
+THERMAL_CONFLICT_ENCODING = "thermal-conflict-warmness-uint16-rg-conflict-b"
 DEFAULT_FRONT_SMOOTH_SIGMA_CELLS = 2.0
 DEFAULT_FRONT_GRADIENT_PERCENTILE = 96.0
 DEFAULT_FRONT_EXCLUDE_TROPICS_ABS_LAT = 20.0
@@ -134,6 +136,7 @@ def parse_args() -> argparse.Namespace:
             THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
             THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND,
             THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND,
+            THERMAL_CONFLICT_NEIGHBORHOOD_FIELD_KIND,
         ),
         help="Scalar field exported into the pressure-slice textures.",
     )
@@ -312,6 +315,7 @@ def resolve_climatology(
         THERMAL_DISPLACEMENT_LATITUDE_SMOOTHED_FIELD_KIND,
         THERMAL_DISPLACEMENT_ZONAL_MEAN_FIELD_KIND,
         THERMAL_DISPLACEMENT_ZONAL_TRIMMED_MEAN_FIELD_KIND,
+        THERMAL_CONFLICT_NEIGHBORHOOD_FIELD_KIND,
     }:
         path = climatology_path or DEFAULT_TEMPERATURE_CLIMATOLOGY_PATH
         return load_climatology_field(
@@ -435,6 +439,10 @@ def is_thermal_displacement_field_kind(field_kind: str) -> bool:
     }
 
 
+def is_thermal_conflict_field_kind(field_kind: str) -> bool:
+    return field_kind == THERMAL_CONFLICT_NEIGHBORHOOD_FIELD_KIND
+
+
 def dry_potential_temperature(
     temperature_k: np.ndarray,
     pressure_hpa: float,
@@ -550,6 +558,126 @@ def thermal_displacement_zonal_profile_score(
     result = flat_result.reshape(raw.shape)
 
     return np.asarray(np.clip(result, 0.0, 1.0), dtype=np.float32)
+
+
+def smoothstep_array(edge0: float, edge1: float, values: np.ndarray) -> np.ndarray:
+    value = np.asarray(values, dtype=np.float32)
+    if edge1 >= edge0:
+        t = np.clip((value - edge0) / max(edge1 - edge0, 1e-6), 0.0, 1.0)
+    else:
+        t = np.clip((edge0 - value) / max(edge0 - edge1, 1e-6), 0.0, 1.0)
+    return np.asarray(t * t * (3.0 - 2.0 * t), dtype=np.float32)
+
+
+def matched_zonal_mean_latitudes_same_hemisphere(
+    raw_temperature_k: np.ndarray,
+    climatology_latitude_profile_k: np.ndarray,
+    latitudes_deg: np.ndarray,
+) -> np.ndarray:
+    raw = np.asarray(raw_temperature_k, dtype=np.float32)
+    profile = np.asarray(climatology_latitude_profile_k, dtype=np.float32)
+    latitudes = np.asarray(latitudes_deg, dtype=np.float32)
+    result = np.full_like(raw, np.nan, dtype=np.float32)
+
+    for source_mask, candidate_mask in (
+        (latitudes >= 0.0, latitudes >= 0.0),
+        (latitudes < 0.0, latitudes < 0.0),
+    ):
+        valid = np.isfinite(profile) & candidate_mask
+        if not np.any(valid):
+            continue
+
+        valid_indices = np.flatnonzero(valid)
+        order = valid_indices[np.argsort(profile[valid], kind="mergesort")]
+        sorted_temperatures = profile[order]
+
+        source_rows = np.flatnonzero(source_mask)
+        source_values = raw[source_rows, :].reshape(-1)
+        insert_positions = np.searchsorted(sorted_temperatures, source_values)
+        right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
+        left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
+
+        right_indices = order[right_positions]
+        left_indices = order[left_positions]
+        right_diffs = np.abs(sorted_temperatures[right_positions] - source_values)
+        left_diffs = np.abs(sorted_temperatures[left_positions] - source_values)
+        repeated_rows = np.repeat(source_rows, raw.shape[1])
+        right_lat_distance = np.abs(right_indices - repeated_rows)
+        left_lat_distance = np.abs(left_indices - repeated_rows)
+        use_left = (left_diffs < right_diffs) | (
+            (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
+        )
+        matched_indices = np.where(use_left, left_indices, right_indices)
+        result[source_rows, :] = latitudes[matched_indices].reshape(source_rows.size, raw.shape[1])
+
+    return result
+
+
+def grid_gradient(values: np.ndarray) -> np.ndarray:
+    field = np.asarray(values, dtype=np.float64)
+    drow = np.gradient(field, axis=0, edge_order=2)
+    dcol = (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) * 0.5
+    return np.asarray(np.sqrt(np.square(drow) + np.square(dcol)), dtype=np.float32)
+
+
+def local_max_filter(values: np.ndarray, radius: int) -> np.ndarray:
+    size = 2 * radius + 1
+    return np.asarray(
+        ndimage.maximum_filter(
+            np.asarray(values, dtype=np.float32),
+            size=(size, size),
+            mode=("nearest", "wrap"),
+        ),
+        dtype=np.float32,
+    )
+
+
+def thermal_conflict_neighborhood_fields(
+    raw_temperature_k: np.ndarray,
+    climatology_temperature_k: np.ndarray,
+    latitudes_deg: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    source_temperature = smooth_lat_lon(raw_temperature_k, 1.0)
+    profile = climatology_zonal_profile(climatology_temperature_k)
+    matched_latitudes = matched_zonal_mean_latitudes_same_hemisphere(
+        source_temperature,
+        profile,
+        latitudes_deg,
+    )
+    max_abs_latitude = max(float(np.nanmax(np.abs(latitudes_deg))), 1e-6)
+    abs_matched_latitude = np.abs(matched_latitudes)
+    warmness = np.asarray(1.0 - abs_matched_latitude / max_abs_latitude, dtype=np.float32)
+    warmness[~np.isfinite(abs_matched_latitude)] = np.nan
+    warmness = smooth_lat_lon(warmness, 1.0)
+
+    warm_membership = smoothstep_array(55.0, 40.0, abs_matched_latitude)
+    cold_membership = smoothstep_array(40.0, 60.0, abs_matched_latitude)
+    warm_membership = smooth_lat_lon(warm_membership, 1.0)
+    cold_membership = smooth_lat_lon(cold_membership, 1.0)
+
+    local_gradient = grid_gradient(warmness)
+    finite_gradient = local_gradient[np.isfinite(local_gradient)]
+    gradient_display_max = (
+        float(np.nanpercentile(finite_gradient, 99.0))
+        if finite_gradient.size
+        else 1.0
+    )
+    local_gradient_norm = np.clip(local_gradient / max(gradient_display_max, 1e-6), 0.0, 1.0)
+
+    best_score = np.zeros_like(warmness, dtype=np.float32)
+    for radius in (3, 6, 12):
+        warm_near = local_max_filter(warm_membership, radius)
+        cold_near = local_max_filter(cold_membership, radius)
+        co_presence = np.sqrt(np.clip(warm_near * cold_near, 0.0, 1.0))
+        score = co_presence * np.sqrt(local_gradient_norm)
+        best_score = np.maximum(best_score, score.astype(np.float32))
+
+    abs_latitudes = np.abs(np.asarray(latitudes_deg, dtype=np.float32))[:, None]
+    equatorward_weight = smoothstep_array(20.0, 35.0, abs_latitudes)
+    poleward_weight = 1.0 - smoothstep_array(70.0, 82.0, abs_latitudes)
+    conflict = np.asarray(best_score * equatorward_weight * poleward_weight, dtype=np.float32)
+    conflict[~np.isfinite(warmness)] = 0.0
+    return np.asarray(np.clip(warmness, 0.0, 1.0), dtype=np.float32), np.clip(conflict, 0.0, 1.0)
 
 
 def smooth_raw_temperature_for_thermal_displacement(
@@ -817,7 +945,7 @@ def compute_field_range(
     field_kind: str,
     climatology: ClimatologyField | None,
 ) -> tuple[float, float]:
-    if is_thermal_displacement_field_kind(field_kind):
+    if is_thermal_displacement_field_kind(field_kind) or is_thermal_conflict_field_kind(field_kind):
         return 0.0, 1.0
 
     variable = raw_dataset.variables[DATASET_VARIABLE]
@@ -1094,6 +1222,60 @@ def build_front_overlay_timestamp_entry(
     }
 
 
+def build_thermal_conflict_timestamp_entry(
+    output_dir: Path,
+    raw_dataset: netCDF4.Dataset,
+    contents: DatasetContents,
+    timestamp: str,
+    time_index: int,
+    level_indices: list[int],
+    climatology: ClimatologyField,
+) -> dict:
+    slug = timestamp_to_slug(timestamp)
+    frame_dir = output_dir / slug
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    variable = raw_dataset.variables[DATASET_VARIABLE]
+    levels: list[dict[str, str | float]] = []
+
+    for level_index in level_indices:
+        pressure_hpa = float(contents.pressure_levels_hpa[level_index])
+        raw_temperature = np.asarray(variable[time_index, level_index, :, :], dtype=np.float32)
+        warmness, conflict = thermal_conflict_neighborhood_fields(
+            raw_temperature_k=raw_temperature,
+            climatology_temperature_k=climatology.values[level_index],
+            latitudes_deg=contents.latitudes_deg,
+        )
+        encoded = encode_temperature_with_strength_to_rgba_uint8(
+            temperature_k=warmness,
+            strength01=conflict,
+            temperature_min_k=0.0,
+            temperature_max_k=1.0,
+        )
+        image_name = f"temperature-{int(round(pressure_hpa))}hpa.png"
+        image_path = frame_dir / image_name
+        Image.fromarray(encoded, mode="RGBA").save(image_path, optimize=True)
+        levels.append(
+            {
+                "pressure_hpa": pressure_hpa,
+                "image": str(image_path.relative_to(output_dir)).replace("\\", "/"),
+                "temperature_min_k": 0.0,
+                "temperature_max_k": 1.0,
+                "value_min": float(np.nanmin(warmness)),
+                "value_max": float(np.nanmax(warmness)),
+                "conflict_min": float(np.nanmin(conflict)),
+                "conflict_max": float(np.nanmax(conflict)),
+                "conflict_p95": float(np.nanpercentile(conflict[np.isfinite(conflict)], 95.0)),
+                "conflict_p99": float(np.nanpercentile(conflict[np.isfinite(conflict)], 99.0)),
+            }
+        )
+
+    levels.sort(key=lambda entry: float(entry["pressure_hpa"]))
+    return {
+        "timestamp": timestamp,
+        "levels": levels,
+    }
+
+
 def build_manifest(
     contents: DatasetContents,
     entries: list[dict],
@@ -1112,9 +1294,12 @@ def build_manifest(
     display_units = (
         "equator-to-pole latitude match"
         if is_thermal_displacement_field_kind(field_kind)
+        or is_thermal_conflict_field_kind(field_kind)
         else "K"
     )
-    if is_front_overlay_field_kind(field_kind):
+    if is_thermal_conflict_field_kind(field_kind):
+        encoding = THERMAL_CONFLICT_ENCODING
+    elif is_front_overlay_field_kind(field_kind):
         encoding = FRONT_OVERLAY_ENCODING
     elif is_signed_saturation_field_kind(field_kind):
         encoding = "raw-temperature-uint16-rg-signed-saturation-b"
@@ -1175,6 +1360,21 @@ def build_manifest(
 
     if front_detection is not None:
         manifest["front_detection"] = front_detection
+
+    if is_thermal_conflict_field_kind(field_kind):
+        manifest["thermal_conflict"] = {
+            "thermal_identity": "hemisphere-constrained zonal-mean equivalent latitude",
+            "warm_full_abs_latitude_degrees": 40.0,
+            "warm_zero_abs_latitude_degrees": 55.0,
+            "cold_zero_abs_latitude_degrees": 40.0,
+            "cold_full_abs_latitude_degrees": 60.0,
+            "conflict_method": "neighborhood opposition plus local sharpness",
+            "neighborhood_radii_grid_cells": [3, 6, 12],
+            "conflict_midlatitude_weight": {
+                "fade_in_abs_latitude_degrees": [20.0, 35.0],
+                "fade_out_abs_latitude_degrees": [70.0, 82.0],
+            },
+        }
 
     return manifest
 
@@ -1313,6 +1513,22 @@ def main() -> None:
                 "min_cells": int(args.front_min_cells),
                 "limitation": "This is a temperature-structure proxy for frontal zones, not a synoptic front analysis with winds or time evolution.",
             }
+        elif is_thermal_conflict_field_kind(args.field_kind):
+            if climatology is None:
+                raise ValueError("Missing climatology for thermal conflict field.")
+            field_min, field_max = 0.0, 1.0
+            entries = [
+                build_thermal_conflict_timestamp_entry(
+                    output_dir=output_dir,
+                    raw_dataset=raw_dataset,
+                    contents=contents,
+                    timestamp=timestamp,
+                    time_index=time_index,
+                    level_indices=level_indices,
+                    climatology=climatology,
+                )
+                for timestamp, time_index in zip(target_timestamps, target_time_indices)
+            ]
         elif is_saturation_encoded_field_kind(args.field_kind):
             field_min, field_max = compute_raw_temperature_range(
                 raw_dataset=raw_dataset,

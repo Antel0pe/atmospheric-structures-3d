@@ -45,6 +45,19 @@ const DISCRETE_COLORS = [
   "rgb(158, 5, 6)",
 ];
 
+const INFERNO_STOPS = [
+  { position: 0, color: "rgb(0, 0, 4)" },
+  { position: 1 / 9, color: "rgb(27, 12, 65)" },
+  { position: 2 / 9, color: "rgb(74, 12, 107)" },
+  { position: 3 / 9, color: "rgb(120, 28, 109)" },
+  { position: 4 / 9, color: "rgb(165, 44, 96)" },
+  { position: 5 / 9, color: "rgb(207, 68, 70)" },
+  { position: 6 / 9, color: "rgb(237, 105, 37)" },
+  { position: 7 / 9, color: "rgb(251, 155, 6)" },
+  { position: 8 / 9, color: "rgb(247, 209, 61)" },
+  { position: 1, color: "rgb(252, 255, 164)" },
+];
+
 function parseCssPx(value: string) {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -90,6 +103,10 @@ function isThermalDisplacementFrame(frame: TemperatureSliceFrame) {
   );
 }
 
+function isThermalConflictFrame(frame: TemperatureSliceFrame) {
+  return frame.manifest.field_kind === "thermal-conflict-neighborhood";
+}
+
 function displayValue(value: number, frame: TemperatureSliceFrame) {
   if (isThermalDisplacementFrame(frame)) {
     return 90 - value * 90;
@@ -116,6 +133,20 @@ function continuousGradientCss() {
   return `linear-gradient(90deg, ${CONTINUOUS_STOPS.map(
     (stop) => `${stop.color} ${stop.position * 100}%`
   ).join(", ")})`;
+}
+
+function infernoGradientCss() {
+  return `linear-gradient(90deg, ${INFERNO_STOPS.map(
+    (stop) => `${stop.color} ${stop.position * 100}%`
+  ).join(", ")})`;
+}
+
+function thermalConflictIdentityGradientCss() {
+  return "linear-gradient(90deg, rgb(12, 48, 224) 0%, rgb(73, 71, 74) 50%, rgb(227, 27, 11) 100%)";
+}
+
+function thermalConflictSignalGradientCss() {
+  return "linear-gradient(90deg, rgba(73, 71, 74, 0.35) 0%, rgb(255, 219, 20) 62%, rgb(255, 250, 217) 100%)";
 }
 
 function discreteGradientCss() {
@@ -190,11 +221,21 @@ export default function TemperatureSliceColorScaleLegend({
       return null;
     }
 
+    if (isThermalConflictFrame(frame)) {
+      return {
+        thermalConflict: true,
+        discrete: false,
+        inferno: false,
+        ticks: [],
+      };
+    }
+
     const range =
       layer.colorScaleMode === "global"
         ? frame.manifest.temperature_range_k
         : pressurePairRange(frame);
     const discrete = layer.colorScaleMode === "perLevelDiscrete";
+    const inferno = layer.colorScaleMode === "perLevelInferno";
     const ticks = discrete
       ? Array.from({ length: DISCRETE_COLORS.length + 1 }, (_, index) => ({
           key: `boundary-${index}`,
@@ -212,6 +253,7 @@ export default function TemperatureSliceColorScaleLegend({
 
     return {
       discrete,
+      inferno,
       ticks,
     };
   }, [
@@ -264,6 +306,57 @@ export default function TemperatureSliceColorScaleLegend({
         Scale
       </div>
 
+      {legend.thermalConflict ? (
+        <div style={{ display: "grid", gap: 9 }}>
+          <div style={{ display: "grid", gap: 4 }}>
+            <div
+              style={{
+                height: 16,
+                borderRadius: 4,
+                border: "1px solid rgba(255, 255, 255, 0.24)",
+                background: thermalConflictIdentityGradientCss(),
+                boxShadow: "inset 0 0 0 1px rgba(0, 0, 0, 0.18)",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                color: "#f3f7fd",
+                font: "750 9px var(--font-mono)",
+                textShadow: "0 1px 3px rgba(0, 0, 0, 0.95)",
+              }}
+            >
+              <span>Cold-side</span>
+              <span>Muted</span>
+              <span>Warm-side</span>
+            </div>
+          </div>
+          <div style={{ display: "grid", gap: 4 }}>
+            <div
+              style={{
+                height: 10,
+                borderRadius: 4,
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                background: thermalConflictSignalGradientCss(),
+                boxShadow: "inset 0 0 0 1px rgba(0, 0, 0, 0.18)",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                color: "#f3f7fd",
+                font: "750 9px var(--font-mono)",
+                textShadow: "0 1px 3px rgba(0, 0, 0, 0.95)",
+              }}
+            >
+              <span>Low conflict</span>
+              <span>High conflict</span>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div style={{ position: "relative", height: 38 }}>
         <div
           style={{
@@ -274,6 +367,8 @@ export default function TemperatureSliceColorScaleLegend({
             border: "1px solid rgba(255, 255, 255, 0.24)",
             background: legend.discrete
               ? discreteGradientCss()
+              : legend.inferno
+                ? infernoGradientCss()
               : continuousGradientCss(),
             boxShadow: "inset 0 0 0 1px rgba(0, 0, 0, 0.18)",
           }}
@@ -318,6 +413,7 @@ export default function TemperatureSliceColorScaleLegend({
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 }

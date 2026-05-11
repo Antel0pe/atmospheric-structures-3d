@@ -120,6 +120,9 @@ describe("controls store", () => {
   });
 
   test("temperature slice color-scale labels include discrete per-level mode", () => {
+    expect(temperatureSliceColorScaleLabel("perLevelInferno")).toBe(
+      "Each pressure level inferno"
+    );
     expect(temperatureSliceColorScaleLabel("perLevelDiscrete")).toBe(
       "Each pressure level discrete"
     );
@@ -143,5 +146,8 @@ describe("controls store", () => {
         "thermal-displacement-zonal-trimmed-mean-latitude"
       )
     ).toBe("Thermal Displacement Middle 80%");
+    expect(temperatureSliceVariantLabel("thermal-conflict-neighborhood")).toBe(
+      "Thermal Conflict"
+    );
   });
 });

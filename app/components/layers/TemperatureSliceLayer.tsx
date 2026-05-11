@@ -50,6 +50,9 @@ function pressureToFlatHeight(pressureHpa: number, verticalExaggeration: number)
 function colorScaleModeUniformValue(
   colorScaleMode: TemperatureSliceLayerParams["colorScaleMode"]
 ) {
+  if (colorScaleMode === "perLevelInferno") {
+    return 3.0;
+  }
   if (colorScaleMode === "perLevelDiscrete") {
     return 2.0;
   }
@@ -156,6 +159,12 @@ function isSaturationEncodedManifest(manifest: TemperatureSliceManifest) {
 }
 
 function saturationModeForManifest(manifest: TemperatureSliceManifest) {
+  if (
+    manifest.rendering.encoding ===
+    "thermal-conflict-warmness-uint16-rg-conflict-b"
+  ) {
+    return 4.0;
+  }
   if (
     manifest.rendering.encoding === "raw-temperature-uint16-rg-front-mask-b"
   ) {
@@ -308,6 +317,68 @@ export default function TemperatureSliceLayer() {
           return vec3(0.620, 0.020, 0.025);
         }
 
+        vec3 infernoColor(float t) {
+          t = clamp(t, 0.0, 1.0);
+          vec3 c0 = vec3(0.000, 0.000, 0.016);
+          vec3 c1 = vec3(0.106, 0.047, 0.255);
+          vec3 c2 = vec3(0.290, 0.047, 0.420);
+          vec3 c3 = vec3(0.471, 0.110, 0.427);
+          vec3 c4 = vec3(0.647, 0.173, 0.376);
+          vec3 c5 = vec3(0.812, 0.267, 0.275);
+          vec3 c6 = vec3(0.929, 0.412, 0.145);
+          vec3 c7 = vec3(0.984, 0.608, 0.024);
+          vec3 c8 = vec3(0.969, 0.820, 0.239);
+          vec3 c9 = vec3(0.988, 1.000, 0.643);
+          if (t < 1.0 / 9.0) {
+            return mix(c0, c1, smoothstep(0.0, 1.0 / 9.0, t));
+          }
+          if (t < 2.0 / 9.0) {
+            return mix(c1, c2, smoothstep(1.0 / 9.0, 2.0 / 9.0, t));
+          }
+          if (t < 3.0 / 9.0) {
+            return mix(c2, c3, smoothstep(2.0 / 9.0, 3.0 / 9.0, t));
+          }
+          if (t < 4.0 / 9.0) {
+            return mix(c3, c4, smoothstep(3.0 / 9.0, 4.0 / 9.0, t));
+          }
+          if (t < 5.0 / 9.0) {
+            return mix(c4, c5, smoothstep(4.0 / 9.0, 5.0 / 9.0, t));
+          }
+          if (t < 6.0 / 9.0) {
+            return mix(c5, c6, smoothstep(5.0 / 9.0, 6.0 / 9.0, t));
+          }
+          if (t < 7.0 / 9.0) {
+            return mix(c6, c7, smoothstep(6.0 / 9.0, 7.0 / 9.0, t));
+          }
+          if (t < 8.0 / 9.0) {
+            return mix(c7, c8, smoothstep(7.0 / 9.0, 8.0 / 9.0, t));
+          }
+          return mix(c8, c9, smoothstep(8.0 / 9.0, 1.0, t));
+        }
+
+        float descendingSmoothstep(float highEdge, float lowEdge, float value) {
+          float t = clamp((highEdge - value) / max(highEdge - lowEdge, 0.000001), 0.0, 1.0);
+          return t * t * (3.0 - 2.0 * t);
+        }
+
+        vec3 thermalConflictColor(float warmness, float conflict) {
+          float equivalentAbsLatitude = (1.0 - clamp(warmness, 0.0, 1.0)) * 89.0;
+          float warmMember = descendingSmoothstep(55.0, 40.0, equivalentAbsLatitude);
+          float coldMember = smoothstep(40.0, 60.0, equivalentAbsLatitude);
+          vec3 neutralColor = vec3(0.285, 0.280, 0.290);
+          vec3 warmColor = vec3(0.890, 0.105, 0.045);
+          vec3 coldColor = vec3(0.045, 0.190, 0.880);
+          float dominance = max(warmMember, coldMember);
+          vec3 identityColor = warmMember >= coldMember ? warmColor : coldColor;
+          vec3 color = mix(neutralColor, identityColor, clamp(dominance, 0.0, 1.0));
+
+          float conflictStrength = smoothstep(0.18, 0.82, clamp(conflict, 0.0, 1.0));
+          float whiteCore = smoothstep(0.68, 1.0, conflictStrength);
+          vec3 conflictColor = mix(vec3(1.0, 0.860, 0.080), vec3(1.0, 0.980, 0.850), whiteCore);
+          float conflictAlpha = clamp((conflictStrength - 0.18) / 0.82, 0.0, 0.88);
+          return mix(color, conflictColor, conflictAlpha);
+        }
+
         float borderAlpha(vec2 uv) {
           vec2 clampedUv = clamp(uv, vec2(0.0), vec2(1.0));
           return texture2D(uBorderTex, clampedUv).a;
@@ -333,12 +404,17 @@ export default function TemperatureSliceLayer() {
           float globalValue = mix(valueA, valueB, clamp(uPressureMix, 0.0, 1.0));
           float levelValue = mix(levelValueA, levelValueB, clamp(uPressureMix, 0.0, 1.0));
           float value = uColorScaleMode > 0.5 ? levelValue : globalValue;
-          vec3 color = uColorScaleMode > 1.5
-            ? discreteTemperatureColor(value)
-            : temperatureColor(value);
+          vec3 color = temperatureColor(value);
+          if (uColorScaleMode > 2.5) {
+            color = infernoColor(value);
+          } else if (uColorScaleMode > 1.5) {
+            color = discreteTemperatureColor(value);
+          }
           float encodedStrength = mix(sampleA.b, sampleB.b, clamp(uPressureMix, 0.0, 1.0));
           float saturation = 1.0;
-          if (uSaturationMode > 2.5) {
+          if (uSaturationMode > 3.5) {
+            color = thermalConflictColor(globalValue, encodedStrength);
+          } else if (uSaturationMode > 2.5) {
             saturation = 1.0;
           } else if (uSaturationMode > 1.5) {
             float signedAnomaly = encodedStrength * 2.0 - 1.0;
@@ -352,7 +428,7 @@ export default function TemperatureSliceLayer() {
           }
           float luminance = dot(color, vec3(0.299, 0.587, 0.114));
           color = mix(vec3(luminance), color, clamp(saturation, 0.0, 1.0));
-          if (uSaturationMode > 2.5) {
+          if (uSaturationMode > 2.5 && uSaturationMode < 3.5) {
             float frontStrength = smoothstep(0.12, 0.72, encodedStrength);
             color = mix(color, vec3(0.030, 0.940, 0.360), frontStrength * 0.88);
           }

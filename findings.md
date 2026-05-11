@@ -74,7 +74,7 @@ additional constraings and thoughts
 - Simplicity is important. I prefer simple heuristics over complicated multi-term hybrids that may overfit or become too specific.
 - Possible next idea: identify cold and warm regimes first, then infer the transition/ribbon between them rather than directly detecting a one-cell line.
 - The transition should probably be a variable-width ribbon, since some warm/cold boundaries are sharp and others are broad or gradual.
-- he hard problem is defining “hot/warm” and “cold/chilly” in a meteorologically meaningful way.
+- the hard problem is defining “hot/warm” and “cold/chilly” in a meteorologically meaningful way.
 - The structure is not always a simple cold-transition-warm sequence; warm anomalies can be embedded inside cold regions, and there can be multiple local regimes.
 - Scale matters: I need to define whether I’m looking for hot vs cold, warm vs chilly, or smaller local contrasts.
 - The pole-cold / equator-warm assumption may work broadly, especially aloft, but may be weaker near the surface.
