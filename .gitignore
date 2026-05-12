@@ -1,11 +1,12 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-data/
+data
 tmp/
-/saved-views/
-notes/
-skills/structure-of-data/logs/
-skills/structure-probe/logs/
+/saved-views
+notes
+/.worktree-shared/
+skills/structure-of-data/logs
+skills/structure-probe/logs
 # dependencies
 /node_modules
 /.pnp
@@ -25,13 +26,16 @@ skills/structure-probe/logs/
 
 # production
 /build
-/public/moisture-structures/
-/public/potential-temperature-structures/
-/public/precipitable-water-proxy/
-/public/precipitation-radar/
-/public/relative-humidity-shell/
-/public/air-mass-structures/
-/public/temperature-slices/
+/public/moisture-structures
+/public/potential-temperature-structures
+/public/precipitable-water-proxy
+/public/precipitation-radar
+/public/relative-humidity-shell
+/public/air-mass-structures
+/public/temperature-slices
+
+
+worktree-scripts/
 
 # misc
 .DS_Store

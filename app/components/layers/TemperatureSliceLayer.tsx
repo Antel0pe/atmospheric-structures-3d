@@ -72,6 +72,7 @@ function applyLayerParams(
   material.uniforms.uColorScaleMode.value = colorScaleModeUniformValue(
     params.colorScaleMode
   );
+  material.uniforms.uColorMidpoint.value = params.colorMidpoint01;
   mesh.position.y = pressureToFlatHeight(params.pressureHpa, verticalExaggeration);
 }
 
@@ -244,6 +245,9 @@ export default function TemperatureSliceLayer() {
             state.temperatureSliceLayer.colorScaleMode
           ),
         },
+        uColorMidpoint: {
+          value: state.temperatureSliceLayer.colorMidpoint01,
+        },
         uSaturationMode: { value: 0.0 },
       },
       vertexShader: `
@@ -264,6 +268,7 @@ export default function TemperatureSliceLayer() {
         uniform float uPressureMix;
         uniform float uLayerOpacity;
         uniform float uColorScaleMode;
+        uniform float uColorMidpoint;
         uniform float uSaturationMode;
 
         varying vec2 vUv;
@@ -356,6 +361,21 @@ export default function TemperatureSliceLayer() {
           return mix(c8, c9, smoothstep(8.0 / 9.0, 1.0, t));
         }
 
+        float shiftColorMidpoint(float t) {
+          t = clamp(t, 0.0, 1.0);
+          float midpoint = clamp(uColorMidpoint, 0.0, 1.0);
+          if (midpoint <= 0.000001) {
+            return 0.5 + 0.5 * t;
+          }
+          if (midpoint >= 0.999999) {
+            return 0.5 * t;
+          }
+          if (t <= midpoint) {
+            return 0.5 * t / midpoint;
+          }
+          return 0.5 + 0.5 * (t - midpoint) / (1.0 - midpoint);
+        }
+
         float descendingSmoothstep(float highEdge, float lowEdge, float value) {
           float t = clamp((highEdge - value) / max(highEdge - lowEdge, 0.000001), 0.0, 1.0);
           return t * t * (3.0 - 2.0 * t);
@@ -403,7 +423,8 @@ export default function TemperatureSliceLayer() {
           );
           float globalValue = mix(valueA, valueB, clamp(uPressureMix, 0.0, 1.0));
           float levelValue = mix(levelValueA, levelValueB, clamp(uPressureMix, 0.0, 1.0));
-          float value = uColorScaleMode > 0.5 ? levelValue : globalValue;
+          float scaleValue = uColorScaleMode > 0.5 ? levelValue : globalValue;
+          float value = shiftColorMidpoint(scaleValue);
           vec3 color = temperatureColor(value);
           if (uColorScaleMode > 2.5) {
             color = infernoColor(value);
@@ -418,7 +439,7 @@ export default function TemperatureSliceLayer() {
             saturation = 1.0;
           } else if (uSaturationMode > 1.5) {
             float signedAnomaly = encodedStrength * 2.0 - 1.0;
-            float rawTemperatureSide = value < 0.5 ? -1.0 : 1.0;
+            float rawTemperatureSide = scaleValue < 0.5 ? -1.0 : 1.0;
             float agreement = rawTemperatureSide * signedAnomaly;
             saturation = agreement >= 0.0
               ? 0.18 + 0.82 * agreement

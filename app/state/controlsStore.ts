@@ -143,6 +143,10 @@ export const TEMPERATURE_SLICE_VARIANT_OPTIONS = [
     label: "Raw Temperature + Fronts",
   },
   {
+    value: "equivalent-potential-temperature",
+    label: "Equivalent Potential Temperature",
+  },
+  {
     value: "thermal-displacement-latitude",
     label: "Thermal Displacement",
   },
@@ -250,6 +254,7 @@ export type TemperatureSliceLayerState = {
   pressureHpa: number;
   variant: TemperatureSliceVariant;
   colorScaleMode: TemperatureSliceColorScaleMode;
+  colorMidpoint01: number;
 };
 
 export type PotentialTemperatureLayerState = {
@@ -338,7 +343,8 @@ export const useControls = create<ControlsState>()(
       opacity: 1,
       pressureHpa: 500,
       variant: "raw-temperature",
-      colorScaleMode: "global",
+      colorScaleMode: "perLevel",
+      colorMidpoint01: 0.5,
     },
     potentialTemperatureLayer: {
       visible: false,
@@ -404,13 +410,19 @@ export const useControls = create<ControlsState>()(
             ...state.temperatureSliceLayer,
             ...patch,
           };
+          nextLayer.colorMidpoint01 = Math.min(
+            Math.max(nextLayer.colorMidpoint01, 0),
+            1
+          );
           if (
             nextLayer.visible === state.temperatureSliceLayer.visible &&
             nextLayer.opacity === state.temperatureSliceLayer.opacity &&
             nextLayer.pressureHpa === state.temperatureSliceLayer.pressureHpa &&
             nextLayer.variant === state.temperatureSliceLayer.variant &&
             nextLayer.colorScaleMode ===
-              state.temperatureSliceLayer.colorScaleMode
+              state.temperatureSliceLayer.colorScaleMode &&
+            nextLayer.colorMidpoint01 ===
+              state.temperatureSliceLayer.colorMidpoint01
           ) {
             return state.temperatureSliceLayer;
           }

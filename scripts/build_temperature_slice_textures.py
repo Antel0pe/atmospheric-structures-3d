@@ -28,7 +28,9 @@ from scripts.simple_voxel_builder import (
 OUTPUT_VERSION = 1
 DATASET_VARIABLE = "t"
 DEFAULT_DATASET_PATH = Path("data/era5_temperature_2021-11_08-12.nc")
+DEFAULT_SPECIFIC_HUMIDITY_PATH = Path("data/era5_specific-humidity_2021-11_08-12.nc")
 RAW_TEMPERATURE_FIELD_KIND = "raw-temperature"
+EQUIVALENT_POTENTIAL_TEMPERATURE_FIELD_KIND = "equivalent-potential-temperature"
 TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND = "temperature-climatology-anomaly"
 POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND = (
     "potential-temperature-climatology-anomaly"
@@ -126,6 +128,7 @@ def parse_args() -> argparse.Namespace:
         default=RAW_TEMPERATURE_FIELD_KIND,
         choices=(
             RAW_TEMPERATURE_FIELD_KIND,
+            EQUIVALENT_POTENTIAL_TEMPERATURE_FIELD_KIND,
             TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
             POTENTIAL_TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND,
             RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
@@ -139,6 +142,15 @@ def parse_args() -> argparse.Namespace:
             THERMAL_CONFLICT_NEIGHBORHOOD_FIELD_KIND,
         ),
         help="Scalar field exported into the pressure-slice textures.",
+    )
+    parser.add_argument(
+        "--specific-humidity",
+        type=Path,
+        default=DEFAULT_SPECIFIC_HUMIDITY_PATH,
+        help=(
+            "Path to the ERA5 pressure-level specific humidity NetCDF file. "
+            "Used when --field-kind equivalent-potential-temperature."
+        ),
     )
     parser.add_argument(
         "--climatology",
@@ -302,6 +314,7 @@ def resolve_climatology(
 ) -> ClimatologyField | None:
     if field_kind in {
         RAW_TEMPERATURE_FIELD_KIND,
+        EQUIVALENT_POTENTIAL_TEMPERATURE_FIELD_KIND,
         RAW_TEMPERATURE_VERTICAL_COHERENCE_FIELD_KIND,
         RAW_TEMPERATURE_FRONT_OVERLAY_FIELD_KIND,
     }:
@@ -451,6 +464,53 @@ def dry_potential_temperature(
         temperature_k * (1000.0 / pressure_hpa) ** 0.285906374501992,
         dtype=np.float32,
     )
+
+
+def equivalent_potential_temperature(
+    temperature_k: np.ndarray,
+    specific_humidity_kgkg: np.ndarray,
+    pressure_hpa: float,
+) -> np.ndarray:
+    temperature = np.asarray(temperature_k, dtype=np.float32)
+    specific_humidity = np.clip(
+        np.asarray(specific_humidity_kgkg, dtype=np.float32),
+        0.0,
+        0.2,
+    )
+    pressure = max(float(pressure_hpa), 1.0)
+    epsilon = 0.622
+
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        mixing_ratio = specific_humidity / np.maximum(1.0 - specific_humidity, 1.0e-7)
+        vapor_pressure_hpa = (
+            specific_humidity
+            * pressure
+            / np.maximum(epsilon + (1.0 - epsilon) * specific_humidity, 1.0e-7)
+        )
+        vapor_pressure_hpa = np.maximum(vapor_pressure_hpa, 1.0e-6)
+        log_ratio = np.log(vapor_pressure_hpa / 6.112)
+        dewpoint_c = (243.5 * log_ratio) / np.maximum(17.67 - log_ratio, 1.0e-7)
+        dewpoint_k = dewpoint_c + 273.15
+        lifting_condensation_temperature_k = (
+            1.0
+            / (
+                1.0 / np.maximum(dewpoint_k - 56.0, 1.0e-7)
+                + np.log(np.maximum(temperature, 1.0) / np.maximum(dewpoint_k, 1.0))
+                / 800.0
+            )
+            + 56.0
+        )
+        theta = temperature * (1000.0 / pressure) ** (
+            0.2854 * (1.0 - 0.28 * mixing_ratio)
+        )
+        theta_e = theta * np.exp(
+            (3.376 / np.maximum(lifting_condensation_temperature_k, 1.0) - 0.00254)
+            * mixing_ratio
+            * 1000.0
+            * (1.0 + 0.81 * mixing_ratio)
+        )
+
+    return np.asarray(theta_e, dtype=np.float32)
 
 
 def thermal_displacement_latitude_score(
@@ -820,12 +880,21 @@ def build_field(
     level_index: int,
     field_kind: str,
     climatology: ClimatologyField | None,
+    specific_humidity_kgkg: np.ndarray | None = None,
     latitudes_deg: np.ndarray | None = None,
 ) -> np.ndarray:
     if field_kind == RAW_TEMPERATURE_FIELD_KIND:
         return raw_temperature_k
     if is_front_overlay_field_kind(field_kind):
         return raw_temperature_k
+    if field_kind == EQUIVALENT_POTENTIAL_TEMPERATURE_FIELD_KIND:
+        if specific_humidity_kgkg is None:
+            raise ValueError("Missing specific humidity for equivalent potential temperature.")
+        return equivalent_potential_temperature(
+            temperature_k=raw_temperature_k,
+            specific_humidity_kgkg=specific_humidity_kgkg,
+            pressure_hpa=pressure_hpa,
+        )
     if climatology is None:
         raise ValueError(f"Missing climatology for field kind: {field_kind}")
     if field_kind == TEMPERATURE_CLIMATOLOGY_ANOMALY_FIELD_KIND:
@@ -912,6 +981,63 @@ def read_raw_temperature_stack(
     return np.asarray(variable[time_index, level_indices, :, :], dtype=np.float32)
 
 
+def uses_specific_humidity(field_kind: str) -> bool:
+    return field_kind == EQUIVALENT_POTENTIAL_TEMPERATURE_FIELD_KIND
+
+
+def normalize_longitudes_360(longitudes_deg: np.ndarray) -> np.ndarray:
+    return np.asarray(np.mod(longitudes_deg, 360.0), dtype=np.float32)
+
+
+def longitudes_for_source_grid(
+    target_longitudes_deg: np.ndarray,
+    source_longitudes_deg: np.ndarray,
+) -> np.ndarray:
+    source = np.asarray(source_longitudes_deg, dtype=np.float32)
+    if np.nanmin(source) >= 0.0 and np.nanmax(source) > 180.0:
+        return normalize_longitudes_360(target_longitudes_deg)
+    return np.asarray(target_longitudes_deg, dtype=np.float32)
+
+
+def load_specific_humidity_stack(
+    specific_humidity_path: Path,
+    timestamp: str,
+    pressure_levels_hpa: np.ndarray,
+    latitudes_deg: np.ndarray,
+    longitudes_deg: np.ndarray,
+) -> np.ndarray:
+    dataset_path = resolve_dataset_path(specific_humidity_path)
+    dataset = xr.open_dataset(dataset_path)
+    try:
+        variable = dataset["q"]
+        selected = variable.sel(
+            valid_time=np.datetime64(timestamp),
+            pressure_level=xr.DataArray(pressure_levels_hpa, dims="pressure_level"),
+            latitude=xr.DataArray(latitudes_deg, dims="latitude"),
+            longitude=xr.DataArray(
+                longitudes_for_source_grid(
+                    target_longitudes_deg=longitudes_deg,
+                    source_longitudes_deg=np.asarray(variable.coords["longitude"].values),
+                ),
+                dims="longitude",
+            ),
+        )
+        return np.asarray(selected.values, dtype=np.float32)
+    finally:
+        dataset.close()
+
+
+def validate_specific_humidity_stack(
+    specific_humidity_stack: np.ndarray,
+    expected_shape: tuple[int, int, int],
+) -> None:
+    if specific_humidity_stack.shape != expected_shape:
+        raise ValueError(
+            "Specific humidity grid does not match selected temperature grid: "
+            f"expected {expected_shape}, got {specific_humidity_stack.shape}."
+        )
+
+
 def saturation_strength_stack(
     raw_stack_k: np.ndarray,
     pressure_levels_hpa: np.ndarray,
@@ -944,16 +1070,44 @@ def compute_field_range(
     level_indices: list[int],
     field_kind: str,
     climatology: ClimatologyField | None,
+    specific_humidity_path: Path | None = None,
 ) -> tuple[float, float]:
-    if is_thermal_displacement_field_kind(field_kind) or is_thermal_conflict_field_kind(field_kind):
+    if is_thermal_displacement_field_kind(
+        field_kind
+    ) or is_thermal_conflict_field_kind(field_kind):
         return 0.0, 1.0
 
     variable = raw_dataset.variables[DATASET_VARIABLE]
     data_min = np.inf
     data_max = -np.inf
 
-    for time_index in target_time_indices:
-        for level_index in level_indices:
+    for timestamp, time_index in zip(
+        (contents.timestamps[index] for index in target_time_indices),
+        target_time_indices,
+    ):
+        specific_humidity_stack = None
+        if uses_specific_humidity(field_kind):
+            if specific_humidity_path is None:
+                raise ValueError(
+                    "Missing specific humidity path for equivalent potential temperature."
+                )
+            specific_humidity_stack = load_specific_humidity_stack(
+                specific_humidity_path=specific_humidity_path,
+                timestamp=timestamp,
+                pressure_levels_hpa=contents.pressure_levels_hpa[level_indices],
+                latitudes_deg=contents.latitudes_deg,
+                longitudes_deg=contents.longitudes_deg,
+            )
+            validate_specific_humidity_stack(
+                specific_humidity_stack,
+                (
+                    len(level_indices),
+                    contents.latitudes_deg.size,
+                    contents.longitudes_deg.size,
+                ),
+            )
+
+        for stack_index, level_index in enumerate(level_indices):
             pressure_hpa = float(contents.pressure_levels_hpa[level_index])
             raw_temperature = np.asarray(
                 variable[time_index, level_index, :, :],
@@ -965,6 +1119,9 @@ def compute_field_range(
                 level_index=level_index,
                 field_kind=field_kind,
                 climatology=climatology,
+                specific_humidity_kgkg=None
+                if specific_humidity_stack is None
+                else specific_humidity_stack[stack_index],
                 latitudes_deg=contents.latitudes_deg,
             )
             data_min = min(data_min, float(np.nanmin(field)))
@@ -1043,6 +1200,7 @@ def build_timestamp_entry(
     field_max: float,
     field_kind: str,
     climatology: ClimatologyField | None,
+    specific_humidity_stack: np.ndarray | None = None,
 ) -> dict:
     slug = timestamp_to_slug(timestamp)
     frame_dir = output_dir / slug
@@ -1050,7 +1208,17 @@ def build_timestamp_entry(
     variable = raw_dataset.variables[DATASET_VARIABLE]
     levels: list[dict[str, str | float]] = []
 
-    for level_index in level_indices:
+    if specific_humidity_stack is not None:
+        validate_specific_humidity_stack(
+            specific_humidity_stack,
+            (
+                len(level_indices),
+                contents.latitudes_deg.size,
+                contents.longitudes_deg.size,
+            ),
+        )
+
+    for stack_index, level_index in enumerate(level_indices):
         pressure_hpa = float(contents.pressure_levels_hpa[level_index])
         raw_temperature = np.asarray(variable[time_index, level_index, :, :], dtype=np.float32)
         field = build_field(
@@ -1059,6 +1227,9 @@ def build_timestamp_entry(
             level_index=level_index,
             field_kind=field_kind,
             climatology=climatology,
+            specific_humidity_kgkg=None
+            if specific_humidity_stack is None
+            else specific_humidity_stack[stack_index],
             latitudes_deg=contents.latitudes_deg,
         )
         encoded = encode_field_to_rgba_uint8(
@@ -1289,6 +1460,7 @@ def build_manifest(
     color_scale: str,
     saturation_strength_scale: float | None = None,
     front_detection: dict | None = None,
+    specific_humidity_path: Path | None = None,
 ) -> dict:
     pressures = sorted(float(contents.pressure_levels_hpa[index]) for index in level_indices)
     display_units = (
@@ -1318,6 +1490,9 @@ def build_manifest(
         "variant_label": variant_label,
         "field_kind": field_kind,
         "climatology_dataset": climatology.dataset_path.name if climatology else None,
+        "specific_humidity_dataset": specific_humidity_path.name
+        if specific_humidity_path
+        else None,
         "rendering": {
             "kind": "full-field-pressure-slice",
             "filtering": "none",
@@ -1374,6 +1549,13 @@ def build_manifest(
                 "fade_in_abs_latitude_degrees": [20.0, 35.0],
                 "fade_out_abs_latitude_degrees": [70.0, 82.0],
             },
+        }
+
+    if field_kind == EQUIVALENT_POTENTIAL_TEMPERATURE_FIELD_KIND:
+        manifest["equivalent_potential_temperature"] = {
+            "method": "Bolton-style theta-e from pressure-level temperature and specific humidity",
+            "inputs": ["temperature", "specific_humidity", "pressure_level"],
+            "specific_humidity_alignment": "selected onto the temperature latitude/longitude grid before calculation",
         }
 
     return manifest
@@ -1567,22 +1749,36 @@ def main() -> None:
                 level_indices=level_indices,
                 field_kind=args.field_kind,
                 climatology=climatology,
+                specific_humidity_path=args.specific_humidity
+                if uses_specific_humidity(args.field_kind)
+                else None,
             )
-            entries = [
-                build_timestamp_entry(
-                    output_dir=output_dir,
-                    raw_dataset=raw_dataset,
-                    contents=contents,
-                    timestamp=timestamp,
-                    time_index=time_index,
-                    level_indices=level_indices,
-                    field_min=field_min,
-                    field_max=field_max,
-                    field_kind=args.field_kind,
-                    climatology=climatology,
+            entries = []
+            for timestamp, time_index in zip(target_timestamps, target_time_indices):
+                specific_humidity_stack = None
+                if uses_specific_humidity(args.field_kind):
+                    specific_humidity_stack = load_specific_humidity_stack(
+                        specific_humidity_path=args.specific_humidity,
+                        timestamp=timestamp,
+                        pressure_levels_hpa=contents.pressure_levels_hpa[level_indices],
+                        latitudes_deg=contents.latitudes_deg,
+                        longitudes_deg=contents.longitudes_deg,
+                    )
+                entries.append(
+                    build_timestamp_entry(
+                        output_dir=output_dir,
+                        raw_dataset=raw_dataset,
+                        contents=contents,
+                        timestamp=timestamp,
+                        time_index=time_index,
+                        level_indices=level_indices,
+                        field_min=field_min,
+                        field_max=field_max,
+                        field_kind=args.field_kind,
+                        climatology=climatology,
+                        specific_humidity_stack=specific_humidity_stack,
+                    )
                 )
-                for timestamp, time_index in zip(target_timestamps, target_time_indices)
-            ]
     finally:
         raw_dataset.close()
 
@@ -1599,6 +1795,9 @@ def main() -> None:
         color_scale=args.color_scale,
         saturation_strength_scale=saturation_strength_scale,
         front_detection=front_detection,
+        specific_humidity_path=resolve_dataset_path(args.specific_humidity)
+        if uses_specific_humidity(args.field_kind)
+        else None,
     )
     border_texture = write_border_texture(
         output_dir=output_dir,

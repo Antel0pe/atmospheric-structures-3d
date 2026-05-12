@@ -129,15 +129,28 @@ function valueAt(range: TemperatureRange, position: number) {
   return range.min + (range.max - range.min) * position;
 }
 
-function continuousGradientCss() {
+function shiftedStopPosition(position: number, midpoint01: number) {
+  const midpoint = Math.min(Math.max(midpoint01, 0), 1);
+  if (position <= 0.5) {
+    return Math.min(Math.max(position * 2 * midpoint, 0), 1);
+  }
+  return Math.min(
+    Math.max(midpoint + (position - 0.5) * 2 * (1 - midpoint), 0),
+    1
+  );
+}
+
+function continuousGradientCss(midpoint01: number) {
   return `linear-gradient(90deg, ${CONTINUOUS_STOPS.map(
-    (stop) => `${stop.color} ${stop.position * 100}%`
+    (stop) =>
+      `${stop.color} ${shiftedStopPosition(stop.position, midpoint01) * 100}%`
   ).join(", ")})`;
 }
 
-function infernoGradientCss() {
+function infernoGradientCss(midpoint01: number) {
   return `linear-gradient(90deg, ${INFERNO_STOPS.map(
-    (stop) => `${stop.color} ${stop.position * 100}%`
+    (stop) =>
+      `${stop.color} ${shiftedStopPosition(stop.position, midpoint01) * 100}%`
   ).join(", ")})`;
 }
 
@@ -149,11 +162,13 @@ function thermalConflictSignalGradientCss() {
   return "linear-gradient(90deg, rgba(73, 71, 74, 0.35) 0%, rgb(255, 219, 20) 62%, rgb(255, 250, 217) 100%)";
 }
 
-function discreteGradientCss() {
-  const step = 100 / DISCRETE_COLORS.length;
+function discreteGradientCss(midpoint01: number) {
   return `linear-gradient(90deg, ${DISCRETE_COLORS.map((color, index) => {
-    const start = index * step;
-    const end = (index + 1) * step;
+    const start =
+      shiftedStopPosition(index / DISCRETE_COLORS.length, midpoint01) * 100;
+    const end =
+      shiftedStopPosition((index + 1) / DISCRETE_COLORS.length, midpoint01) *
+      100;
     return `${color} ${start}% ${end}%`;
   }).join(", ")})`;
 }
@@ -239,16 +254,28 @@ export default function TemperatureSliceColorScaleLegend({
     const ticks = discrete
       ? Array.from({ length: DISCRETE_COLORS.length + 1 }, (_, index) => ({
           key: `boundary-${index}`,
-          position: index / DISCRETE_COLORS.length,
+          position: shiftedStopPosition(
+            index / DISCRETE_COLORS.length,
+            layer.colorMidpoint01
+          ),
           label: formatLegendValue(
-            valueAt(range, index / DISCRETE_COLORS.length),
+            valueAt(
+              range,
+              shiftedStopPosition(
+                index / DISCRETE_COLORS.length,
+                layer.colorMidpoint01
+              )
+            ),
             frame
           ),
         }))
       : CONTINUOUS_STOPS.map((stop) => ({
           key: `stop-${stop.position}`,
-          position: stop.position,
-          label: formatLegendValue(valueAt(range, stop.position), frame),
+          position: shiftedStopPosition(stop.position, layer.colorMidpoint01),
+          label: formatLegendValue(
+            valueAt(range, shiftedStopPosition(stop.position, layer.colorMidpoint01)),
+            frame
+          ),
         }));
 
     return {
@@ -258,6 +285,7 @@ export default function TemperatureSliceColorScaleLegend({
     };
   }, [
     layer.colorScaleMode,
+    layer.colorMidpoint01,
     layer.pressureHpa,
     layer.variant,
     layer.visible,
@@ -366,10 +394,10 @@ export default function TemperatureSliceColorScaleLegend({
             borderRadius: 4,
             border: "1px solid rgba(255, 255, 255, 0.24)",
             background: legend.discrete
-              ? discreteGradientCss()
+              ? discreteGradientCss(layer.colorMidpoint01)
               : legend.inferno
-                ? infernoGradientCss()
-              : continuousGradientCss(),
+                ? infernoGradientCss(layer.colorMidpoint01)
+              : continuousGradientCss(layer.colorMidpoint01),
             boxShadow: "inset 0 0 0 1px rgba(0, 0, 0, 0.18)",
           }}
         />

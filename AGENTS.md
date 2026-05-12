@@ -46,6 +46,8 @@ When to update:
 
 Treat the notes as an active tool. Before major brainstorming, planning, or implementation work in this repo, check whether the notes contain relevant context and refresh them if needed.
 
+In git worktrees, `notes/` may be a symlink to shared local state created by `worktree-scripts/setup-worktree.sh`. Re-read the specific note immediately before editing it, keep updates append-oriented, and use `worktree-scripts/with-shared-notes-lock.sh -- <command>` for scripted or bulk notes edits.
+
 # Local Skills
 
 This repo includes two local-only meteorological diagnostic skills under `skills/`:

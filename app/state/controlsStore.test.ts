@@ -28,7 +28,8 @@ describe("controls store", () => {
       opacity: 1,
       pressureHpa: 500,
       variant: "raw-temperature",
-      colorScaleMode: "global",
+      colorScaleMode: "perLevel",
+      colorMidpoint01: 0.5,
     });
     expect(state.potentialTemperatureLayer).toEqual({
       visible: false,
@@ -58,6 +59,7 @@ describe("controls store", () => {
       visible: true,
       variant: "temperature-minus-climatology",
       colorScaleMode: "perLevelDiscrete",
+      colorMidpoint01: 0.74,
     });
     controls.setPotentialTemperatureLayer({
       visible: true,
@@ -83,6 +85,7 @@ describe("controls store", () => {
       pressureHpa: 500,
       variant: "temperature-minus-climatology",
       colorScaleMode: "perLevelDiscrete",
+      colorMidpoint01: 0.74,
     });
     expect(nextState.potentialTemperatureLayer).toMatchObject({
       visible: true,

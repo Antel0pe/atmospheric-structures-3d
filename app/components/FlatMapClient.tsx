@@ -21,7 +21,8 @@ export default function FlatMapClient() {
       pressureHpa: 500,
       opacity: 1,
       variant: "raw-temperature",
-      colorScaleMode: "global",
+      colorScaleMode: "perLevel",
+      colorMidpoint01: 0.5,
     });
   }, []);
 

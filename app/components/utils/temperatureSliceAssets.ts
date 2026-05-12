@@ -28,6 +28,7 @@ export type TemperatureSliceManifest = {
   variant_label?: string;
   field_kind?:
     | "raw-temperature"
+    | "equivalent-potential-temperature"
     | "temperature-climatology-anomaly"
     | "potential-temperature-climatology-anomaly"
     | "raw-temperature-vertical-coherence"

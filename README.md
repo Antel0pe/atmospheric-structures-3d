@@ -15,6 +15,16 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Worktrees
+
+After creating a git worktree, run:
+
+```bash
+scripts/setup-worktree.sh
+```
+
+This links raw data, generated public viewer assets, notes, saved views, and diagnostic logs into shared local state while keeping `tmp/`, `.next/`, and `node_modules/` per worktree. See `docs/worktrees.md` for the full layout and cleanup commands.
+
 ## Fast Playwright Capture
 
 Use the repo-local capture workflow when you want a deterministic screenshot of the fully loaded WebGL app:

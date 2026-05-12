@@ -1,18 +1,41 @@
 "use client";
 
-import { useMemo, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import {
   temperatureSliceColorScaleLabel,
   type TemperatureSliceVariant,
   temperatureSliceVariantLabel,
   useControls,
 } from "@/app/state/controlsStore";
+import { useViewerStore } from "@/app/state/viewerStore";
+import {
+  fetchTemperatureSliceFrame,
+  type TemperatureSliceFrame,
+} from "@/app/components/utils/temperatureSliceAssets";
 
 type ActiveLayerInfo = {
   title: string;
   badge?: string;
   tag: string;
   description: string;
+};
+
+type TemperatureRange = {
+  min: number;
+  max: number;
+};
+
+type LoadedTemperatureFrame = {
+  frame: TemperatureSliceFrame;
+  timestamp: string;
+  pressureHpa: number;
+  variant: TemperatureSliceVariant;
 };
 
 const PRESSURE_LEVELS = [250, 500, 700, 850, 1000];
@@ -53,6 +76,9 @@ function temperatureSliceDescription(variant: TemperatureSliceVariant) {
   if (variant === "raw-temperature-front-overlay") {
     return "A full-map raw-temperature pressure slice with green overlays marking TFP-style front candidates from smoothed horizontal temperature gradients.";
   }
+  if (variant === "equivalent-potential-temperature") {
+    return "A full-map pressure slice of equivalent potential temperature derived from ERA5 pressure-level temperature and specific humidity.";
+  }
   if (variant === "thermal-displacement-zonal-trimmed-mean-latitude") {
     return "A full-map pressure slice colored by the latitude whose middle-80% global climatology average is closest to each raw cell.";
   }
@@ -84,7 +110,68 @@ function temperatureSliceUnits(variant: TemperatureSliceVariant) {
   ) {
     return "Matched latitude";
   }
+  if (variant === "equivalent-potential-temperature") {
+    return "K";
+  }
   return "°C";
+}
+
+function pressurePairRange(frame: TemperatureSliceFrame): TemperatureRange {
+  const { lower, upper, mix } = frame.pressurePair;
+  return {
+    min:
+      lower.temperature_min_k +
+      (upper.temperature_min_k - lower.temperature_min_k) * mix,
+    max:
+      lower.temperature_max_k +
+      (upper.temperature_max_k - lower.temperature_max_k) * mix,
+  };
+}
+
+function isAbsoluteTemperatureFrame(frame: TemperatureSliceFrame) {
+  return (
+    frame.manifest.field_kind === undefined ||
+    frame.manifest.field_kind === "raw-temperature" ||
+    frame.manifest.field_kind === "raw-temperature-front-overlay" ||
+    frame.manifest.field_kind === "raw-temperature-vertical-coherence" ||
+    frame.manifest.field_kind === "raw-temperature-anomaly-strength" ||
+    frame.manifest.field_kind === "raw-temperature-anomaly-agreement"
+  );
+}
+
+function isThermalDisplacementFrame(frame: TemperatureSliceFrame) {
+  return (
+    frame.manifest.field_kind === "thermal-displacement-latitude" ||
+    frame.manifest.field_kind === "thermal-displacement-latitude-smoothed" ||
+    frame.manifest.field_kind === "thermal-displacement-zonal-mean-latitude" ||
+    frame.manifest.field_kind ===
+      "thermal-displacement-zonal-trimmed-mean-latitude"
+  );
+}
+
+function displayTemperatureScaleValue(value: number, frame: TemperatureSliceFrame) {
+  if (isThermalDisplacementFrame(frame)) {
+    return 90 - value * 90;
+  }
+  return isAbsoluteTemperatureFrame(frame) ? value - 273.15 : value;
+}
+
+function formatTemperatureScaleValue(
+  value: number,
+  frame: TemperatureSliceFrame
+) {
+  const display = displayTemperatureScaleValue(value, frame);
+  if (isThermalDisplacementFrame(frame)) {
+    return `${display.toFixed(0)}°`;
+  }
+  const abs = Math.abs(display);
+  if (abs >= 100) return display.toFixed(0);
+  if (abs >= 10) return display.toFixed(1);
+  return display.toFixed(2);
+}
+
+function valueAt(range: TemperatureRange, position: number) {
+  return range.min + (range.max - range.min) * position;
 }
 
 function TemperaturePressureControl({
@@ -164,7 +251,66 @@ function TemperaturePressureControl({
   );
 }
 
+function TemperatureColorMidpointControl({
+  frame,
+  colorScaleMode,
+  midpoint01,
+  onChange,
+}: {
+  frame: TemperatureSliceFrame | null;
+  colorScaleMode: string;
+  midpoint01: number;
+  onChange: (midpoint01: number) => void;
+}) {
+  const range =
+    frame && colorScaleMode === "global"
+      ? frame.manifest.temperature_range_k
+      : frame
+        ? pressurePairRange(frame)
+        : null;
+  const midpointValue = range ? valueAt(range, midpoint01) : null;
+  const minLabel =
+    range && frame ? formatTemperatureScaleValue(range.min, frame) : "Min";
+  const maxLabel =
+    range && frame ? formatTemperatureScaleValue(range.max, frame) : "Max";
+  const midpointLabel =
+    midpointValue !== null && frame
+      ? formatTemperatureScaleValue(midpointValue, frame)
+      : `${Math.round(midpoint01 * 100)}%`;
+
+  return (
+    <label className="atm-field">
+      <div>
+        <span>Color Midpoint</span>
+        <span>{midpointLabel}</span>
+      </div>
+      <input
+        aria-label="Temperature slice color midpoint"
+        type="range"
+        min={0}
+        max={1}
+        step={0.001}
+        value={midpoint01}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        style={{ width: "100%", accentColor: "#f6f7f0" }}
+      />
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          color: "rgba(202, 213, 228, 0.78)",
+          font: "750 9px var(--font-mono)",
+        }}
+      >
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
+    </label>
+  );
+}
+
 export default function LayerInfoPane() {
+  const timestamp = useViewerStore((state) => state.timestamp);
   const precipitableWaterLayer = useControls(
     (state) => state.precipitableWaterLayer
   );
@@ -179,6 +325,55 @@ export default function LayerInfoPane() {
   const setTemperatureSliceLayer = useControls(
     (state) => state.setTemperatureSliceLayer
   );
+  const [loadedTemperatureFrame, setLoadedTemperatureFrame] =
+    useState<LoadedTemperatureFrame | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!temperatureSliceLayer.visible) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void fetchTemperatureSliceFrame(timestamp, temperatureSliceLayer.pressureHpa, {
+      variant: temperatureSliceLayer.variant,
+      notifyOnError: false,
+    })
+      .then((frame) => {
+        if (!cancelled) {
+          setLoadedTemperatureFrame({
+            frame,
+            timestamp,
+            pressureHpa: temperatureSliceLayer.pressureHpa,
+            variant: temperatureSliceLayer.variant,
+          });
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load temperature slice midpoint range", error);
+          setLoadedTemperatureFrame(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    temperatureSliceLayer.pressureHpa,
+    temperatureSliceLayer.variant,
+    temperatureSliceLayer.visible,
+    timestamp,
+  ]);
+
+  const temperatureFrame =
+    loadedTemperatureFrame?.timestamp === timestamp &&
+    loadedTemperatureFrame.pressureHpa === temperatureSliceLayer.pressureHpa &&
+    loadedTemperatureFrame.variant === temperatureSliceLayer.variant
+      ? loadedTemperatureFrame.frame
+      : null;
 
   const primaryLayer = useMemo<ActiveLayerInfo | null>(() => {
     if (temperatureSliceLayer.visible) {
@@ -292,6 +487,18 @@ export default function LayerInfoPane() {
                 pressureHpa={temperatureSliceLayer.pressureHpa}
                 onChange={(pressureHpa) =>
                   setTemperatureSliceLayer({ pressureHpa })
+                }
+              />
+            </section>
+
+            <section style={panelSectionStyle()}>
+              <div style={titleStyle()}>Color Scale</div>
+              <TemperatureColorMidpointControl
+                frame={temperatureFrame}
+                colorScaleMode={temperatureSliceLayer.colorScaleMode}
+                midpoint01={temperatureSliceLayer.colorMidpoint01}
+                onChange={(colorMidpoint01) =>
+                  setTemperatureSliceLayer({ colorMidpoint01 })
                 }
               />
             </section>
