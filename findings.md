@@ -80,3 +80,8 @@ additional constraings and thoughts
 - The pole-cold / equator-warm assumption may work broadly, especially aloft, but may be weaker near the surface.
 - I’m wondering whether temperature alone is making this problem unnecessarily hard.
 - At upper levels, especially around 250 hPa, jet-stream structure may make the warm/cold divide much easier and more meteorologically grounded.
+
+the smallest bucket thing probably works best because it finds areas of rapid change like an isoterm does
+- however given this single range globally to find areas of hot + cold air is maybe not accurate because different air masses collide in different ways
+- smoothing the temperature buckets before picking minima is good 
+- equivalent latitude isotherms are terrible perhaps because of the rapid precise changes? 
