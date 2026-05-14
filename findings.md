@@ -85,3 +85,7 @@ the smallest bucket thing probably works best because it finds areas of rapid ch
 - however given this single range globally to find areas of hot + cold air is maybe not accurate because different air masses collide in different ways
 - smoothing the temperature buckets before picking minima is good 
 - equivalent latitude isotherms are terrible perhaps because of the rapid precise changes? 
+
+- there are multiple collision zones of rapid raw temperature isotherm change. at 250 at the south mid latitudes there is a smooshed hot side and then smooshed cold side. sometimes the hot and cold directly push up against each other. 
+- been generating only 250,500,850,1000 for fast iteration sake but try to see if the boundaries tilt with height between levels - that might be a good test
+- seems to be best result so far thermal-displacement-bucket-stats-middle60-smoothed-sigma1-2021-11-08T12 due to the smoothing seeming to actually pick the lowest bucket globally instead of random 1 off low bucket count in a field of high bucket counts
