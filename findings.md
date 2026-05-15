@@ -89,3 +89,12 @@ the smallest bucket thing probably works best because it finds areas of rapid ch
 - there are multiple collision zones of rapid raw temperature isotherm change. at 250 at the south mid latitudes there is a smooshed hot side and then smooshed cold side. sometimes the hot and cold directly push up against each other. 
 - been generating only 250,500,850,1000 for fast iteration sake but try to see if the boundaries tilt with height between levels - that might be a good test
 - seems to be best result so far thermal-displacement-bucket-stats-middle60-smoothed-sigma1-2021-11-08T12 due to the smoothing seeming to actually pick the lowest bucket globally instead of random 1 off low bucket count in a field of high bucket counts
+
+things to try
+- generate isotherms on the middle 60, smoothed sigma stuff
+- heatmap of where rapid change happens
+- other vars like gph, moisture to see if boundaries line up
+
+- doing zonal mean instead of comparing to longitude specific latitudes, smooths out the boundaries. theyre not as sharp with zonal mean
+- looking at differences between cells doesnt really correlate with where the white is placed according to smallest bucket. somewhat there but not as aligned as something to catch hot vs cold air mass should be. thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12. it's kinda there
+- look at the bar graph and make color cuts where it dips down after smoothing. so white happens at the global middle 60% minimum. dark blue to light blue happens somewhere in bottom 30%? might help identify areas that have rapid change but not as much as white parts
