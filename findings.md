@@ -98,3 +98,5 @@ things to try
 - doing zonal mean instead of comparing to longitude specific latitudes, smooths out the boundaries. theyre not as sharp with zonal mean
 - looking at differences between cells doesnt really correlate with where the white is placed according to smallest bucket. somewhat there but not as aligned as something to catch hot vs cold air mass should be. thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12. it's kinda there
 - look at the bar graph and make color cuts where it dips down after smoothing. so white happens at the global middle 60% minimum. dark blue to light blue happens somewhere in bottom 30%? might help identify areas that have rapid change but not as much as white parts
+    - does this keep coherence between pressure levels?
+- make gif between plots
