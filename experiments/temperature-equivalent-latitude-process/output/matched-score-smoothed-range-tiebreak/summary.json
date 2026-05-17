@@ -1,0 +1,906 @@
+{
+  "process": "same-longitude climatology thermal-displacement score smoothed after matching",
+  "dataset": ".worktree-shared/data/era5_temperature_2021-11_08-12.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "climatology_variable": "temperature_climatology_mean",
+  "timestamp": "2021-11-08T12:00:00",
+  "score_smooth_sigma_cells": 1.0,
+  "smoothing_order": "match raw temperature first, convert matched latitude to score, then smooth score",
+  "matched_latitude_tie_breaker": "When left and right climatology temperatures are equally close, choose the matched climatology latitude row closest to the source cell row.",
+  "score_definition": "score_points = (1 - abs(matched_latitude) / max_abs_latitude) * 100",
+  "bucket_edges": "1-point score buckets centered on integer values from 0 to 100",
+  "middle_60_definition": "Middle 60% of each level's score range: min + 20% of range through max - 20% of range.",
+  "selected_bucket_rule": "Fewest nonzero score bucket whose integer center falls inside the level's range-based middle 60%.",
+  "map_color_scale": "blue-white-red TwoSlopeNorm over each level's score min/max, white at selected score bucket center",
+  "border_geojson": "node_modules/three-globe/example/country-polygons/ne_110m_admin_0_countries.geojson",
+  "levels": [
+    {
+      "pressure_level_hpa": 1000.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_1000hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_1000hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_1000hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_1000hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_1000hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.974780273437503,
+        "upper": 79.89912109375
+      },
+      "selected_bucket": {
+        "lower": 52.5,
+        "upper": 53.5,
+        "center_for_map_white": 53.0,
+        "count": 7858
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.8739013671875
+    },
+    {
+      "pressure_level_hpa": 975.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_975hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_975hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_975hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_975hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_975hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.974334716796875,
+        "upper": 79.8973388671875
+      },
+      "selected_bucket": {
+        "lower": 54.5,
+        "upper": 55.5,
+        "center_for_map_white": 55.0,
+        "count": 7567
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.87167358398438
+    },
+    {
+      "pressure_level_hpa": 950.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_950hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_950hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_950hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_950hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_950hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.91328582763672,
+        "upper": 79.65314331054688
+      },
+      "selected_bucket": {
+        "lower": 56.5,
+        "upper": 57.5,
+        "center_for_map_white": 57.0,
+        "count": 7506
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.5664291381836
+    },
+    {
+      "pressure_level_hpa": 925.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_925hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_925hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_925hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_925hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_925hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.92478485107422,
+        "upper": 79.69913940429687
+      },
+      "selected_bucket": {
+        "lower": 56.5,
+        "upper": 57.5,
+        "center_for_map_white": 57.0,
+        "count": 7708
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.6239242553711
+    },
+    {
+      "pressure_level_hpa": 900.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_900hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_900hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_900hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_900hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_900hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.898908996582033,
+        "upper": 79.59563598632812
+      },
+      "selected_bucket": {
+        "lower": 51.5,
+        "upper": 52.5,
+        "center_for_map_white": 52.0,
+        "count": 7872
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.49454498291016
+    },
+    {
+      "pressure_level_hpa": 875.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_875hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_875hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_875hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_875hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_875hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.977217102050783,
+        "upper": 79.90886840820312
+      },
+      "selected_bucket": {
+        "lower": 50.5,
+        "upper": 51.5,
+        "center_for_map_white": 51.0,
+        "count": 7323
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.8860855102539
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_850hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_850hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_850hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_850hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_850hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.999743652343753,
+        "upper": 79.998974609375
+      },
+      "selected_bucket": {
+        "lower": 49.5,
+        "upper": 50.5,
+        "center_for_map_white": 50.0,
+        "count": 6707
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.99871826171875
+    },
+    {
+      "pressure_level_hpa": 825.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_825hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_825hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_825hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_825hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_825hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.99973602294922,
+        "upper": 79.99894409179687
+      },
+      "selected_bucket": {
+        "lower": 48.5,
+        "upper": 49.5,
+        "center_for_map_white": 49.0,
+        "count": 6728
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.9986801147461
+    },
+    {
+      "pressure_level_hpa": 800.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_800hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_800hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_800hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_800hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_800hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.98988189697266,
+        "upper": 79.95952758789062
+      },
+      "selected_bucket": {
+        "lower": 46.5,
+        "upper": 47.5,
+        "center_for_map_white": 47.0,
+        "count": 6806
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.94940948486328
+    },
+    {
+      "pressure_level_hpa": 775.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_775hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_775hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_775hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_775hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_775hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.997698974609378,
+        "upper": 79.9907958984375
+      },
+      "selected_bucket": {
+        "lower": 44.5,
+        "upper": 45.5,
+        "center_for_map_white": 45.0,
+        "count": 6820
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.98849487304688
+    },
+    {
+      "pressure_level_hpa": 750.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_750hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_750hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_750hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_750hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_750hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.968496704101565,
+        "upper": 79.87398681640624
+      },
+      "selected_bucket": {
+        "lower": 43.5,
+        "upper": 44.5,
+        "center_for_map_white": 44.0,
+        "count": 6539
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.84248352050781
+    },
+    {
+      "pressure_level_hpa": 700.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_700hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_700hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_700hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_700hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_700hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.999487304687502,
+        "upper": 79.99794921875
+      },
+      "selected_bucket": {
+        "lower": 41.5,
+        "upper": 42.5,
+        "center_for_map_white": 42.0,
+        "count": 6878
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.9974365234375
+    },
+    {
+      "pressure_level_hpa": 650.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_650hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_650hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_650hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_650hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_650hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.99922332763672,
+        "upper": 79.99689331054688
+      },
+      "selected_bucket": {
+        "lower": 40.5,
+        "upper": 41.5,
+        "center_for_map_white": 41.0,
+        "count": 6747
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.9961166381836
+    },
+    {
+      "pressure_level_hpa": 600.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_600hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_600hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_600hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_600hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_600hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.976602172851564,
+        "upper": 79.90640869140626
+      },
+      "selected_bucket": {
+        "lower": 41.5,
+        "upper": 42.5,
+        "center_for_map_white": 42.0,
+        "count": 6374
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.88301086425781
+    },
+    {
+      "pressure_level_hpa": 550.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_550hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_550hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_550hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_550hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_550hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.993389892578126,
+        "upper": 79.9735595703125
+      },
+      "selected_bucket": {
+        "lower": 41.5,
+        "upper": 42.5,
+        "center_for_map_white": 42.0,
+        "count": 6110
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.96694946289062
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_500hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_500hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_500hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_500hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_500hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.980821228027345,
+        "upper": 79.92328491210938
+      },
+      "selected_bucket": {
+        "lower": 39.5,
+        "upper": 40.5,
+        "center_for_map_white": 40.0,
+        "count": 6181
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.90410614013672
+    },
+    {
+      "pressure_level_hpa": 450.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_450hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_450hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_450hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_450hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_450hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.99927215576172,
+        "upper": 79.99708862304688
+      },
+      "selected_bucket": {
+        "lower": 38.5,
+        "upper": 39.5,
+        "center_for_map_white": 39.0,
+        "count": 6164
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.9963607788086
+    },
+    {
+      "pressure_level_hpa": 400.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_400hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_400hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_400hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_400hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_400hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.999690246582034,
+        "upper": 79.99876098632812
+      },
+      "selected_bucket": {
+        "lower": 28.5,
+        "upper": 29.5,
+        "center_for_map_white": 29.0,
+        "count": 6176
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.99845123291016
+    },
+    {
+      "pressure_level_hpa": 350.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_350hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_350hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_350hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_350hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_350hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.99999237060547,
+        "upper": 79.99996948242188
+      },
+      "selected_bucket": {
+        "lower": 30.5,
+        "upper": 31.5,
+        "center_for_map_white": 31.0,
+        "count": 4866
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.99996185302734
+    },
+    {
+      "pressure_level_hpa": 300.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_300hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_300hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_300hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_300hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_300hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.99640808105469,
+        "upper": 79.98563232421876
+      },
+      "selected_bucket": {
+        "lower": 21.5,
+        "upper": 22.5,
+        "center_for_map_white": 22.0,
+        "count": 4806
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.98204040527344
+    },
+    {
+      "pressure_level_hpa": 250.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_250hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_250hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_250hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_250hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_250hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.997947692871094,
+        "upper": 79.99179077148438
+      },
+      "selected_bucket": {
+        "lower": 53.5,
+        "upper": 54.5,
+        "center_for_map_white": 54.0,
+        "count": 5958
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.98973846435547
+    },
+    {
+      "pressure_level_hpa": 225.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_225hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_225hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_225hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_225hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_225hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.999961853027344,
+        "upper": 79.99984741210938
+      },
+      "selected_bucket": {
+        "lower": 59.5,
+        "upper": 60.5,
+        "center_for_map_white": 60.0,
+        "count": 3209
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.99980926513672
+    },
+    {
+      "pressure_level_hpa": 200.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_200hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_200hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_200hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_200hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_200hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.99798583984375,
+        "upper": 79.991943359375
+      },
+      "selected_bucket": {
+        "lower": 77.5,
+        "upper": 78.5,
+        "center_for_map_white": 78.0,
+        "count": 5228
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.98992919921875
+    },
+    {
+      "pressure_level_hpa": 175.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_175hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_175hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_175hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_175hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_175hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.808700561523438,
+        "upper": 79.23480224609375
+      },
+      "selected_bucket": {
+        "lower": 19.5,
+        "upper": 20.5,
+        "center_for_map_white": 20.0,
+        "count": 7316
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.04350280761719
+    },
+    {
+      "pressure_level_hpa": 150.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_150hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_150hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_150hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_150hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_150hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.758718872070315,
+        "upper": 79.03487548828124
+      },
+      "selected_bucket": {
+        "lower": 20.5,
+        "upper": 21.5,
+        "center_for_map_white": 21.0,
+        "count": 4058
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.79359436035156
+    },
+    {
+      "pressure_level_hpa": 125.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_125hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_125hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_125hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_125hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_125hpa.npy",
+      "middle_60_score_range": {
+        "lower": 20.609467172622683,
+        "upper": 80.15230957269668
+      },
+      "selected_bucket": {
+        "lower": 66.5,
+        "upper": 67.5,
+        "center_for_map_white": 67.0,
+        "count": 1274
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.761853039264679,
+      "score_max": 99.99992370605469
+    },
+    {
+      "pressure_level_hpa": 100.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_100hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_100hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_100hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_100hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_100hpa.npy",
+      "middle_60_score_range": {
+        "lower": 20.407214879989624,
+        "upper": 80.1018037199974
+      },
+      "selected_bucket": {
+        "lower": 61.5,
+        "upper": 62.5,
+        "center_for_map_white": 62.0,
+        "count": 832
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.50901859998703,
+      "score_max": 100.0
+    },
+    {
+      "pressure_level_hpa": 70.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_70hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_70hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_70hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_70hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_70hpa.npy",
+      "middle_60_score_range": {
+        "lower": 20.24376304149628,
+        "upper": 80.0476427257061
+      },
+      "selected_bucket": {
+        "lower": 58.5,
+        "upper": 59.5,
+        "center_for_map_white": 59.0,
+        "count": 1078
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.3091364800930023,
+      "score_max": 99.98226928710938
+    },
+    {
+      "pressure_level_hpa": 50.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_50hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_50hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_50hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_50hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_50hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.999487304687502,
+        "upper": 79.99794921875
+      },
+      "selected_bucket": {
+        "lower": 19.5,
+        "upper": 20.5,
+        "center_for_map_white": 20.0,
+        "count": 2715
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.9974365234375
+    },
+    {
+      "pressure_level_hpa": 30.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_30hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_30hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_30hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_30hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_30hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.768818664550782,
+        "upper": 79.07527465820313
+      },
+      "selected_bucket": {
+        "lower": 64.5,
+        "upper": 65.5,
+        "center_for_map_white": 65.0,
+        "count": 7008
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.8440933227539
+    },
+    {
+      "pressure_level_hpa": 20.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_20hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_20hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_20hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_20hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_20hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.71147918701172,
+        "upper": 78.84591674804688
+      },
+      "selected_bucket": {
+        "lower": 19.5,
+        "upper": 20.5,
+        "center_for_map_white": 20.0,
+        "count": 5015
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.5573959350586
+    },
+    {
+      "pressure_level_hpa": 10.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_10hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_10hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_10hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_10hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_10hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.75846405029297,
+        "upper": 79.03385620117187
+      },
+      "selected_bucket": {
+        "lower": 48.5,
+        "upper": 49.5,
+        "center_for_map_white": 49.0,
+        "count": 5857
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.79232025146484
+    },
+    {
+      "pressure_level_hpa": 7.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_7hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_7hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_7hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_7hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_7hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.66282196044922,
+        "upper": 78.65128784179687
+      },
+      "selected_bucket": {
+        "lower": 46.5,
+        "upper": 47.5,
+        "center_for_map_white": 47.0,
+        "count": 8068
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.3141098022461
+    },
+    {
+      "pressure_level_hpa": 5.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_5hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_5hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_5hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_5hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_5hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.67007293701172,
+        "upper": 78.68029174804687
+      },
+      "selected_bucket": {
+        "lower": 35.5,
+        "upper": 36.5,
+        "center_for_map_white": 36.0,
+        "count": 6376
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.3503646850586
+    },
+    {
+      "pressure_level_hpa": 3.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_3hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_3hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_3hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_3hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_3hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.984484863281253,
+        "upper": 79.937939453125
+      },
+      "selected_bucket": {
+        "lower": 39.5,
+        "upper": 40.5,
+        "center_for_map_white": 40.0,
+        "count": 5474
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.92242431640625
+    },
+    {
+      "pressure_level_hpa": 2.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_2hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_2hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_2hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_2hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_2hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.704450988769533,
+        "upper": 78.81780395507812
+      },
+      "selected_bucket": {
+        "lower": 43.5,
+        "upper": 44.5,
+        "center_for_map_white": 44.0,
+        "count": 5686
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 98.52225494384766
+    },
+    {
+      "pressure_level_hpa": 1.0,
+      "histogram_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/histograms/histogram_1hpa.png",
+      "map_png": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/maps/map_1hpa.png",
+      "matched_latitude_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/matched_latitude_1hpa.npy",
+      "thermal_displacement_score_points_unsmoothed_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_unsmoothed_1hpa.npy",
+      "thermal_displacement_score_points_npy": "tmp/temperature-equivalent-latitude-process/output/matched-score-smoothed-range-tiebreak/arrays/thermal_displacement_score_points_1hpa.npy",
+      "middle_60_score_range": {
+        "lower": 19.993147277832033,
+        "upper": 79.97258911132812
+      },
+      "selected_bucket": {
+        "lower": 19.5,
+        "upper": 20.5,
+        "center_for_map_white": 20.0,
+        "count": 4366
+      },
+      "matched_latitude_min": -89.0,
+      "matched_latitude_max": 89.0,
+      "score_unsmoothed_min": 0.0,
+      "score_unsmoothed_max": 100.0,
+      "score_min": 0.0,
+      "score_max": 99.96573638916016
+    }
+  ]
+}

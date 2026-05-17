@@ -1,0 +1,40 @@
+{
+  "source_dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology_dataset": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "field_kind": "thermal-displacement-latitude",
+  "smoothing_sigma_native_grid_cells": 1.0,
+  "offset_cells": 7,
+  "change_metric": "abs(value 7 cells north - value 7 cells south) + abs(value 7 cells east - value 7 cells west)",
+  "units": "thermal displacement score points (score * 100)",
+  "edge_handling": "longitude wraps; first and last 7 latitude rows are left missing/white",
+  "levels": {
+    "250": {
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-change-heatmap-7cell-0250hpa.png",
+      "min_change": 0.0,
+      "max_change": 87.45855712890625,
+      "mean_change": 10.639484405517578,
+      "p95_change": 31.039352416992188
+    },
+    "500": {
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-change-heatmap-7cell-0500hpa.png",
+      "min_change": 0.0,
+      "max_change": 61.99467468261719,
+      "mean_change": 7.729241371154785,
+      "p95_change": 20.03241539001465
+    },
+    "850": {
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-change-heatmap-7cell-0850hpa.png",
+      "min_change": 0.0,
+      "max_change": 73.7979736328125,
+      "mean_change": 9.328431129455566,
+      "p95_change": 22.93478012084961
+    },
+    "1000": {
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-change-heatmap-7cell-1000hpa.png",
+      "min_change": 7.941672811284661e-05,
+      "max_change": 65.12066650390625,
+      "mean_change": 8.941645622253418,
+      "p95_change": 21.972482681274414
+    }
+  }
+}

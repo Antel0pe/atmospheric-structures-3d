@@ -1,0 +1,169 @@
+{
+  "timestamp": "2021-11-08T12:00:00",
+  "pressure_levels_hpa": [
+    1000.0,
+    975.0,
+    950.0,
+    925.0,
+    900.0,
+    875.0,
+    850.0,
+    825.0,
+    800.0,
+    775.0,
+    750.0,
+    700.0,
+    650.0,
+    600.0,
+    550.0,
+    500.0,
+    450.0,
+    400.0,
+    350.0,
+    300.0,
+    250.0
+  ],
+  "method_metrics": [
+    {
+      "method": "vertical_identity_shear",
+      "name": "Vertical thermal-identity shear",
+      "grade": "B",
+      "science_score_1_to_5": 4,
+      "median_adjacent_level_shift_deg": 1.6396608352661133,
+      "p90_adjacent_level_shift_deg": 2.507012176513672,
+      "median_1000_to_250_shift_deg": 12.320877075195312,
+      "median_longitude_waviness_deg": 0.004054546356201172
+    },
+    {
+      "method": "thermal_advection_dipole",
+      "name": "Warm/cold advection dipole",
+      "grade": "C",
+      "science_score_1_to_5": 4,
+      "median_adjacent_level_shift_deg": 0.8884639739990234,
+      "p90_adjacent_level_shift_deg": 1.589962387084961,
+      "median_1000_to_250_shift_deg": 11.095376014709473,
+      "median_longitude_waviness_deg": 0.0025625228881835938
+    },
+    {
+      "method": "thetae_displacement_contact",
+      "name": "Theta-e gradient with displacement contrast",
+      "grade": "C",
+      "science_score_1_to_5": 4,
+      "median_adjacent_level_shift_deg": 0.5097808837890625,
+      "p90_adjacent_level_shift_deg": 0.8534267425537125,
+      "median_1000_to_250_shift_deg": 10.493621349334717,
+      "median_longitude_waviness_deg": 0.0027742385864257812
+    },
+    {
+      "method": "thermal_wind_baroclinic",
+      "name": "Thermal-wind baroclinicity",
+      "grade": "B",
+      "science_score_1_to_5": 5,
+      "median_adjacent_level_shift_deg": 1.0832433700561523,
+      "p90_adjacent_level_shift_deg": 1.8086078643798829,
+      "median_1000_to_250_shift_deg": 10.337688446044922,
+      "median_longitude_waviness_deg": 0.003914833068847656
+    },
+    {
+      "method": "isotherm_normal_displacement_jump",
+      "name": "Raw-isotherm-normal displacement jump",
+      "grade": "C",
+      "science_score_1_to_5": 4,
+      "median_adjacent_level_shift_deg": 0.49748706817626953,
+      "p90_adjacent_level_shift_deg": 0.931614494323732,
+      "median_1000_to_250_shift_deg": 10.961995601654053,
+      "median_longitude_waviness_deg": 0.0024213790893554688
+    }
+  ],
+  "methods": [
+    {
+      "key": "vertical_identity_shear",
+      "name": "Vertical thermal-identity shear",
+      "hypothesis": "A sloping frontal/baroclinic zone should show large thermal-identity change between neighboring pressure levels as well as horizontal identity contrast at the level being plotted.",
+      "steps": [
+        "Match raw temperature to same-longitude climatology and compute thermal-displacement score at every 250-1000 hPa level.",
+        "For each level, compare that score with the nearest pressure level above and below.",
+        "Score cells where vertical thermal-identity shear and horizontal thermal-identity gradient are both high.",
+        "Pick the strongest midlatitude ridge by longitude in each hemisphere."
+      ]
+    },
+    {
+      "key": "thermal_advection_dipole",
+      "name": "Warm/cold advection dipole",
+      "hypothesis": "Hot/cold fighting should be active where winds are advecting tropical-like identity into nearby polar-like identity, or vice versa.",
+      "steps": [
+        "Compute thermal-displacement score and its horizontal gradient.",
+        "Read ERA5 wind at the same pressure level and time.",
+        "Compute thermal-identity advection, then smooth nearby warm-advection and cold-advection lobes.",
+        "Score cells where opposite-signed advection lobes touch near a thermal-identity gradient."
+      ]
+    },
+    {
+      "key": "thetae_displacement_contact",
+      "name": "Theta-e gradient with displacement contrast",
+      "hypothesis": "Air-mass fights often sharpen equivalent potential temperature, so a theta-e gradient becomes more relevant when it also separates tropical-like and polar-like thermal displacement.",
+      "steps": [
+        "Compute equivalent potential temperature from temperature and specific humidity.",
+        "Smooth theta-e about 500 km and compute its horizontal gradient.",
+        "Sample thermal-displacement score across that theta-e gradient direction.",
+        "Score cells where theta-e changes sharply and the warm/moist side is more tropical-like than the cold/dry side."
+      ]
+    },
+    {
+      "key": "thermal_wind_baroclinic",
+      "name": "Thermal-wind baroclinicity",
+      "hypothesis": "A real baroclinic boundary should align with vertical wind shear because horizontal temperature contrasts imply thermal-wind shear.",
+      "steps": [
+        "Read wind at every 250-1000 hPa level.",
+        "Compute vertical wind-shear magnitude against neighboring pressure levels.",
+        "Multiply shear by the local thermal-displacement horizontal gradient.",
+        "Pick the strongest shear-supported thermal-identity ridge by longitude."
+      ]
+    },
+    {
+      "key": "isotherm_normal_displacement_jump",
+      "name": "Raw-isotherm-normal displacement jump",
+      "hypothesis": "Use real smoothed-temperature isotherms for geometry, then ask whether crossing those isotherms also crosses a polar-like to tropical-like displacement jump.",
+      "steps": [
+        "Smooth raw temperature about 500 km and compute its gradient direction.",
+        "Sample thermal-displacement score on the warm and cold sides normal to the smoothed isotherms.",
+        "Score cells where real isotherms are packed and thermal-displacement score jumps across the isotherm normal.",
+        "Pick the strongest real-isotherm/displacement-jump ridge by longitude."
+      ]
+    }
+  ],
+  "pruned_ideas": [
+    {
+      "idea": "signed displacement zero-crossing",
+      "reason": "Already tested in the previous pressure-level loop; it is too close to a normal-for-latitude crossing."
+    },
+    {
+      "idea": "side-ordered tropical/polar contact",
+      "reason": "Already the strongest simple prior candidate, so this pass avoids repeating it as a standalone method."
+    },
+    {
+      "idea": "local tropical/polar co-presence",
+      "reason": "Already tested and found useful as corridor width/confidence rather than line placement."
+    },
+    {
+      "idea": "thermal-character frontogenesis/confluence",
+      "reason": "Already tested as process evidence; this pass uses different wind-process ideas instead."
+    },
+    {
+      "idea": "middle-80 and zonal-mean climatology displacement",
+      "reason": "Prior notes show they remove longitude-specific context and introduce hard-to-defend pressure jumps."
+    },
+    {
+      "idea": "dry-potential-temperature displacement",
+      "reason": "At fixed pressure levels it nearly duplicates raw-temperature displacement for this lookup."
+    },
+    {
+      "idea": "standalone raw temperature gradient",
+      "reason": "Meteorologically real, but prior diagnostics show it is too generic and terrain/polar biased unless gated."
+    },
+    {
+      "idea": "one global rare histogram bucket",
+      "reason": "Useful as a contour proposal, but it does not directly measure spatial hot/cold opposition."
+    }
+  ]
+}

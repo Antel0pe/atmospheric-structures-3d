@@ -1,0 +1,64 @@
+{
+  "source_dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology_dataset": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "field_kind": "thermal-displacement-latitude",
+  "smoothing_sigma_native_grid_cells": 1.0,
+  "bucket_method": "Thermal Displacement score * 100 after sigma=1 smoothing, then 1-point centered buckets without pre-rounding",
+  "rarest_bucket_rule": "smallest nonzero 1-point bucket whose center falls within the middle 60% of the level's smoothed score range",
+  "middle_range_fraction": 0.6,
+  "levels": {
+    "250": {
+      "bar_graph_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-actual-score-smoothed-sigma1-1point-bucket-bars-0250hpa.png",
+      "min_score_points": 0.0,
+      "max_score_points": 99.98974204063416,
+      "middle_60_range_lower_score_points": 19.99794840812683,
+      "middle_60_range_upper_score_points": 79.99179363250732,
+      "smallest_eligible_bucket_center_score_points": 54,
+      "smallest_eligible_bucket_count": 5958,
+      "bucket_count": 101,
+      "total_cells": 1026720,
+      "largest_bucket_center_score_points": 0,
+      "largest_bucket_count": 71380
+    },
+    "500": {
+      "bar_graph_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-actual-score-smoothed-sigma1-1point-bucket-bars-0500hpa.png",
+      "min_score_points": 0.0,
+      "max_score_points": 99.90410804748535,
+      "middle_60_range_lower_score_points": 19.98082160949707,
+      "middle_60_range_upper_score_points": 79.92328643798828,
+      "smallest_eligible_bucket_center_score_points": 40,
+      "smallest_eligible_bucket_count": 6181,
+      "bucket_count": 101,
+      "total_cells": 1026720,
+      "largest_bucket_center_score_points": 0,
+      "largest_bucket_count": 22335
+    },
+    "850": {
+      "bar_graph_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-actual-score-smoothed-sigma1-1point-bucket-bars-0850hpa.png",
+      "min_score_points": 0.0,
+      "max_score_points": 99.99871850013733,
+      "middle_60_range_lower_score_points": 19.999743700027466,
+      "middle_60_range_upper_score_points": 79.99897480010986,
+      "smallest_eligible_bucket_center_score_points": 50,
+      "smallest_eligible_bucket_count": 6707,
+      "bucket_count": 101,
+      "total_cells": 1026720,
+      "largest_bucket_center_score_points": 84,
+      "largest_bucket_count": 18843
+    },
+    "1000": {
+      "bar_graph_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-actual-score-smoothed-sigma1-1point-bucket-bars-1000hpa.png",
+      "min_score_points": 0.0,
+      "max_score_points": 99.8738944530487,
+      "middle_60_range_lower_score_points": 19.97477889060974,
+      "middle_60_range_upper_score_points": 79.89911556243896,
+      "smallest_eligible_bucket_center_score_points": 53,
+      "smallest_eligible_bucket_count": 7858,
+      "bucket_count": 101,
+      "total_cells": 1026720,
+      "largest_bucket_center_score_points": 84,
+      "largest_bucket_count": 15820
+    }
+  },
+  "bucket_counts_csv": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-actual-score-smoothed-sigma1-1point-bucket-counts.csv"
+}

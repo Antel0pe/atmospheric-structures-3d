@@ -100,3 +100,18 @@ things to try
 - look at the bar graph and make color cuts where it dips down after smoothing. so white happens at the global middle 60% minimum. dark blue to light blue happens somewhere in bottom 30%? might help identify areas that have rapid change but not as much as white parts
     - does this keep coherence between pressure levels?
 - make gif between plots
+
+one problem is i currently want to queue messages for codex like implement this method then perform this analysis then try something else but the problem is sometimes the next steps depends on the output of the step. like if the method output is good then i want to move forward. otherwise the next steps arent super useful. i could just try them anyway and in the event the output isn't good, fork the chat from there, improve and then copy the next step messages
+
+best method so far:
+1. Take raw temperature from data/era5_temperature_2021-11_08-12.nc, but only for 1000, 850, 500, 250 hPa.
+2. Take temperature climatology from data/era5_temperature-climatology_1990-2020_11-08_12.nc at the same pressure levels.3. Smooth the raw temperature first with Gaussian sigma=1 native grid cell. Longitude wraps; latitude edge uses nearest.
+4. For each cell, take its smoothed raw temperature, longitude, and pressure level. At the same longitude and pressure level in climatology, find the latitude whose climatology temperature is closest. If two climatology latitudes are equally close in temperature, break the tie by choosing the climatology latitude whose row is closest to the source cell’s own latitude row.
+5. Instead of keeping that matched latitude as -90..90, convert it into a thermal-displacement score:
+score = 1 - abs(matched_latitude) / max_abs_latitude
+6. Each cell now has a value from 0..1, then multiplied by 100.
+0 means polar-like, 100 means equator-like. North and south are collapsed together because it uses abs(latitude).
+7. Define 1-point score buckets from 0..100, like 39.5-40.5, 40.5-41.5, etc.
+8. Draw bar graphs of those buckets for each selected pressure level.
+9. For each pressure level, find the middle 60% of that level’s score range, then identify the nonzero bucket with the fewest cells inside that middle range.
+10. Draw maps with land/coast/country borders using a continuous blue-white-red scale. Blue is low score, red is high score, and white is centered on the rarest middle-60% score bucket for that pressure level.

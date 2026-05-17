@@ -1,0 +1,6 @@
+method,name,grade,science_score_1_to_5,median_adjacent_level_shift_deg,p90_adjacent_level_shift_deg,median_1000_to_250_shift_deg,median_longitude_waviness_deg
+vertical_identity_shear,Vertical thermal-identity shear,B,4,1.6396608352661133,2.507012176513672,12.320877075195312,0.004054546356201172
+thermal_advection_dipole,Warm/cold advection dipole,C,4,0.8884639739990234,1.589962387084961,11.095376014709473,0.0025625228881835938
+thetae_displacement_contact,Theta-e gradient with displacement contrast,C,4,0.5097808837890625,0.8534267425537125,10.493621349334717,0.0027742385864257812
+thermal_wind_baroclinic,Thermal-wind baroclinicity,B,5,1.0832433700561523,1.8086078643798829,10.337688446044922,0.003914833068847656
+isotherm_normal_displacement_jump,Raw-isotherm-normal displacement jump,C,4,0.49748706817626953,0.931614494323732,10.961995601654053,0.0024213790893554688

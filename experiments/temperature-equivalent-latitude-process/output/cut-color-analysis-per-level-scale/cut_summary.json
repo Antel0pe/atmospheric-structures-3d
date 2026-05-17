@@ -1,0 +1,85 @@
+{
+  "reference_pressure_range_hpa": [
+    1000.0,
+    250.0
+  ],
+  "histogram_smooth_sigma_bins": 2.0,
+  "percentiles": {
+    "p03": -86.94989013671875,
+    "p20": -30.610179138183597,
+    "p30": -17.096996688842772,
+    "p70": 8.300923633575438,
+    "p80": 14.73613052368163,
+    "p97": 58.92306961059569
+  },
+  "cuts": [
+    {
+      "name": "cold_outer_density_dip",
+      "value": -62.5,
+      "bucket_lower": -63.0,
+      "bucket_count": 26159,
+      "role": "dark blue to blue"
+    },
+    {
+      "name": "white_middle_60_density_dip",
+      "value": -29.5,
+      "bucket_lower": -30.0,
+      "bucket_count": 121267,
+      "role": "blue/red transition white point"
+    },
+    {
+      "name": "warm_middle_60_shoulder",
+      "value": 14.5,
+      "source": "rounded 80th percentile of reference distribution",
+      "role": "pale red to red shoulder"
+    },
+    {
+      "name": "warm_outer_density_dip",
+      "value": 57.5,
+      "bucket_lower": 57.0,
+      "bucket_count": 26366,
+      "role": "red to dark red"
+    }
+  ],
+  "method_note": "Reference histogram is all smoothed equivalent-latitude cells from 1000-250 hPa. Density dips are chosen after Gaussian smoothing the whole-degree histogram. The warm shoulder is the rounded 80th percentile because the red side did not contain a robust central density valley before the warm outer tail dip.",
+  "map_scale": "per-level",
+  "color_stops": [
+    {
+      "value": -90.0,
+      "color": "#061536",
+      "meaning": "deep cold-side equivalent latitude"
+    },
+    {
+      "value": -62.5,
+      "color": "#1764b5",
+      "meaning": "cold-side density dip"
+    },
+    {
+      "value": -29.5,
+      "color": "#f7f7f2",
+      "meaning": "global middle-60 density minimum"
+    },
+    {
+      "value": 14.5,
+      "color": "#f3a0a0",
+      "meaning": "warm-side shoulder"
+    },
+    {
+      "value": 57.5,
+      "color": "#cd2a2a",
+      "meaning": "warm-side density dip"
+    },
+    {
+      "value": 90.0,
+      "color": "#4a0000",
+      "meaning": "deep warm-side equivalent latitude"
+    }
+  ],
+  "outputs": {
+    "aggregate_histogram": "tmp/temperature-equivalent-latitude-process/output/cut-color-analysis-per-level-scale/aggregate_histogram_with_yellow_cuts.png",
+    "histograms": "tmp/temperature-equivalent-latitude-process/output/cut-color-analysis-per-level-scale/histograms",
+    "maps": "tmp/temperature-equivalent-latitude-process/output/cut-color-analysis-per-level-scale/maps",
+    "contact_sheet": "tmp/temperature-equivalent-latitude-process/output/cut-color-analysis-per-level-scale/cut_color_key_levels_contact_sheet.png",
+    "gif": null
+  }
+}

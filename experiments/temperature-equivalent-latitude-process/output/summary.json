@@ -1,0 +1,681 @@
+{
+  "process": "raw-temperature same-longitude climatology equivalent latitude",
+  "dataset": ".worktree-shared/data/era5_temperature_2021-11_08-12.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "climatology_variable": "temperature_climatology_mean",
+  "timestamp": "2021-11-08T12:00:00",
+  "smooth_sigma_cells": 1.0,
+  "bucket_edges": "whole-degree bins from -90 to 90",
+  "middle_60_definition": "20th through 80th percentiles of smoothed equivalent-latitude cells",
+  "selected_bucket_rule": "fewest cells among whole-degree buckets overlapping the middle 60%",
+  "map_color_scale": "blue-white-red TwoSlopeNorm over each level, white at selected bucket center",
+  "border_geojson": "node_modules/three-globe/example/country-polygons/ne_110m_admin_0_countries.geojson",
+  "levels": [
+    {
+      "pressure_level_hpa": 1000.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_1000hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_1000hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_1000hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -29.208226776123038,
+        "p80": 15.959594917297375
+      },
+      "selected_bucket": {
+        "lower": -30.0,
+        "upper": -29.0,
+        "center_for_map_white": -29.5,
+        "count": 8950
+      },
+      "field_min": -88.77607727050781,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 975.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_975hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_975hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_975hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -27.695885848999023,
+        "p80": 16.46913681030274
+      },
+      "selected_bucket": {
+        "lower": -28.0,
+        "upper": -27.0,
+        "center_for_map_white": -27.5,
+        "count": 9080
+      },
+      "field_min": -88.68095397949219,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 950.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_950hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_950hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_950hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.747679519653317,
+        "p80": 15.32807445526124
+      },
+      "selected_bucket": {
+        "lower": -29.0,
+        "upper": -28.0,
+        "center_for_map_white": -28.5,
+        "count": 8226
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 925.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_925hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_925hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_925hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -29.12967910766601,
+        "p80": 15.105677032470703
+      },
+      "selected_bucket": {
+        "lower": -30.0,
+        "upper": -29.0,
+        "center_for_map_white": -29.5,
+        "count": 7608
+      },
+      "field_min": -89.0,
+      "field_max": 88.56829833984375
+    },
+    {
+      "pressure_level_hpa": 900.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_900hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_900hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_900hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -29.67514152526855,
+        "p80": 14.674450302124026
+      },
+      "selected_bucket": {
+        "lower": -30.0,
+        "upper": -29.0,
+        "center_for_map_white": -29.5,
+        "count": 7187
+      },
+      "field_min": -89.0,
+      "field_max": 88.58489227294922
+    },
+    {
+      "pressure_level_hpa": 875.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_875hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_875hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_875hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -30.094932174682615,
+        "p80": 14.514472007751465
+      },
+      "selected_bucket": {
+        "lower": -31.0,
+        "upper": -30.0,
+        "center_for_map_white": -30.5,
+        "count": 6655
+      },
+      "field_min": -89.0,
+      "field_max": 88.9994125366211
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_850hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_850hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_850hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -30.907146835327147,
+        "p80": 14.501258277893069
+      },
+      "selected_bucket": {
+        "lower": -31.0,
+        "upper": -30.0,
+        "center_for_map_white": -30.5,
+        "count": 6418
+      },
+      "field_min": -89.0,
+      "field_max": 88.9171142578125
+    },
+    {
+      "pressure_level_hpa": 825.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_825hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_825hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_825hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -30.45876770019531,
+        "p80": 14.024057197570809
+      },
+      "selected_bucket": {
+        "lower": -31.0,
+        "upper": -30.0,
+        "center_for_map_white": -30.5,
+        "count": 5916
+      },
+      "field_min": -89.0,
+      "field_max": 88.749755859375
+    },
+    {
+      "pressure_level_hpa": 800.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_800hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_800hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_800hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -29.51039009094238,
+        "p80": 13.67568244934083
+      },
+      "selected_bucket": {
+        "lower": -30.0,
+        "upper": -29.0,
+        "center_for_map_white": -29.5,
+        "count": 6055
+      },
+      "field_min": -89.0,
+      "field_max": 88.99684143066406
+    },
+    {
+      "pressure_level_hpa": 775.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_775hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_775hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_775hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -29.181616592407227,
+        "p80": 13.251198387146001
+      },
+      "selected_bucket": {
+        "lower": -30.0,
+        "upper": -29.0,
+        "center_for_map_white": -29.5,
+        "count": 5661
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 750.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_750hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_750hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_750hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.981798171997067,
+        "p80": 13.443924522399909
+      },
+      "selected_bucket": {
+        "lower": -28.0,
+        "upper": -27.0,
+        "center_for_map_white": -27.5,
+        "count": 5694
+      },
+      "field_min": -89.0,
+      "field_max": 88.99952697753906
+    },
+    {
+      "pressure_level_hpa": 700.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_700hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_700hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_700hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.380593109130857,
+        "p80": 15.12868061065674
+      },
+      "selected_bucket": {
+        "lower": -29.0,
+        "upper": -28.0,
+        "center_for_map_white": -28.5,
+        "count": 5324
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 650.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_650hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_650hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_650hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.7649917602539,
+        "p80": 15.617688751220708
+      },
+      "selected_bucket": {
+        "lower": -29.0,
+        "upper": -28.0,
+        "center_for_map_white": -28.5,
+        "count": 5271
+      },
+      "field_min": -89.0,
+      "field_max": 88.99999237060547
+    },
+    {
+      "pressure_level_hpa": 600.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_600hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_600hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_600hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.808648681640623,
+        "p80": 15.893182182312014
+      },
+      "selected_bucket": {
+        "lower": -29.0,
+        "upper": -28.0,
+        "center_for_map_white": -28.5,
+        "count": 5154
+      },
+      "field_min": -89.0,
+      "field_max": 88.95999908447266
+    },
+    {
+      "pressure_level_hpa": 550.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_550hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_550hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_550hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.5462547302246,
+        "p80": 15.368486213684085
+      },
+      "selected_bucket": {
+        "lower": -29.0,
+        "upper": -28.0,
+        "center_for_map_white": -28.5,
+        "count": 5146
+      },
+      "field_min": -89.0,
+      "field_max": 88.09258270263672
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_500hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_500hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_500hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -28.439310836791982,
+        "p80": 14.911370277404785
+      },
+      "selected_bucket": {
+        "lower": -29.0,
+        "upper": -28.0,
+        "center_for_map_white": -28.5,
+        "count": 4845
+      },
+      "field_min": -89.0,
+      "field_max": 88.97492980957031
+    },
+    {
+      "pressure_level_hpa": 450.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_450hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_450hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_450hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -29.080259323120114,
+        "p80": 14.930040550231935
+      },
+      "selected_bucket": {
+        "lower": -30.0,
+        "upper": -29.0,
+        "center_for_map_white": -29.5,
+        "count": 4189
+      },
+      "field_min": -89.0,
+      "field_max": 88.45551300048828
+    },
+    {
+      "pressure_level_hpa": 400.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_400hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_400hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_400hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -32.76317749023437,
+        "p80": 14.939741134643555
+      },
+      "selected_bucket": {
+        "lower": -33.0,
+        "upper": -32.0,
+        "center_for_map_white": -32.5,
+        "count": 3506
+      },
+      "field_min": -89.0,
+      "field_max": 88.92109680175781
+    },
+    {
+      "pressure_level_hpa": 350.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_350hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_350hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_350hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -48.42617187499997,
+        "p80": 13.738804626464844
+      },
+      "selected_bucket": {
+        "lower": -49.0,
+        "upper": -48.0,
+        "center_for_map_white": -48.5,
+        "count": 762
+      },
+      "field_min": -89.0,
+      "field_max": 86.99185180664062
+    },
+    {
+      "pressure_level_hpa": 300.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_300hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_300hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_300hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -65.02349090576168,
+        "p80": 13.881819725036621
+      },
+      "selected_bucket": {
+        "lower": -59.0,
+        "upper": -58.0,
+        "center_for_map_white": -58.5,
+        "count": 242
+      },
+      "field_min": -89.0,
+      "field_max": 87.42244720458984
+    },
+    {
+      "pressure_level_hpa": 250.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_250hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_250hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_250hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -65.48473358154297,
+        "p80": 14.131641578674335
+      },
+      "selected_bucket": {
+        "lower": -59.0,
+        "upper": -58.0,
+        "center_for_map_white": -58.5,
+        "count": 394
+      },
+      "field_min": -89.0,
+      "field_max": 86.94133758544922
+    },
+    {
+      "pressure_level_hpa": 225.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_225hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_225hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_225hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -68.49109802246093,
+        "p80": 11.834397315979004
+      },
+      "selected_bucket": {
+        "lower": -53.0,
+        "upper": -52.0,
+        "center_for_map_white": -52.5,
+        "count": 911
+      },
+      "field_min": -89.0,
+      "field_max": 87.63700866699219
+    },
+    {
+      "pressure_level_hpa": 200.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_200hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_200hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_200hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -72.39844970703125,
+        "p80": 21.66139717102051
+      },
+      "selected_bucket": {
+        "lower": -44.0,
+        "upper": -43.0,
+        "center_for_map_white": -43.5,
+        "count": 1064
+      },
+      "field_min": -89.0,
+      "field_max": 85.95864868164062
+    },
+    {
+      "pressure_level_hpa": 175.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_175hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_175hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_175hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -70.5582061767578,
+        "p80": 16.84744148254396
+      },
+      "selected_bucket": {
+        "lower": -62.0,
+        "upper": -61.0,
+        "center_for_map_white": -61.5,
+        "count": 1161
+      },
+      "field_min": -89.0,
+      "field_max": 87.49372863769531
+    },
+    {
+      "pressure_level_hpa": 150.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_150hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_150hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_150hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -52.17448196411133,
+        "p80": 12.42464904785158
+      },
+      "selected_bucket": {
+        "lower": -42.0,
+        "upper": -41.0,
+        "center_for_map_white": -41.5,
+        "count": 2027
+      },
+      "field_min": -89.0,
+      "field_max": 87.51518249511719
+    },
+    {
+      "pressure_level_hpa": 125.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_125hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_125hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_125hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -33.16154861450195,
+        "p80": 14.618490219116211
+      },
+      "selected_bucket": {
+        "lower": -34.0,
+        "upper": -33.0,
+        "center_for_map_white": -33.5,
+        "count": 5164
+      },
+      "field_min": -86.4764175415039,
+      "field_max": 87.27616882324219
+    },
+    {
+      "pressure_level_hpa": 100.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_100hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_100hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_100hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -35.73293914794921,
+        "p80": 18.914271926879884
+      },
+      "selected_bucket": {
+        "lower": -36.0,
+        "upper": -35.0,
+        "center_for_map_white": -35.5,
+        "count": 3609
+      },
+      "field_min": -87.00176239013672,
+      "field_max": 88.38307189941406
+    },
+    {
+      "pressure_level_hpa": 70.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_70hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_70hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_70hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -44.99692611694335,
+        "p80": 22.248722457885744
+      },
+      "selected_bucket": {
+        "lower": -38.0,
+        "upper": -37.0,
+        "center_for_map_white": -37.5,
+        "count": 1333
+      },
+      "field_min": -86.72724151611328,
+      "field_max": 88.7248306274414
+    },
+    {
+      "pressure_level_hpa": 50.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_50hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_50hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_50hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -51.948213195800776,
+        "p80": 36.90759582519532
+      },
+      "selected_bucket": {
+        "lower": -42.0,
+        "upper": -41.0,
+        "center_for_map_white": -41.5,
+        "count": 367
+      },
+      "field_min": -87.09525299072266,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 30.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_30hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_30hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_30hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -45.61818466186523,
+        "p80": 61.102960968017584
+      },
+      "selected_bucket": {
+        "lower": -27.0,
+        "upper": -26.0,
+        "center_for_map_white": -26.5,
+        "count": 672
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 20.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_20hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_20hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_20hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -51.34802398681641,
+        "p80": 49.53621673583988
+      },
+      "selected_bucket": {
+        "lower": -36.0,
+        "upper": -35.0,
+        "center_for_map_white": -35.5,
+        "count": 1292
+      },
+      "field_min": -86.35272979736328,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 10.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_10hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_10hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_10hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -57.47942581176758,
+        "p80": 51.13178939819336
+      },
+      "selected_bucket": {
+        "lower": -44.0,
+        "upper": -43.0,
+        "center_for_map_white": -43.5,
+        "count": 941
+      },
+      "field_min": -88.99932861328125,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 7.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_7hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_7hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_7hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -54.30263748168945,
+        "p80": 48.67681732177736
+      },
+      "selected_bucket": {
+        "lower": 5.0,
+        "upper": 6.0,
+        "center_for_map_white": 5.5,
+        "count": 1444
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 5.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_5hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_5hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_5hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -35.75712661743164,
+        "p80": 47.00105438232422
+      },
+      "selected_bucket": {
+        "lower": 2.0,
+        "upper": 3.0,
+        "center_for_map_white": 2.5,
+        "count": 1658
+      },
+      "field_min": -89.0,
+      "field_max": 88.75
+    },
+    {
+      "pressure_level_hpa": 3.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_3hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_3hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_3hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -33.64170532226561,
+        "p80": 48.337950134277385
+      },
+      "selected_bucket": {
+        "lower": 4.0,
+        "upper": 5.0,
+        "center_for_map_white": 4.5,
+        "count": 2475
+      },
+      "field_min": -89.0,
+      "field_max": 88.73065948486328
+    },
+    {
+      "pressure_level_hpa": 2.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_2hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_2hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_2hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -47.78708877563476,
+        "p80": 49.86651382446292
+      },
+      "selected_bucket": {
+        "lower": -48.0,
+        "upper": -47.0,
+        "center_for_map_white": -47.5,
+        "count": 2093
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    },
+    {
+      "pressure_level_hpa": 1.0,
+      "histogram_png": "/tmp/temperature-equivalent-latitude-process/output/histograms/histogram_1hpa.png",
+      "map_png": "/tmp/temperature-equivalent-latitude-process/output/maps/map_1hpa.png",
+      "smoothed_equivalent_latitude_npy": "/tmp/temperature-equivalent-latitude-process/output/arrays/equivalent_latitude_smoothed_1hpa.npy",
+      "middle_60_percentile_bounds": {
+        "p20": -52.80013656616211,
+        "p80": 48.12503204345707
+      },
+      "selected_bucket": {
+        "lower": 48.0,
+        "upper": 49.0,
+        "center_for_map_white": 48.5,
+        "count": 2553
+      },
+      "field_min": -89.0,
+      "field_max": 89.0
+    }
+  ]
+}

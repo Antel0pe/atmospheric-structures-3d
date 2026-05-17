@@ -1,0 +1,38 @@
+{
+  "source_dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology_dataset": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "source_bucket_summary": "tmp/thermal-displacement-bucket-stats-middle60-smoothed-sigma1-2021-11-08T12/summary.json",
+  "field_kind": "thermal-displacement-latitude",
+  "smoothing_sigma_native_grid_cells": 1.0,
+  "color_scale": "continuous blue-white-red with TwoSlopeNorm centered on rarest middle-60% bucket center",
+  "levels": {
+    "250": {
+      "white_center_score_points": 54.0,
+      "rarest_bucket_count": 5958,
+      "min_score_points": 0.0,
+      "max_score_points": 99.98974204063416,
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-continuous-bwr-centered-0250hpa.png"
+    },
+    "500": {
+      "white_center_score_points": 40.0,
+      "rarest_bucket_count": 6181,
+      "min_score_points": 0.0,
+      "max_score_points": 99.90410804748535,
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-continuous-bwr-centered-0500hpa.png"
+    },
+    "850": {
+      "white_center_score_points": 50.0,
+      "rarest_bucket_count": 6707,
+      "min_score_points": 0.0,
+      "max_score_points": 99.99871850013733,
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-continuous-bwr-centered-0850hpa.png"
+    },
+    "1000": {
+      "white_center_score_points": 53.0,
+      "rarest_bucket_count": 7858,
+      "min_score_points": 0.0,
+      "max_score_points": 99.8738944530487,
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-continuous-bwr-centered-1000hpa.png"
+    }
+  }
+}

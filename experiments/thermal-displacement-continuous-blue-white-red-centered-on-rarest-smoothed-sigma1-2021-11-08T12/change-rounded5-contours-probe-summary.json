@@ -1,0 +1,22 @@
+{
+  "source_dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology_dataset": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "field_kind": "thermal-displacement-latitude",
+  "smoothing_sigma_native_grid_cells": 1.0,
+  "offset_cells": 7,
+  "change_metric": "abs(value 7 cells north - value 7 cells south) + abs(value 7 cells east - value 7 cells west)",
+  "contour_method": "round change field to nearest 5 score points, then draw 5-point contour levels",
+  "probe_only": true,
+  "levels": {
+    "500": {
+      "map_png": "tmp/thermal-displacement-continuous-blue-white-red-centered-on-rarest-smoothed-sigma1-2021-11-08T12/thermal-displacement-change-heatmap-7cell-rounded5-contours-0500hpa.png",
+      "max_change": 61.99467468261719,
+      "max_rounded_change": 60.0,
+      "contour_interval": 5.0,
+      "contour_level_count": 12,
+      "contour_seconds": 0.1327929189999395,
+      "total_plot_seconds": 4.201726401999849,
+      "level_total_seconds": 4.7449771040001
+    }
+  }
+}
