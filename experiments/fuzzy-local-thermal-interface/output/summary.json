@@ -1,0 +1,131 @@
+{
+  "method": "fuzzy_local_thermal_identity_interface",
+  "valid_time": "2021-11-08T12:00",
+  "temperature": ".worktree-shared/data/era5_temperature_2021-11_08-12.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "levels_hpa": [
+    1000.0,
+    850.0,
+    500.0,
+    250.0
+  ],
+  "window_degrees": 16.0,
+  "window_cells": 65,
+  "low_percentile": 15.0,
+  "high_percentile": 85.0,
+  "interpretation": "Conflict is local co-presence of cold-like and warm-like thermal identity plus a fuzzy transition between those local regimes. Gradient sharpness brightens the signal but is not required.",
+  "level_summaries": {
+    "1000hpa": {
+      "anchors": {
+        "cold_center": 30.782777786254883,
+        "warm_center": 68.78343963623047,
+        "midpoint": 49.783108711242676,
+        "softness": 4.750082731246948
+      },
+      "local_range_mean": 14.251690864562988,
+      "local_range_p90": 21.70445442199707,
+      "conflict_p94": 0.039939697831869125,
+      "conflict_p98": 0.09857882559299469,
+      "corridor_grid_share": 0.01387720118435406,
+      "high_confidence_grid_share": 0.005137720118435406,
+      "corridor_components": {
+        "component_count": 31,
+        "largest_component_cells": 2960,
+        "midlatitude_share": 0.9981049971925884
+      },
+      "high_confidence_components": {
+        "component_count": 28,
+        "largest_component_cells": 1570,
+        "midlatitude_share": 1.0
+      }
+    },
+    "0850hpa": {
+      "anchors": {
+        "cold_center": 28.298263549804688,
+        "warm_center": 68.39675903320312,
+        "midpoint": 48.347511291503906,
+        "softness": 5.012311935424805
+      },
+      "local_range_mean": 15.183469772338867,
+      "local_range_p90": 25.058759689331055,
+      "conflict_p94": 0.07398853451013565,
+      "conflict_p98": 0.17604677379131317,
+      "corridor_grid_share": 0.03647245597631292,
+      "high_confidence_grid_share": 0.0192282219105501,
+      "corridor_components": {
+        "component_count": 42,
+        "largest_component_cells": 7511,
+        "midlatitude_share": 0.9981039869682484
+      },
+      "high_confidence_components": {
+        "component_count": 54,
+        "largest_component_cells": 3277,
+        "midlatitude_share": 1.0
+      }
+    },
+    "0500hpa": {
+      "anchors": {
+        "cold_center": 22.472246170043945,
+        "warm_center": 64.26673126220703,
+        "midpoint": 43.36948871612549,
+        "softness": 5.224310636520386
+      },
+      "local_range_mean": 14.434940338134766,
+      "local_range_p90": 24.959993362426758,
+      "conflict_p94": 0.10042224824428558,
+      "conflict_p98": 0.21445104479789734,
+      "corridor_grid_share": 0.048868240610877356,
+      "high_confidence_grid_share": 0.02000058438522674,
+      "corridor_components": {
+        "component_count": 59,
+        "largest_component_cells": 13560,
+        "midlatitude_share": 0.9686291704867063
+      },
+      "high_confidence_components": {
+        "component_count": 43,
+        "largest_component_cells": 4009,
+        "midlatitude_share": 0.9457998539079621
+      }
+    },
+    "0250hpa": {
+      "anchors": {
+        "cold_center": 20.400602340698242,
+        "warm_center": 66.03133392333984,
+        "midpoint": 43.21596813201904,
+        "softness": 5.7038414478302
+      },
+      "local_range_mean": 18.37522315979004,
+      "local_range_p90": 33.592247009277344,
+      "conflict_p94": 0.2342994511127472,
+      "conflict_p98": 0.4242442846298218,
+      "corridor_grid_share": 0.06000077918030232,
+      "high_confidence_grid_share": 0.02000058438522674,
+      "corridor_components": {
+        "component_count": 167,
+        "largest_component_cells": 8096,
+        "midlatitude_share": 0.9321147977404065
+      },
+      "high_confidence_components": {
+        "component_count": 114,
+        "largest_component_cells": 3147,
+        "midlatitude_share": 0.9218894570245921
+      }
+    }
+  },
+  "plots": {
+    "contact_sheet": "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-contact-sheet.png",
+    "greenland_crop_contact_sheet": "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-greenland-crop-contact-sheet.png",
+    "global_maps": [
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-1000hpa.png",
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-0850hpa.png",
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-0500hpa.png",
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-0250hpa.png"
+    ],
+    "greenland_crop_maps": [
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-greenland-crop-1000hpa.png",
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-greenland-crop-0850hpa.png",
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-greenland-crop-0500hpa.png",
+      "experiments/fuzzy-local-thermal-interface/output/fuzzy-local-interface-greenland-crop-0250hpa.png"
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "description": "Scatter plots of raw ERA5 temperature values against latitude, including every longitude cell globally for each requested pressure level.",
+  "source_dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "source_variable": "t",
+  "valid_time": "2021-11-08T12:00:00.000000000",
+  "pressure_levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "latitude_count": 713,
+  "longitude_count": 1440,
+  "combined_plot_png": "tmp/raw-temperature-latitude-scatter/raw_temperature_latitude_scatter_250_500_850_1000hpa.png",
+  "levels": [
+    {
+      "pressure_level_hpa": 250.0,
+      "plot_png": "tmp/raw-temperature-latitude-scatter/raw_temperature_latitude_scatter_0250hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 200.88088989257812,
+      "p05_kelvin": 205.78811645507812,
+      "median_kelvin": 221.28811645507812,
+      "mean_kelvin": 221.3592529296875,
+      "p95_kelvin": 233.23245239257812,
+      "max_kelvin": 235.70901489257812
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "plot_png": "tmp/raw-temperature-latitude-scatter/raw_temperature_latitude_scatter_0500hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 228.2738037109375,
+      "p05_kelvin": 233.4554443359375,
+      "median_kelvin": 253.6849365234375,
+      "mean_kelvin": 252.4130401611328,
+      "p95_kelvin": 269.01800537109375,
+      "max_kelvin": 271.8646240234375
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "plot_png": "tmp/raw-temperature-latitude-scatter/raw_temperature_latitude_scatter_0850hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 243.51126098632812,
+      "p05_kelvin": 250.89895629882812,
+      "median_kelvin": 276.0981750488281,
+      "mean_kelvin": 274.374755859375,
+      "p95_kelvin": 292.8520812988281,
+      "max_kelvin": 305.0552062988281
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "plot_png": "tmp/raw-temperature-latitude-scatter/raw_temperature_latitude_scatter_1000hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 247.7929229736328,
+      "p05_kelvin": 256.37689208984375,
+      "median_kelvin": 282.01361083984375,
+      "mean_kelvin": 281.4176025390625,
+      "p95_kelvin": 301.35345458984375,
+      "max_kelvin": 314.83782958984375
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "description": "Scatter plots of ERA5 temperature climatology values against latitude. Climatology is the valid_time mean of the raw 1990-2020 stack, including every longitude cell globally for each requested pressure level.",
+  "source_dataset": "data/global-pressure-level-temperature-stack-for-nov-8-12z-dry-theta-climatology_1990-to-2020_p1-to-1000.nc",
+  "source_variable": "t",
+  "climatology_method": "mean_over_valid_time",
+  "pressure_levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "latitude_count": 713,
+  "longitude_count": 1440,
+  "combined_plot_png": "tmp/temperature-climatology-latitude-scatter/temperature_climatology_latitude_scatter_250_500_850_1000hpa.png",
+  "levels": [
+    {
+      "pressure_level_hpa": 250.0,
+      "plot_png": "tmp/temperature-climatology-latitude-scatter/temperature_climatology_latitude_scatter_0250hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 206.97415161132812,
+      "p05_kelvin": 208.81756591796875,
+      "median_kelvin": 221.65838623046875,
+      "mean_kelvin": 221.95864868164062,
+      "p95_kelvin": 232.50962829589844,
+      "max_kelvin": 233.5242919921875
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "plot_png": "tmp/temperature-climatology-latitude-scatter/temperature_climatology_latitude_scatter_0500hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 231.65103149414062,
+      "p05_kelvin": 235.2859649658203,
+      "median_kelvin": 252.81346130371094,
+      "mean_kelvin": 252.50953674316406,
+      "p95_kelvin": 268.3624267578125,
+      "max_kelvin": 269.0226135253906
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "plot_png": "tmp/temperature-climatology-latitude-scatter/temperature_climatology_latitude_scatter_0850hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 246.6554412841797,
+      "p05_kelvin": 251.91619873046875,
+      "median_kelvin": 275.04766845703125,
+      "mean_kelvin": 274.1219482421875,
+      "p95_kelvin": 291.7835693359375,
+      "max_kelvin": 302.02734375
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "plot_png": "tmp/temperature-climatology-latitude-scatter/temperature_climatology_latitude_scatter_1000hpa.png",
+      "cell_count": 1026720,
+      "min_kelvin": 248.24530029296875,
+      "p05_kelvin": 255.3402557373047,
+      "median_kelvin": 282.1343994140625,
+      "mean_kelvin": 280.78216552734375,
+      "p95_kelvin": 300.5906677246094,
+      "max_kelvin": 311.9124755859375
+    }
+  ]
+}

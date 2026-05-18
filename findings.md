@@ -115,3 +115,6 @@ score = 1 - abs(matched_latitude) / max_abs_latitude
 8. Draw bar graphs of those buckets for each selected pressure level.
 9. For each pressure level, find the middle 60% of that level’s score range, then identify the nonzero bucket with the fewest cells inside that middle range.
 10. Draw maps with land/coast/country borders using a continuous blue-white-red scale. Blue is low score, red is high score, and white is centered on the rarest middle-60% score bucket for that pressure level.
+
+
+experiments/raw-temperature-latitude-scatter/ and experiments/temperature-climatology-latitude-scatter - can kinda see hot and cold extrusions based on the distribution of this data
