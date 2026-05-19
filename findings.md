@@ -105,7 +105,8 @@ one problem is i currently want to queue messages for codex like implement this 
 
 best method so far:
 1. Take raw temperature from data/era5_temperature_2021-11_08-12.nc, but only for 1000, 850, 500, 250 hPa.
-2. Take temperature climatology from data/era5_temperature-climatology_1990-2020_11-08_12.nc at the same pressure levels.3. Smooth the raw temperature first with Gaussian sigma=1 native grid cell. Longitude wraps; latitude edge uses nearest.
+2. Take temperature climatology from data/era5_temperature-climatology_1990-2020_11-08_12.nc at the same pressure levels. 
+3. Smooth the raw temperature first with Gaussian sigma=1 native grid cell. Longitude wraps; latitude edge uses nearest.
 4. For each cell, take its smoothed raw temperature, longitude, and pressure level. At the same longitude and pressure level in climatology, find the latitude whose climatology temperature is closest. If two climatology latitudes are equally close in temperature, break the tie by choosing the climatology latitude whose row is closest to the source cell’s own latitude row.
 5. Instead of keeping that matched latitude as -90..90, convert it into a thermal-displacement score:
 score = 1 - abs(matched_latitude) / max_abs_latitude

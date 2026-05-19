@@ -8,6 +8,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Use the conda environment named `atmospheric-structures-3d` for Python work in this repo.
 
+# Thermal Displacement
+
+When the user asks for "thermal displacement", equivalent-latitude temperature
+matching, or the polar-like/equator-like temperature score, read
+`thermal_displacement.md` before implementing. Use
+`scripts/thermal_displacement.py` as the canonical reference implementation.
+
 # Notes Memory
 
 The repo contains a local-only `notes/` directory that should be treated as working memory for ongoing collaboration, not as polished project documentation.

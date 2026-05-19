@@ -517,43 +517,57 @@ def thermal_displacement_latitude_score(
     raw_temperature_k: np.ndarray,
     climatology_temperature_k: np.ndarray,
     latitudes_deg: np.ndarray,
+    same_hemisphere: bool = True,
 ) -> np.ndarray:
     raw = np.asarray(raw_temperature_k, dtype=np.float32)
     climatology = np.asarray(climatology_temperature_k, dtype=np.float32)
     latitudes = np.asarray(latitudes_deg, dtype=np.float32)
-    result = np.zeros_like(raw, dtype=np.float32)
+    result = np.full_like(raw, np.nan, dtype=np.float32)
     max_abs_latitude = max(float(np.nanmax(np.abs(latitudes))), 1e-6)
+
+    if same_hemisphere:
+        search_groups = (
+            (latitudes >= 0.0, latitudes >= 0.0),
+            (latitudes < 0.0, latitudes < 0.0),
+        )
+    else:
+        all_rows = np.ones(raw.shape[0], dtype=bool)
+        search_groups = ((all_rows, all_rows),)
 
     for lon_index in range(raw.shape[1]):
         climatology_column = climatology[:, lon_index]
-        valid = np.isfinite(climatology_column)
-        if not np.any(valid):
-            result[:, lon_index] = np.nan
-            continue
+        valid_profile = np.isfinite(climatology_column)
+        source_column = raw[:, lon_index]
 
-        valid_indices = np.flatnonzero(valid)
-        order = valid_indices[np.argsort(climatology_column[valid], kind="mergesort")]
-        sorted_temperatures = climatology_column[order]
-        source_temperatures = raw[:, lon_index]
-        insert_positions = np.searchsorted(sorted_temperatures, source_temperatures)
-        right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
-        left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
+        for source_mask, candidate_mask in search_groups:
+            source_rows = np.flatnonzero(source_mask)
+            candidate_rows = np.flatnonzero(valid_profile & candidate_mask)
+            if source_rows.size == 0 or candidate_rows.size == 0:
+                continue
 
-        right_indices = order[right_positions]
-        left_indices = order[left_positions]
-        right_diffs = np.abs(sorted_temperatures[right_positions] - source_temperatures)
-        left_diffs = np.abs(sorted_temperatures[left_positions] - source_temperatures)
+            order = candidate_rows[
+                np.argsort(climatology_column[candidate_rows], kind="mergesort")
+            ]
+            sorted_temperatures = climatology_column[order]
+            source_temperatures = source_column[source_rows]
+            finite_source = np.isfinite(source_temperatures)
+            insert_positions = np.searchsorted(sorted_temperatures, source_temperatures)
+            right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
+            left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
 
-        row_indices = np.arange(raw.shape[0])
-        right_lat_distance = np.abs(right_indices - row_indices)
-        left_lat_distance = np.abs(left_indices - row_indices)
-        use_left = (left_diffs < right_diffs) | (
-            (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
-        )
-        matched_indices = np.where(use_left, left_indices, right_indices)
-        matched_latitudes = latitudes[matched_indices]
-        result[:, lon_index] = 1.0 - np.abs(matched_latitudes) / max_abs_latitude
-        result[~np.isfinite(source_temperatures), lon_index] = np.nan
+            right_indices = order[right_positions]
+            left_indices = order[left_positions]
+            right_diffs = np.abs(sorted_temperatures[right_positions] - source_temperatures)
+            left_diffs = np.abs(sorted_temperatures[left_positions] - source_temperatures)
+            right_lat_distance = np.abs(right_indices - source_rows)
+            left_lat_distance = np.abs(left_indices - source_rows)
+            use_left = (left_diffs < right_diffs) | (
+                (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
+            )
+            matched_indices = np.where(use_left, left_indices, right_indices)
+            result[source_rows[finite_source], lon_index] = (
+                1.0 - np.abs(latitudes[matched_indices[finite_source]]) / max_abs_latitude
+            )
 
     return np.asarray(np.clip(result, 0.0, 1.0), dtype=np.float32)
 
@@ -580,42 +594,51 @@ def thermal_displacement_zonal_profile_score(
     raw_temperature_k: np.ndarray,
     climatology_latitude_profile_k: np.ndarray,
     latitudes_deg: np.ndarray,
+    same_hemisphere: bool = True,
 ) -> np.ndarray:
     raw = np.asarray(raw_temperature_k, dtype=np.float32)
     profile = np.asarray(climatology_latitude_profile_k, dtype=np.float32)
     latitudes = np.asarray(latitudes_deg, dtype=np.float32)
-    result = np.zeros_like(raw, dtype=np.float32)
+    result = np.full_like(raw, np.nan, dtype=np.float32)
     max_abs_latitude = max(float(np.nanmax(np.abs(latitudes))), 1e-6)
 
-    valid = np.isfinite(profile)
-    if not np.any(valid):
-        result[:] = np.nan
-        return result
+    if same_hemisphere:
+        search_groups = (
+            (latitudes >= 0.0, latitudes >= 0.0),
+            (latitudes < 0.0, latitudes < 0.0),
+        )
+    else:
+        all_rows = np.ones(raw.shape[0], dtype=bool)
+        search_groups = ((all_rows, all_rows),)
 
-    valid_indices = np.flatnonzero(valid)
-    order = valid_indices[np.argsort(profile[valid], kind="mergesort")]
-    sorted_temperatures = profile[order]
-    flat_raw = raw.reshape(-1)
-    insert_positions = np.searchsorted(sorted_temperatures, flat_raw)
-    right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
-    left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
+    for source_mask, candidate_mask in search_groups:
+        candidate_rows = np.flatnonzero(np.isfinite(profile) & candidate_mask)
+        source_rows = np.flatnonzero(source_mask)
+        if candidate_rows.size == 0 or source_rows.size == 0:
+            continue
 
-    right_indices = order[right_positions]
-    left_indices = order[left_positions]
-    right_diffs = np.abs(sorted_temperatures[right_positions] - flat_raw)
-    left_diffs = np.abs(sorted_temperatures[left_positions] - flat_raw)
+        order = candidate_rows[np.argsort(profile[candidate_rows], kind="mergesort")]
+        sorted_temperatures = profile[order]
+        source_values = raw[source_rows, :].reshape(-1)
+        finite_source = np.isfinite(source_values)
+        insert_positions = np.searchsorted(sorted_temperatures, source_values)
+        right_positions = np.clip(insert_positions, 0, sorted_temperatures.size - 1)
+        left_positions = np.clip(insert_positions - 1, 0, sorted_temperatures.size - 1)
 
-    row_indices = np.repeat(np.arange(raw.shape[0]), raw.shape[1])
-    right_lat_distance = np.abs(right_indices - row_indices)
-    left_lat_distance = np.abs(left_indices - row_indices)
-    use_left = (left_diffs < right_diffs) | (
-        (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
-    )
-    matched_indices = np.where(use_left, left_indices, right_indices)
-    matched_latitudes = latitudes[matched_indices]
-    flat_result = 1.0 - np.abs(matched_latitudes) / max_abs_latitude
-    flat_result[~np.isfinite(flat_raw)] = np.nan
-    result = flat_result.reshape(raw.shape)
+        right_indices = order[right_positions]
+        left_indices = order[left_positions]
+        right_diffs = np.abs(sorted_temperatures[right_positions] - source_values)
+        left_diffs = np.abs(sorted_temperatures[left_positions] - source_values)
+        repeated_rows = np.repeat(source_rows, raw.shape[1])
+        right_lat_distance = np.abs(right_indices - repeated_rows)
+        left_lat_distance = np.abs(left_indices - repeated_rows)
+        use_left = (left_diffs < right_diffs) | (
+            (left_diffs == right_diffs) & (left_lat_distance <= right_lat_distance)
+        )
+        matched_indices = np.where(use_left, left_indices, right_indices)
+        flat_result = 1.0 - np.abs(latitudes[matched_indices]) / max_abs_latitude
+        flat_result[~finite_source] = np.nan
+        result[source_rows, :] = flat_result.reshape(source_rows.size, raw.shape[1])
 
     return np.asarray(np.clip(result, 0.0, 1.0), dtype=np.float32)
 
