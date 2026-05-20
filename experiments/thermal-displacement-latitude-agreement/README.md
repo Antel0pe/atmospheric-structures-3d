@@ -58,12 +58,30 @@ agreement overlay maps. The green agreement mask and latitude-difference
 histograms are computed from the smoothed score field. With the native `0.25°`
 grid, sigma `20` is about `5°`.
 
+## Score-Displacement Maps
+
+The no-green score-displacement run is saved under
+`output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/`.
+It uses same-hemisphere matching and sigma `20` smoothing on the matched
+thermal-displacement score, then colors:
+
+```text
+actual_latitude_score = (1 - abs(source_grid_latitude) / max_abs_latitude) * 100
+score_displacement = smoothed_matched_score - actual_latitude_score
+```
+
+Positive values are red and mean the matched air is more equator-like than the
+cell's actual latitude. Negative values are blue and mean the matched air is
+more polar-like than the cell's actual latitude. White is zero displacement.
+Each pressure level uses a symmetric blue-white-red range centered on zero.
+
 Run:
 
 ```bash
 conda run -n atmospheric-structures-3d python tmp/thermal-displacement-latitude-agreement/generate_maps.py
 conda run -n atmospheric-structures-3d python tmp/thermal-displacement-latitude-agreement/generate_maps.py --matching-mode same-hemisphere --output-dir tmp/thermal-displacement-latitude-agreement/output/same-hemisphere
 conda run -n atmospheric-structures-3d python tmp/thermal-displacement-latitude-agreement/generate_maps.py --matching-mode same-hemisphere --smooth-sigma-cells 20 --write-diagnostics --output-dir tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-smoothed-agreement
+conda run -n atmospheric-structures-3d python tmp/thermal-displacement-latitude-agreement/generate_score_displacement_maps.py
 ```
 
 Light smoothed matched-latitude run:

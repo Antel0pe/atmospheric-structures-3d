@@ -1,0 +1,78 @@
+{
+  "process": "same-hemisphere thermal-displacement score colored by displacement from actual-latitude score",
+  "dataset": ".worktree-shared/data/era5_temperature_2021-11_08-12.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp": "2021-11-08T12:00:00",
+  "pressure_levels_hpa": [
+    1000.0,
+    850.0,
+    500.0,
+    250.0
+  ],
+  "matching_mode": "same-hemisphere",
+  "same_hemisphere_rule": "source latitudes >= 0 only compare against climatology latitudes >= 0; source latitudes < 0 only compare against climatology latitudes < 0",
+  "score_definition": "score = (1 - abs(latitude) / max_abs_latitude) * 100",
+  "latitude_grid": {
+    "min": -89.0,
+    "max": 89.0,
+    "max_abs_latitude": 89.0,
+    "step_degrees": 0.25
+  },
+  "score_smoothing": "Gaussian sigma=20 native grid cells on matched thermal-displacement score; longitude wraps, latitude uses nearest edge",
+  "displacement_definition": "score_displacement = smoothed_matched_score - actual_latitude_score",
+  "color_scale": "blue-white-red centered on zero per pressure level; red means more equator-like than actual latitude, blue means more polar-like",
+  "outputs": [
+    {
+      "pressure_level_hpa": 1000.0,
+      "map_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-maps/score_displacement_1000hpa.png",
+      "histogram_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_1000hpa.png",
+      "histogram_csv": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_1000hpa.csv",
+      "displacement_min": -18.49530792236328,
+      "displacement_max": 29.408443450927734,
+      "map_symmetric_color_extent": 29.408443450927734,
+      "displacement_mean": 0.8871448040008545,
+      "displacement_median": 0.6930718421936035,
+      "displacement_abs_mean": 4.10036039352417,
+      "displacement_abs_median": 2.8260498046875
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "map_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-maps/score_displacement_850hpa.png",
+      "histogram_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_850hpa.png",
+      "histogram_csv": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_850hpa.csv",
+      "displacement_min": -20.16246795654297,
+      "displacement_max": 27.4852352142334,
+      "map_symmetric_color_extent": 27.4852352142334,
+      "displacement_mean": 0.25882822275161743,
+      "displacement_median": 0.19350814819335938,
+      "displacement_abs_mean": 4.992335796356201,
+      "displacement_abs_median": 4.010225772857666
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "map_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-maps/score_displacement_500hpa.png",
+      "histogram_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_500hpa.png",
+      "histogram_csv": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_500hpa.csv",
+      "displacement_min": -24.626134872436523,
+      "displacement_max": 23.895092010498047,
+      "map_symmetric_color_extent": 24.626134872436523,
+      "displacement_mean": -0.3199380040168762,
+      "displacement_median": -0.14095115661621094,
+      "displacement_abs_mean": 5.268918514251709,
+      "displacement_abs_median": 4.176280975341797
+    },
+    {
+      "pressure_level_hpa": 250.0,
+      "map_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-maps/score_displacement_250hpa.png",
+      "histogram_png": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_250hpa.png",
+      "histogram_csv": "tmp/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-displacement-from-actual-latitude/score-displacement-histograms/score_displacement_histogram_250hpa.csv",
+      "displacement_min": -31.01657485961914,
+      "displacement_max": 48.97920227050781,
+      "map_symmetric_color_extent": 48.97920227050781,
+      "displacement_mean": -0.447183758020401,
+      "displacement_median": -1.5889778137207031,
+      "displacement_abs_mean": 8.089767456054688,
+      "displacement_abs_median": 5.955146789550781
+    }
+  ]
+}

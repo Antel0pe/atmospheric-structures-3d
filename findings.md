@@ -119,3 +119,7 @@ score = 1 - abs(matched_latitude) / max_abs_latitude
 
 
 experiments/raw-temperature-latitude-scatter/ and experiments/temperature-climatology-latitude-scatter - can kinda see hot and cold extrusions based on the distribution of this data
+
+19/05/26 things to investigate tmmr
+- start from waterfall plots can kinda see a tilted line through the longitudes. i mistakenly thought it was pressure levels at first so was more excited than i should be. but maybe can make waterfall through pressure levels or look at the pattern at a single pressure level along longitude
+- heatmap/contour thing add more finer grain contours
