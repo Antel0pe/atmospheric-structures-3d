@@ -1,0 +1,174 @@
+{
+  "process": "Contour coherence and separability diagnostics for same-hemisphere sigma-20 thermal-displacement score.",
+  "domain": {
+    "longitude": [
+      -125.0,
+      -50.0
+    ],
+    "latitude": [
+      89.0,
+      0.0
+    ]
+  },
+  "pressure_levels_hpa": [
+    1000.0,
+    850.0,
+    500.0,
+    250.0
+  ],
+  "score_smoothing_sigma_cells": 20.0,
+  "score_contours": [
+    5.0,
+    10.0,
+    15.0,
+    20.0,
+    25.0,
+    30.0,
+    35.0,
+    40.0,
+    45.0,
+    50.0,
+    55.0,
+    60.0,
+    65.0,
+    70.0,
+    75.0,
+    80.0,
+    85.0,
+    90.0,
+    95.0
+  ],
+  "best_cross_level_same_score_correlations": [
+    {
+      "score_contour": 10.0,
+      "level_pair": "850-250",
+      "correlation": 0.9961796193355087,
+      "mean_abs_latitude_separation": 15.186237360910152,
+      "n_longitudes": 16
+    },
+    {
+      "score_contour": 10.0,
+      "level_pair": "850-500",
+      "correlation": 0.9955267477271511,
+      "mean_abs_latitude_separation": 1.941616209525006,
+      "n_longitudes": 16
+    },
+    {
+      "score_contour": 15.0,
+      "level_pair": "1000-250",
+      "correlation": -0.9735095507270828,
+      "mean_abs_latitude_separation": 4.9726201390653895,
+      "n_longitudes": 79
+    },
+    {
+      "score_contour": 50.0,
+      "level_pair": "1000-850",
+      "correlation": 0.9574709213201811,
+      "mean_abs_latitude_separation": 1.2737694743552412,
+      "n_longitudes": 301
+    },
+    {
+      "score_contour": 55.0,
+      "level_pair": "1000-850",
+      "correlation": 0.9563763335309032,
+      "mean_abs_latitude_separation": 1.1446884838196245,
+      "n_longitudes": 301
+    },
+    {
+      "score_contour": 35.0,
+      "level_pair": "1000-850",
+      "correlation": 0.9422073778550187,
+      "mean_abs_latitude_separation": 1.6985757823512107,
+      "n_longitudes": 301
+    },
+    {
+      "score_contour": 30.0,
+      "level_pair": "1000-850",
+      "correlation": 0.9360253862629474,
+      "mean_abs_latitude_separation": 4.655537510218373,
+      "n_longitudes": 301
+    },
+    {
+      "score_contour": 45.0,
+      "level_pair": "1000-850",
+      "correlation": 0.9355323694465374,
+      "mean_abs_latitude_separation": 1.4990399969295585,
+      "n_longitudes": 301
+    }
+  ],
+  "within_level_spacing_summary": [
+    {
+      "pressure_level_hpa": 1000.0,
+      "tightest_score_band_center": 52.5,
+      "tightest_mean_spacing_deg": 3.9586952399465622,
+      "loosest_score_band_center": 82.5,
+      "loosest_mean_spacing_deg": 9.671847934209774,
+      "overall_mean_spacing_deg": 5.24106820195951
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "tightest_score_band_center": 12.5,
+      "tightest_mean_spacing_deg": 2.869340987894317,
+      "loosest_score_band_center": 87.5,
+      "loosest_mean_spacing_deg": 11.217869532910271,
+      "overall_mean_spacing_deg": 5.5716227564053895
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "tightest_score_band_center": 17.5,
+      "tightest_mean_spacing_deg": 2.9661304598637224,
+      "loosest_score_band_center": 27.5,
+      "loosest_mean_spacing_deg": 9.246215764668914,
+      "overall_mean_spacing_deg": 5.106365010002226
+    },
+    {
+      "pressure_level_hpa": 250.0,
+      "tightest_score_band_center": 52.5,
+      "tightest_mean_spacing_deg": 2.6737493090567885,
+      "loosest_score_band_center": 17.5,
+      "loosest_mean_spacing_deg": 7.550205543239056,
+      "overall_mean_spacing_deg": 4.031045836117378
+    }
+  ],
+  "otsu_score_split_metrics": [
+    {
+      "pressure_level_hpa": 1000.0,
+      "threshold": 53.5,
+      "separation_ratio": 0.8055004867959481,
+      "cold_fraction": 0.4835329480629461,
+      "hot_fraction": 0.5164670519370539
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "threshold": 53.5,
+      "separation_ratio": 0.8256437383216776,
+      "cold_fraction": 0.4814111691188103,
+      "hot_fraction": 0.5185888308811897
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "threshold": 55.5,
+      "separation_ratio": 0.8031006883519795,
+      "cold_fraction": 0.5365681156183404,
+      "hot_fraction": 0.4634318843816596
+    },
+    {
+      "pressure_level_hpa": 250.0,
+      "threshold": 49.5,
+      "separation_ratio": 0.7953111268233775,
+      "cold_fraction": 0.5024056134081539,
+      "hot_fraction": 0.49759438659184607
+    }
+  ],
+  "cross_pressure_contour_spread_mean_deg": 4.754991825301133,
+  "cross_pressure_contour_spread_min_deg": 0.0,
+  "cross_pressure_contour_spread_max_deg": 18.05161084937773,
+  "outputs": {
+    "plots": "plots/",
+    "otsu_histograms": "score-histograms-otsu/",
+    "cross_level_metrics_csv": "cross_level_contour_metrics.csv",
+    "within_level_spacing_csv": "within_level_contour_spacing_summary.csv",
+    "otsu_metrics_csv": "otsu_score_split_metrics.csv",
+    "field_correlation_csv": "field_correlation_matrix.csv"
+  }
+}

@@ -123,3 +123,7 @@ experiments/raw-temperature-latitude-scatter/ and experiments/temperature-climat
 19/05/26 things to investigate tmmr
 - start from waterfall plots can kinda see a tilted line through the longitudes. i mistakenly thought it was pressure levels at first so was more excited than i should be. but maybe can make waterfall through pressure levels or look at the pattern at a single pressure level along longitude
 - heatmap/contour thing add more finer grain contours
+
+20/05/26 things to investigate tmmr
+- analyze contours and think about what closer, further, divering contours might mean
+- look at centroid and median 50 plots in experiments/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-smoothed-agreement/tilt-pattern-analysis-stride16/plots/within_level_fit_gradient_centroid.png and think about what those could mean. are they correlated with the contours i mean the 50 definitely because thats what it shows but what about the centroid?

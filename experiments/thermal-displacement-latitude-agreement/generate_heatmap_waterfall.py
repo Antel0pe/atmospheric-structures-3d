@@ -25,12 +25,14 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from generate_maps import (  # noqa: E402
     CLIMATOLOGY_VARIABLE,
+    DEFAULT_BORDER_GEOJSON,
     DEFAULT_CLIMATOLOGY,
     DEFAULT_DATASET,
     DEFAULT_LEVELS,
     DEFAULT_TIMESTAMP,
     TEMPERATURE_VARIABLE,
     choose_timestamp,
+    load_border_segments,
     match_equivalent_latitude,
     parse_requested_levels,
     resolve_path,
@@ -61,11 +63,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--climatology", type=Path, default=DEFAULT_CLIMATOLOGY)
+    parser.add_argument("--border-geojson", type=Path, default=DEFAULT_BORDER_GEOJSON)
     parser.add_argument("--timestamp", type=str, default=DEFAULT_TIMESTAMP)
     parser.add_argument("--pressure-levels", type=str, default=DEFAULT_LEVELS)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--smooth-sigma-cells", type=float, default=20.0)
     parser.add_argument("--longitude-stride", type=int, default=16)
+    parser.add_argument("--contour-step", type=float, default=20.0)
+    parser.add_argument("--heatmaps-only", action="store_true")
     parser.add_argument("--lon-min", type=float, default=-125.0)
     parser.add_argument("--lon-max", type=float, default=-50.0)
     parser.add_argument("--lat-min", type=float, default=0.0)
@@ -97,7 +102,9 @@ def plot_heatmap(
     score_subset: np.ndarray,
     latitudes: np.ndarray,
     longitudes: np.ndarray,
+    border_segments: list[list[tuple[float, float]]],
     level_hpa: float,
+    contour_step: float,
     output_path: Path,
     dpi: int,
 ) -> None:
@@ -111,7 +118,7 @@ def plot_heatmap(
         shading="auto",
         rasterized=True,
     )
-    contour_levels = [20.0, 40.0, 50.0, 60.0, 80.0]
+    contour_levels = np.arange(contour_step, 100.0, contour_step, dtype=np.float32)
     contours = ax.contour(
         longitudes,
         latitudes,
@@ -122,6 +129,20 @@ def plot_heatmap(
         alpha=0.82,
     )
     ax.clabel(contours, inline=True, fmt="%g", fontsize=8)
+    lon_min = float(np.min(longitudes))
+    lon_max = float(np.max(longitudes))
+    lat_min = float(np.min(latitudes))
+    lat_max = float(np.max(latitudes))
+    for segment in border_segments:
+        points = [
+            (lon, lat)
+            for lon, lat in segment
+            if lon_min <= lon <= lon_max and lat_min <= lat <= lat_max
+        ]
+        if len(points) < 2:
+            continue
+        xs, ys = zip(*points)
+        ax.plot(xs, ys, color="#111111", linewidth=0.45, alpha=0.82)
     ax.set_xlim(float(np.min(longitudes)), float(np.max(longitudes)))
     ax.set_ylim(float(np.min(latitudes)), float(np.max(latitudes)))
     ax.set_xlabel("Longitude")
@@ -190,6 +211,7 @@ def main() -> None:
     args = parse_args()
     dataset_path = resolve_path(args.dataset)
     climatology_path = resolve_path(args.climatology)
+    border_path = resolve_path(args.border_geojson)
     output_dir = args.output_dir.expanduser().resolve()
     heatmap_dir = output_dir / "heatmaps"
     waterfall_dir = output_dir / "waterfalls"
@@ -207,6 +229,7 @@ def main() -> None:
     selected_levels = parse_requested_levels(args.pressure_levels, level_values)
     latitudes = np.asarray(temperature.coords["latitude"].values, dtype=np.float32)
     longitudes = np.asarray(temperature.coords["longitude"].values, dtype=np.float32)
+    border_segments = load_border_segments(border_path, np.asarray([-180.0, 180.0], dtype=np.float32))
     lat_indices, lon_indices, selected_lats, selected_lons = selected_domain(
         latitudes=latitudes,
         longitudes=longitudes,
@@ -244,21 +267,24 @@ def main() -> None:
         score_subset = score_smoothed[np.ix_(lat_indices, lon_indices)]
 
         plot_heatmap(
-            score_subset=score_subset,
+        score_subset=score_subset,
             latitudes=selected_lats,
             longitudes=selected_lons,
+            border_segments=border_segments,
             level_hpa=level_hpa,
-            output_path=heatmap_dir / f"heatmap_{slug}.png",
-            dpi=args.dpi,
-        )
-        plot_waterfall(
-            score_subset=score_subset,
-            latitudes=selected_lats,
-            longitudes=selected_lons,
-            level_hpa=level_hpa,
-            output_path=waterfall_dir / f"waterfall_{slug}.png",
-            dpi=args.dpi,
-        )
+        contour_step=args.contour_step,
+        output_path=heatmap_dir / f"heatmap_{slug}.png",
+        dpi=args.dpi,
+    )
+        if not args.heatmaps_only:
+            plot_waterfall(
+                score_subset=score_subset,
+                latitudes=selected_lats,
+                longitudes=selected_lons,
+                level_hpa=level_hpa,
+                output_path=waterfall_dir / f"waterfall_{slug}.png",
+                dpi=args.dpi,
+            )
 
     try:
         print(f"Wrote {output_dir.relative_to(Path.cwd()).as_posix()}")

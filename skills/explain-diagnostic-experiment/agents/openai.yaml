@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explain Diagnostic Experiment"
+  short_description: "Plain explanations for diagnostic plots."
+  default_prompt: "Use $explain-diagnostic-experiment to explain this diagnostic plot or experiment in plain, traceable terms."
