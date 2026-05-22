@@ -127,3 +127,14 @@ experiments/raw-temperature-latitude-scatter/ and experiments/temperature-climat
 20/05/26 things to investigate tmmr
 - analyze contours and think about what closer, further, divering contours might mean
 - look at centroid and median 50 plots in experiments/thermal-displacement-latitude-agreement/output/same-hemisphere-score-smoothed-sigma20-smoothed-agreement/tilt-pattern-analysis-stride16/plots/within_level_fit_gradient_centroid.png and think about what those could mean. are they correlated with the contours i mean the 50 definitely because thats what it shows but what about the centroid?
+
+maybe make some sort of plot viewer that makes it easy to compare plots
+- easy access to file system, searchable so codex outputs are easier to find
+- split screen viewer
+- sync'd mouse across multiple plots
+- extract contours/other info and put them on plots - make "plots" dynamically by combining info, color, etc
+
+21/05/26
+- smoothed raw temperature isotherms and smoothed thermal displacement isotherms line up very closely which makes sense since we're using raw temperature to derive values close to them
+- theta e and w thermal displacement are somewhat different at lower levels compared to raw temperature thermal displacement but very similar at higher levels
+- perhaps generate more levels in between to see if you can see any patterns between pressure levels

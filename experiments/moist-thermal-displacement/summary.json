@@ -1,0 +1,112 @@
+{
+  "method": "For each raw theta-e/theta-w cell, find the same-pressure, same-longitude, same-hemisphere climatology latitude whose theta-e/theta-w is closest; convert matched absolute latitude to 0..100 polar-like/equator-like score; smooth score after matching.",
+  "theta_e_method": "Bolton-style equivalent potential temperature from T, q, and pressure.",
+  "theta_w_method": "Diagnostic inversion of saturated theta-e at 1000 hPa.",
+  "score_smooth_sigma_cells": 1.0,
+  "raw_dataset": "data/global-air-mass-proxy-bundle_2021-11_p1-to-1000.nc",
+  "temperature_climatology_stack": "data/global-pressure-level-temperature-stack-for-nov-8-12z-dry-theta-climatology_1990-to-2020_p1-to-1000.nc",
+  "specific_humidity_climatology_stack": "data/specific-humidity-climatology-for-theta-e-and-theta-w-displacement_1990-to-2020_p250-500-850-1000.nc",
+  "moist_climatology": "data/era5_moist-potential-temperature-climatology_1990-2020_11-08_12_p250-500-850-1000.nc",
+  "fields": {
+    "theta_e": {
+      "250.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 49.41935348510742,
+        "selected_white_center": 47.0,
+        "selected_bucket_count": 6230,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 298.40277099609375,
+        "raw_field_max_k": 351.3389587402344,
+        "raw_field_mean_k": 329.03338623046875
+      },
+      "500.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 49.43137741088867,
+        "selected_white_center": 37.0,
+        "selected_bucket_count": 5503,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 278.5268249511719,
+        "raw_field_max_k": 351.0205993652344,
+        "raw_field_mean_k": 310.5107116699219
+      },
+      "850.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 50.201255798339844,
+        "selected_white_center": 22.0,
+        "selected_bucket_count": 7437,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 255.3965301513672,
+        "raw_field_max_k": 373.19964599609375,
+        "raw_field_mean_k": 300.3530578613281
+      },
+      "1000.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 50.6959228515625,
+        "selected_white_center": 52.0,
+        "selected_bucket_count": 7995,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 248.80006408691406,
+        "raw_field_max_k": 372.02618408203125,
+        "raw_field_mean_k": 301.05645751953125
+      }
+    },
+    "theta_w": {
+      "250.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 49.85833740234375,
+        "selected_white_center": 39.0,
+        "selected_bucket_count": 6457,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 280.54498291015625,
+        "raw_field_max_k": 296.86346435546875,
+        "raw_field_mean_k": 291.0321350097656
+      },
+      "500.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 49.81442642211914,
+        "selected_white_center": 37.0,
+        "selected_bucket_count": 5365,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 270.14093017578125,
+        "raw_field_max_k": 296.79498291015625,
+        "raw_field_mean_k": 284.4903869628906
+      },
+      "850.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 50.640010833740234,
+        "selected_white_center": 22.0,
+        "selected_bucket_count": 7893,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 253.23095703125,
+        "raw_field_max_k": 301.0474853515625,
+        "raw_field_mean_k": 279.11175537109375
+      },
+      "1000.0": {
+        "score_min": 0.0,
+        "score_max": 100.0,
+        "score_mean": 50.98358154296875,
+        "selected_white_center": 52.0,
+        "selected_bucket_count": 7844,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0,
+        "raw_field_min_k": 247.49185180664062,
+        "raw_field_max_k": 300.845947265625,
+        "raw_field_mean_k": 278.4228210449219
+      }
+    }
+  }
+}

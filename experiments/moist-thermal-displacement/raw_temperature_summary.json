@@ -1,0 +1,53 @@
+{
+  "method": "canonical raw-temperature same-longitude same-hemisphere Thermal Displacement",
+  "dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp": "2021-11-08T12:00",
+  "score_smooth_sigma_cells": 1.0,
+  "levels": [
+    {
+      "pressure_hpa": 250.0,
+      "selected_white_center": 47.0,
+      "selected_bucket_count": 6172,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 49.54854202270508,
+      "raw_temperature_min_k": 200.88088989257812,
+      "raw_temperature_max_k": 235.70901489257812,
+      "raw_temperature_mean_k": 221.3592529296875
+    },
+    {
+      "pressure_hpa": 500.0,
+      "selected_white_center": 37.0,
+      "selected_bucket_count": 5954,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 49.5933837890625,
+      "raw_temperature_min_k": 228.2738037109375,
+      "raw_temperature_max_k": 271.8646240234375,
+      "raw_temperature_mean_k": 252.4130401611328
+    },
+    {
+      "pressure_hpa": 850.0,
+      "selected_white_center": 50.0,
+      "selected_bucket_count": 8000,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 50.25480651855469,
+      "raw_temperature_min_k": 243.51126098632812,
+      "raw_temperature_max_k": 305.0552062988281,
+      "raw_temperature_mean_k": 274.374755859375
+    },
+    {
+      "pressure_hpa": 1000.0,
+      "selected_white_center": 60.0,
+      "selected_bucket_count": 8251,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 50.821800231933594,
+      "raw_temperature_min_k": 247.7929229736328,
+      "raw_temperature_max_k": 314.83782958984375,
+      "raw_temperature_mean_k": 281.4176025390625
+    }
+  ]
+}
