@@ -1,0 +1,456 @@
+{
+  "process": "canonical Thermal Displacement score maps plus score-region clustering",
+  "dataset": ".worktree-shared/data/era5_temperature_2021-11_08-12.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp": "2021-11-08T12:00:00",
+  "pressure_levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "score_method": "Canonical same-longitude same-hemisphere Thermal Displacement: match raw ERA5 temperature to closest climatology latitude at the same pressure and longitude, convert matched latitude to 0..100 score points, then smooth the score.",
+  "score_smooth_sigma_cells": 1.0,
+  "score_color_scale": "fixed blue-white-red: 0 blue, 50 white, 100 red",
+  "clustering_method": "For each pressure level, run 1D k-means on every finite ERA5 cell's Thermal Displacement score, then extract 8-neighbor connected components within each score class. Longitude edge components are merged across the dateline.",
+  "kmeans_score_classes": 7,
+  "min_cluster_cells": 1200,
+  "cluster_map_color_rule": "Each retained connected component gets its own categorical color. Components below min_cluster_cells are gray.",
+  "border_geojson": "node_modules/three-globe/example/country-polygons/ne_110m_admin_0_countries.geojson",
+  "score_contact_sheet": "tmp/thermal-displacement-score-clusters-2021-11-08T12/thermal-displacement-score-contact-sheet.png",
+  "cluster_contact_sheet": "tmp/thermal-displacement-score-clusters-2021-11-08T12/thermal-displacement-score-clusters-contact-sheet.png",
+  "outputs": [
+    {
+      "pressure_level_hpa": 250.0,
+      "score_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/score-blue-white-red-maps/thermal-displacement-score-0250hpa.png",
+      "cluster_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/cluster-membership-maps/thermal-displacement-score-clusters-0250hpa.png",
+      "score_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/thermal_displacement_score_0250hpa.npy",
+      "score_kmeans_class_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_kmeans_class_0250hpa.npy",
+      "cluster_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_region_cluster_0250hpa.npy",
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 49.54854202270508,
+      "selected_white_bucket": {
+        "lower": 46.5,
+        "upper": 47.5,
+        "center": 47.0,
+        "count": 6172,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0
+      },
+      "kmeans_score_class_centers": [
+        3.0469982624053955,
+        23.688079833984375,
+        38.992713928222656,
+        55.38023376464844,
+        67.81192779541016,
+        81.8484115600586,
+        95.78938293457031
+      ],
+      "retained_cluster_count": 35,
+      "retained_cluster_cell_count": 999439,
+      "noise_or_small_component_cell_count": 27281,
+      "largest_clusters": [
+        {
+          "cluster_id": 34,
+          "score_class": 6,
+          "cell_count": 156528
+        },
+        {
+          "cluster_id": 4,
+          "score_class": 0,
+          "cell_count": 128469
+        },
+        {
+          "cluster_id": 10,
+          "score_class": 1,
+          "cell_count": 79394
+        },
+        {
+          "cluster_id": 0,
+          "score_class": 0,
+          "cell_count": 78677
+        },
+        {
+          "cluster_id": 15,
+          "score_class": 3,
+          "cell_count": 76288
+        },
+        {
+          "cluster_id": 27,
+          "score_class": 4,
+          "cell_count": 72438
+        },
+        {
+          "cluster_id": 26,
+          "score_class": 4,
+          "cell_count": 59996
+        },
+        {
+          "cluster_id": 29,
+          "score_class": 5,
+          "cell_count": 59740
+        },
+        {
+          "cluster_id": 11,
+          "score_class": 2,
+          "cell_count": 56640
+        },
+        {
+          "cluster_id": 14,
+          "score_class": 2,
+          "cell_count": 54227
+        },
+        {
+          "cluster_id": 31,
+          "score_class": 5,
+          "cell_count": 48063
+        },
+        {
+          "cluster_id": 5,
+          "score_class": 1,
+          "cell_count": 31114
+        },
+        {
+          "cluster_id": 20,
+          "score_class": 3,
+          "cell_count": 29431
+        },
+        {
+          "cluster_id": 6,
+          "score_class": 1,
+          "cell_count": 11319
+        },
+        {
+          "cluster_id": 13,
+          "score_class": 2,
+          "cell_count": 6640
+        }
+      ]
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "score_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/score-blue-white-red-maps/thermal-displacement-score-0500hpa.png",
+      "cluster_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/cluster-membership-maps/thermal-displacement-score-clusters-0500hpa.png",
+      "score_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/thermal_displacement_score_0500hpa.npy",
+      "score_kmeans_class_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_kmeans_class_0500hpa.npy",
+      "cluster_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_region_cluster_0500hpa.npy",
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 49.5933837890625,
+      "selected_white_bucket": {
+        "lower": 36.5,
+        "upper": 37.5,
+        "center": 37.0,
+        "count": 5954,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0
+      },
+      "kmeans_score_class_centers": [
+        4.561377048492432,
+        21.228803634643555,
+        35.748260498046875,
+        51.042396545410156,
+        65.1950454711914,
+        79.63079833984375,
+        92.70742797851562
+      ],
+      "retained_cluster_count": 17,
+      "retained_cluster_cell_count": 1007733,
+      "noise_or_small_component_cell_count": 18987,
+      "largest_clusters": [
+        {
+          "cluster_id": 16,
+          "score_class": 6,
+          "cell_count": 140851
+        },
+        {
+          "cluster_id": 14,
+          "score_class": 5,
+          "cell_count": 135129
+        },
+        {
+          "cluster_id": 2,
+          "score_class": 0,
+          "cell_count": 93990
+        },
+        {
+          "cluster_id": 12,
+          "score_class": 4,
+          "cell_count": 89064
+        },
+        {
+          "cluster_id": 11,
+          "score_class": 3,
+          "cell_count": 81242
+        },
+        {
+          "cluster_id": 10,
+          "score_class": 3,
+          "cell_count": 79450
+        },
+        {
+          "cluster_id": 0,
+          "score_class": 0,
+          "cell_count": 76173
+        },
+        {
+          "cluster_id": 13,
+          "score_class": 4,
+          "cell_count": 67826
+        },
+        {
+          "cluster_id": 3,
+          "score_class": 1,
+          "cell_count": 63263
+        },
+        {
+          "cluster_id": 5,
+          "score_class": 1,
+          "cell_count": 63024
+        },
+        {
+          "cluster_id": 8,
+          "score_class": 2,
+          "cell_count": 61689
+        },
+        {
+          "cluster_id": 9,
+          "score_class": 2,
+          "cell_count": 39576
+        },
+        {
+          "cluster_id": 7,
+          "score_class": 1,
+          "cell_count": 8111
+        },
+        {
+          "cluster_id": 6,
+          "score_class": 1,
+          "cell_count": 3476
+        },
+        {
+          "cluster_id": 15,
+          "score_class": 5,
+          "cell_count": 1816
+        }
+      ]
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "score_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/score-blue-white-red-maps/thermal-displacement-score-0850hpa.png",
+      "cluster_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/cluster-membership-maps/thermal-displacement-score-clusters-0850hpa.png",
+      "score_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/thermal_displacement_score_0850hpa.npy",
+      "score_kmeans_class_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_kmeans_class_0850hpa.npy",
+      "cluster_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_region_cluster_0850hpa.npy",
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 50.25480651855469,
+      "selected_white_bucket": {
+        "lower": 49.5,
+        "upper": 50.5,
+        "center": 50.0,
+        "count": 8000,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0
+      },
+      "kmeans_score_class_centers": [
+        3.7991137504577637,
+        18.87232208251953,
+        33.90150451660156,
+        49.33929443359375,
+        64.63993835449219,
+        78.85541534423828,
+        91.0931396484375
+      ],
+      "retained_cluster_count": 15,
+      "retained_cluster_cell_count": 984630,
+      "noise_or_small_component_cell_count": 42090,
+      "largest_clusters": [
+        {
+          "cluster_id": 13,
+          "score_class": 5,
+          "cell_count": 168802
+        },
+        {
+          "cluster_id": 14,
+          "score_class": 6,
+          "cell_count": 113844
+        },
+        {
+          "cluster_id": 12,
+          "score_class": 4,
+          "cell_count": 92823
+        },
+        {
+          "cluster_id": 8,
+          "score_class": 3,
+          "cell_count": 82147
+        },
+        {
+          "cluster_id": 4,
+          "score_class": 1,
+          "cell_count": 80183
+        },
+        {
+          "cluster_id": 6,
+          "score_class": 2,
+          "cell_count": 79976
+        },
+        {
+          "cluster_id": 7,
+          "score_class": 2,
+          "cell_count": 70948
+        },
+        {
+          "cluster_id": 11,
+          "score_class": 4,
+          "cell_count": 61130
+        },
+        {
+          "cluster_id": 2,
+          "score_class": 0,
+          "cell_count": 58529
+        },
+        {
+          "cluster_id": 3,
+          "score_class": 1,
+          "cell_count": 57684
+        },
+        {
+          "cluster_id": 9,
+          "score_class": 3,
+          "cell_count": 55798
+        },
+        {
+          "cluster_id": 0,
+          "score_class": 0,
+          "cell_count": 54408
+        },
+        {
+          "cluster_id": 5,
+          "score_class": 2,
+          "cell_count": 4498
+        },
+        {
+          "cluster_id": 10,
+          "score_class": 3,
+          "cell_count": 2141
+        },
+        {
+          "cluster_id": 1,
+          "score_class": 0,
+          "cell_count": 1719
+        }
+      ]
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "score_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/score-blue-white-red-maps/thermal-displacement-score-1000hpa.png",
+      "cluster_map_png": "tmp/thermal-displacement-score-clusters-2021-11-08T12/cluster-membership-maps/thermal-displacement-score-clusters-1000hpa.png",
+      "score_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/thermal_displacement_score_1000hpa.npy",
+      "score_kmeans_class_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_kmeans_class_1000hpa.npy",
+      "cluster_array_npy": "tmp/thermal-displacement-score-clusters-2021-11-08T12/arrays/score_region_cluster_1000hpa.npy",
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "score_mean": 50.821800231933594,
+      "selected_white_bucket": {
+        "lower": 59.5,
+        "upper": 60.5,
+        "center": 60.0,
+        "count": 8251,
+        "middle_60_lower": 20.0,
+        "middle_60_upper": 80.0
+      },
+      "kmeans_score_class_centers": [
+        7.746009826660156,
+        23.210893630981445,
+        37.12057113647461,
+        49.84396743774414,
+        65.0040054321289,
+        78.50789642333984,
+        91.61023712158203
+      ],
+      "retained_cluster_count": 20,
+      "retained_cluster_cell_count": 990973,
+      "noise_or_small_component_cell_count": 35747,
+      "largest_clusters": [
+        {
+          "cluster_id": 18,
+          "score_class": 5,
+          "cell_count": 152586
+        },
+        {
+          "cluster_id": 19,
+          "score_class": 6,
+          "cell_count": 126868
+        },
+        {
+          "cluster_id": 14,
+          "score_class": 3,
+          "cell_count": 82602
+        },
+        {
+          "cluster_id": 6,
+          "score_class": 0,
+          "cell_count": 79821
+        },
+        {
+          "cluster_id": 7,
+          "score_class": 1,
+          "cell_count": 79777
+        },
+        {
+          "cluster_id": 13,
+          "score_class": 2,
+          "cell_count": 75787
+        },
+        {
+          "cluster_id": 17,
+          "score_class": 4,
+          "cell_count": 75268
+        },
+        {
+          "cluster_id": 11,
+          "score_class": 2,
+          "cell_count": 71897
+        },
+        {
+          "cluster_id": 15,
+          "score_class": 3,
+          "cell_count": 66941
+        },
+        {
+          "cluster_id": 16,
+          "score_class": 4,
+          "cell_count": 62461
+        },
+        {
+          "cluster_id": 8,
+          "score_class": 1,
+          "cell_count": 56706
+        },
+        {
+          "cluster_id": 1,
+          "score_class": 0,
+          "cell_count": 31935
+        },
+        {
+          "cluster_id": 0,
+          "score_class": 0,
+          "cell_count": 12101
+        },
+        {
+          "cluster_id": 9,
+          "score_class": 1,
+          "cell_count": 4946
+        },
+        {
+          "cluster_id": 12,
+          "score_class": 2,
+          "cell_count": 2214
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+pressure_hpa,estimated_geopotential_height_m,estimated_geopotential_height_km,method
+250,10363,10.36,US Standard Atmosphere troposphere approximation
+300,9164,9.16,US Standard Atmosphere troposphere approximation
+350,8117,8.12,US Standard Atmosphere troposphere approximation
+400,7185,7.19,US Standard Atmosphere troposphere approximation
+450,6344,6.34,US Standard Atmosphere troposphere approximation
+500,5574,5.57,US Standard Atmosphere troposphere approximation
+550,4865,4.87,US Standard Atmosphere troposphere approximation
+600,4206,4.21,US Standard Atmosphere troposphere approximation
+650,3591,3.59,US Standard Atmosphere troposphere approximation
+700,3012,3.01,US Standard Atmosphere troposphere approximation
+750,2466,2.47,US Standard Atmosphere troposphere approximation
+775,2204,2.2,US Standard Atmosphere troposphere approximation
+800,1949,1.95,US Standard Atmosphere troposphere approximation
+825,1700,1.7,US Standard Atmosphere troposphere approximation
+850,1457,1.46,US Standard Atmosphere troposphere approximation
+875,1220,1.22,US Standard Atmosphere troposphere approximation
+900,988,0.99,US Standard Atmosphere troposphere approximation
+925,762,0.76,US Standard Atmosphere troposphere approximation
+950,540,0.54,US Standard Atmosphere troposphere approximation
+975,323,0.32,US Standard Atmosphere troposphere approximation
+1000,111,0.11,US Standard Atmosphere troposphere approximation

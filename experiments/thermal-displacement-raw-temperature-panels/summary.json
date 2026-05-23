@@ -1,0 +1,232 @@
+{
+  "method": "canonical same-longitude same-hemisphere Thermal Displacement paired with raw temperature",
+  "dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp_requested": "2021-11-08T12:00",
+  "pressure_levels_hpa": [
+    1000.0,
+    975.0,
+    950.0,
+    925.0,
+    900.0,
+    875.0,
+    850.0,
+    825.0,
+    800.0,
+    775.0,
+    750.0,
+    700.0,
+    650.0,
+    600.0,
+    550.0,
+    500.0,
+    450.0,
+    400.0,
+    350.0,
+    300.0,
+    250.0
+  ],
+  "domain": {
+    "longitude_min": -180.0,
+    "longitude_max": 180.0,
+    "latitude_min": -90.0,
+    "latitude_max": 90.0
+  },
+  "score_smooth_sigma_cells": 1.0,
+  "color_scales": {
+    "thermal_displacement": "blue-white-red fixed at 0/50/100",
+    "raw_temperature": "blue-white-red per pressure level, centered between cropped min and max"
+  },
+  "border_geojson": "node_modules/three-globe/example/country-polygons/ne_110m_admin_0_countries.geojson",
+  "levels": [
+    {
+      "pressure_hpa": 1000.0,
+      "image": "thermal-displacement-and-raw-temperature-1000hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -25.357070922851562,
+      "raw_temperature_max_c": 41.687835693359375
+    },
+    {
+      "pressure_hpa": 975.0,
+      "image": "thermal-displacement-and-raw-temperature-0975hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -24.992385864257812,
+      "raw_temperature_max_c": 40.175567626953125
+    },
+    {
+      "pressure_hpa": 950.0,
+      "image": "thermal-displacement-and-raw-temperature-0950hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -26.276763916015625,
+      "raw_temperature_max_c": 38.639251708984375
+    },
+    {
+      "pressure_hpa": 925.0,
+      "image": "thermal-displacement-and-raw-temperature-0925hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -27.454818725585938,
+      "raw_temperature_max_c": 37.051055908203125
+    },
+    {
+      "pressure_hpa": 900.0,
+      "image": "thermal-displacement-and-raw-temperature-0900hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -30.479782104492188,
+      "raw_temperature_max_c": 36.281951904296875
+    },
+    {
+      "pressure_hpa": 875.0,
+      "image": "thermal-displacement-and-raw-temperature-0875hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -29.710708618164062,
+      "raw_temperature_max_c": 34.541229248046875
+    },
+    {
+      "pressure_hpa": 850.0,
+      "image": "thermal-displacement-and-raw-temperature-0850hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -29.63873291015625,
+      "raw_temperature_max_c": 31.90521240234375
+    },
+    {
+      "pressure_hpa": 825.0,
+      "image": "thermal-displacement-and-raw-temperature-0825hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -31.158920288085938,
+      "raw_temperature_max_c": 28.865509033203125
+    },
+    {
+      "pressure_hpa": 800.0,
+      "image": "thermal-displacement-and-raw-temperature-0800hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -33.407623291015625,
+      "raw_temperature_max_c": 26.111907958984375
+    },
+    {
+      "pressure_hpa": 775.0,
+      "image": "thermal-displacement-and-raw-temperature-0775hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -34.683258056640625,
+      "raw_temperature_max_c": 23.337249755859375
+    },
+    {
+      "pressure_hpa": 750.0,
+      "image": "thermal-displacement-and-raw-temperature-0750hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -35.76017761230469,
+      "raw_temperature_max_c": 20.538665771484375
+    },
+    {
+      "pressure_hpa": 700.0,
+      "image": "thermal-displacement-and-raw-temperature-0700hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -41.650909423828125,
+      "raw_temperature_max_c": 15.344207763671875
+    },
+    {
+      "pressure_hpa": 650.0,
+      "image": "thermal-displacement-and-raw-temperature-0650hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -45.254638671875,
+      "raw_temperature_max_c": 13.398681640625
+    },
+    {
+      "pressure_hpa": 600.0,
+      "image": "thermal-displacement-and-raw-temperature-0600hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -46.619781494140625,
+      "raw_temperature_max_c": 10.603851318359375
+    },
+    {
+      "pressure_hpa": 550.0,
+      "image": "thermal-displacement-and-raw-temperature-0550hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -41.79814147949219,
+      "raw_temperature_max_c": 4.088592529296875
+    },
+    {
+      "pressure_hpa": 500.0,
+      "image": "thermal-displacement-and-raw-temperature-0500hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -44.876190185546875,
+      "raw_temperature_max_c": -1.285369873046875
+    },
+    {
+      "pressure_hpa": 450.0,
+      "image": "thermal-displacement-and-raw-temperature-0450hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -49.550048828125,
+      "raw_temperature_max_c": -6.554931640625
+    },
+    {
+      "pressure_hpa": 400.0,
+      "image": "thermal-displacement-and-raw-temperature-0400hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -54.830108642578125,
+      "raw_temperature_max_c": -11.644561767578125
+    },
+    {
+      "pressure_hpa": 350.0,
+      "image": "thermal-displacement-and-raw-temperature-0350hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -58.0543212890625,
+      "raw_temperature_max_c": -18.8521728515625
+    },
+    {
+      "pressure_hpa": 300.0,
+      "image": "thermal-displacement-and-raw-temperature-0300hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -64.28317260742188,
+      "raw_temperature_max_c": -27.296844482421875
+    },
+    {
+      "pressure_hpa": 250.0,
+      "image": "thermal-displacement-and-raw-temperature-0250hpa.png",
+      "thermal_displacement_white": 50.0,
+      "score_min": 0.0,
+      "score_max": 100.0,
+      "raw_temperature_min_c": -72.26910400390625,
+      "raw_temperature_max_c": -37.44097900390625
+    }
+  ]
+}

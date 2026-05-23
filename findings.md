@@ -138,3 +138,8 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 - smoothed raw temperature isotherms and smoothed thermal displacement isotherms line up very closely which makes sense since we're using raw temperature to derive values close to them
 - theta e and w thermal displacement are somewhat different at lower levels compared to raw temperature thermal displacement but very similar at higher levels
 - perhaps generate more levels in between to see if you can see any patterns between pressure levels
+
+22/05/26
+- problem with thermal displacement
+    - At 1000 hPa, air temperature can be strongly changed by land/sea contrast, snow cover, radiation, terrain, boundary-layer mixing, and surface fluxes. So your “thermal displacement” may not always mean “this air came from lower latitude.”
+    - At the same latitude, oceanic west coasts, continental interiors, deserts, mountains, snow-covered land, and monsoon regions can have very different climatologies.
