@@ -143,3 +143,8 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 - problem with thermal displacement
     - At 1000 hPa, air temperature can be strongly changed by land/sea contrast, snow cover, radiation, terrain, boundary-layer mixing, and surface fluxes. So your “thermal displacement” may not always mean “this air came from lower latitude.”
     - At the same latitude, oceanic west coasts, continental interiors, deserts, mountains, snow-covered land, and monsoon regions can have very different climatologies.
+
+23/05/26
+- look at frontogensis and temperature gradient again
+- different levels typically look at different things?
+- ask what would a meteorologist do/think/look at to find cold vs hot boundaries

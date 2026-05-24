@@ -1,0 +1,113 @@
+{
+  "process": "global thermal-displacement score contours plus nearest-different-contour paths",
+  "algorithm": "iteration_03_southward-unvisited-to-pole",
+  "algorithm_description": "Choose the nearest southward point on a contour segment that has not already been visited by this path. If no southward contour remains, finish by connecting to latitude -90.",
+  "dataset": ".worktree-shared/data/era5_temperature_2021-11_08-12.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp": "2021-11-08T12:00:00",
+  "pressure_levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "matching_mode": "same-hemisphere",
+  "score_smoothing": "Gaussian sigma=20 native grid cells on score; longitude wraps and latitude uses nearest edge.",
+  "contour_levels": [
+    5.0,
+    10.0,
+    15.0,
+    20.0,
+    25.0,
+    30.0,
+    35.0,
+    40.0,
+    45.0,
+    50.0,
+    55.0,
+    60.0,
+    65.0,
+    70.0,
+    75.0,
+    80.0,
+    85.0,
+    90.0,
+    95.0
+  ],
+  "path_rule": "Each green path starts at latitude 90 on a 25-degree seed longitude, then repeatedly connects to the closest allowed point on a score-contour segment. Algorithm options define which contour points are allowed.",
+  "path_constraints_implemented": [
+    "do not select the same contour segment as the current segment",
+    "stop after at most 100 nearest-contour iterations",
+    "south_only=True",
+    "exclude_visited=True",
+    "south_pole_fallback=True"
+  ],
+  "path_constraints_not_implemented_in_this_pass": [
+    "prevent two-point ping-pong explicitly",
+    "force generally southward movement explicitly"
+  ],
+  "seed_longitudes": [
+    -175.0,
+    -150.0,
+    -125.0,
+    -100.0,
+    -75.0,
+    -50.0,
+    -25.0,
+    0.0,
+    25.0,
+    50.0,
+    75.0,
+    100.0,
+    125.0,
+    150.0,
+    175.0
+  ],
+  "diagnostics": "experiments/thermal-displacement-latitude-agreement/output/global-heatmaps-score-contours-step5-250-1000-north-south-contour-paths/iteration_03_southward-unvisited-to-pole/path_diagnostics.csv",
+  "outputs": [
+    {
+      "pressure_level_hpa": 250.0,
+      "map": "experiments/thermal-displacement-latitude-agreement/output/global-heatmaps-score-contours-step5-250-1000-north-south-contour-paths/iteration_03_southward-unvisited-to-pole/heatmaps/heatmap_250hpa.png",
+      "contour_line_count": 76,
+      "path_count": 15,
+      "successful_path_count": 15,
+      "path_step_count": 622,
+      "northward_step_count": 0,
+      "ping_pong_like_step_count": 0,
+      "south_pole_finish_count": 15
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "map": "experiments/thermal-displacement-latitude-agreement/output/global-heatmaps-score-contours-step5-250-1000-north-south-contour-paths/iteration_03_southward-unvisited-to-pole/heatmaps/heatmap_500hpa.png",
+      "contour_line_count": 52,
+      "path_count": 15,
+      "successful_path_count": 15,
+      "path_step_count": 538,
+      "northward_step_count": 0,
+      "ping_pong_like_step_count": 0,
+      "south_pole_finish_count": 15
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "map": "experiments/thermal-displacement-latitude-agreement/output/global-heatmaps-score-contours-step5-250-1000-north-south-contour-paths/iteration_03_southward-unvisited-to-pole/heatmaps/heatmap_850hpa.png",
+      "contour_line_count": 59,
+      "path_count": 15,
+      "successful_path_count": 15,
+      "path_step_count": 531,
+      "northward_step_count": 0,
+      "ping_pong_like_step_count": 0,
+      "south_pole_finish_count": 15
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "map": "experiments/thermal-displacement-latitude-agreement/output/global-heatmaps-score-contours-step5-250-1000-north-south-contour-paths/iteration_03_southward-unvisited-to-pole/heatmaps/heatmap_1000hpa.png",
+      "contour_line_count": 51,
+      "path_count": 15,
+      "successful_path_count": 15,
+      "path_step_count": 513,
+      "northward_step_count": 0,
+      "ping_pong_like_step_count": 0,
+      "south_pole_finish_count": 15
+    }
+  ]
+}
