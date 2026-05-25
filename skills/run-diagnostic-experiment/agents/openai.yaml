@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Diagnostic Experiment"
+  short_description: "Run repo-local tmp experiments with per-level plots."
+  default_prompt: "Use $run-diagnostic-experiment to run this repo-local atmospheric diagnostic experiment."
