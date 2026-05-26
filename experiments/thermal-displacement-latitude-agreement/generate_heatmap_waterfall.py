@@ -17,8 +17,10 @@ matplotlib.use("Agg")
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
 import numpy as np
 import xarray as xr
+from contourpy import contour_generator
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -71,6 +73,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--longitude-stride", type=int, default=16)
     parser.add_argument("--contour-step", type=float, default=20.0)
     parser.add_argument("--heatmaps-only", action="store_true")
+    parser.add_argument(
+        "--contours-only",
+        action="store_true",
+        help="Draw score contours without the colored heatmap fill or colorbar.",
+    )
+    parser.add_argument(
+        "--min-contour-vertices",
+        type=int,
+        default=0,
+        help="Drop contour segments with fewer vertices than this.",
+    )
+    parser.add_argument(
+        "--min-contour-length-deg",
+        type=float,
+        default=0.0,
+        help="Drop contour segments shorter than this lon/lat-degree path length.",
+    )
     parser.add_argument("--lon-min", type=float, default=-125.0)
     parser.add_argument("--lon-max", type=float, default=-50.0)
     parser.add_argument("--lat-min", type=float, default=0.0)
@@ -98,6 +117,93 @@ def selected_domain(
     return lat_indices, lon_indices, latitudes[lat_indices], lon_signed
 
 
+def contour_path_length_deg(vertices: np.ndarray) -> float:
+    if len(vertices) < 2:
+        return 0.0
+    steps = np.diff(np.asarray(vertices, dtype=np.float64), axis=0)
+    finite_steps = steps[np.isfinite(steps).all(axis=1)]
+    if finite_steps.size == 0:
+        return 0.0
+    return float(np.hypot(finite_steps[:, 0], finite_steps[:, 1]).sum())
+
+
+def draw_filtered_contours(
+    ax: plt.Axes,
+    score_subset: np.ndarray,
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    contour_levels: np.ndarray,
+    min_vertices: int,
+    min_length_deg: float,
+) -> tuple[int, int]:
+    contour_lats = np.asarray(latitudes, dtype=np.float64)
+    contour_values = np.asarray(score_subset, dtype=np.float64)
+    if contour_lats[0] > contour_lats[-1]:
+        contour_lats = contour_lats[::-1]
+        contour_values = contour_values[::-1, :]
+
+    generator = contour_generator(
+        x=np.asarray(longitudes, dtype=np.float64),
+        y=contour_lats,
+        z=contour_values,
+        line_type="Separate",
+    )
+
+    kept_total = 0
+    dropped_total = 0
+    for level in contour_levels:
+        kept_segments = []
+        labeled_segments = []
+        for vertices in generator.lines(float(level)):
+            length_deg = contour_path_length_deg(vertices)
+            if len(vertices) < min_vertices or length_deg < min_length_deg:
+                dropped_total += 1
+                continue
+            kept_segments.append(vertices)
+            labeled_segments.append((length_deg, vertices))
+
+        if not kept_segments:
+            continue
+
+        linewidth = 1.15 if int(round(float(level))) % 25 == 0 else 0.68
+        ax.add_collection(
+            LineCollection(
+                kept_segments,
+                colors="#404040",
+                linewidths=linewidth,
+                alpha=0.86,
+                zorder=3,
+            )
+        )
+        kept_total += len(kept_segments)
+
+        longest_segments = sorted(
+            labeled_segments,
+            reverse=True,
+            key=lambda item: item[0],
+        )[:4]
+        for _, vertices in longest_segments:
+            midpoint = vertices[len(vertices) // 2]
+            ax.text(
+                float(midpoint[0]),
+                float(midpoint[1]),
+                f"{level:g}",
+                color="#5f5f5f",
+                fontsize=8,
+                ha="center",
+                va="center",
+                bbox={
+                    "boxstyle": "round,pad=0.1",
+                    "facecolor": "white",
+                    "edgecolor": "none",
+                    "alpha": 0.68,
+                },
+                zorder=4,
+            )
+
+    return kept_total, dropped_total
+
+
 def plot_heatmap(
     score_subset: np.ndarray,
     latitudes: np.ndarray,
@@ -107,28 +213,46 @@ def plot_heatmap(
     contour_step: float,
     output_path: Path,
     dpi: int,
-) -> None:
+    contours_only: bool,
+    min_contour_vertices: int,
+    min_contour_length_deg: float,
+) -> tuple[int, int]:
     fig, ax = plt.subplots(figsize=(12.5, 7.4), constrained_layout=True)
-    mesh = ax.pcolormesh(
-        longitudes,
-        latitudes,
-        score_subset,
-        cmap="bwr",
-        norm=mcolors.TwoSlopeNorm(vmin=0.0, vcenter=50.0, vmax=100.0),
-        shading="auto",
-        rasterized=True,
-    )
+    mesh = None
+    if not contours_only:
+        mesh = ax.pcolormesh(
+            longitudes,
+            latitudes,
+            score_subset,
+            cmap="bwr",
+            norm=mcolors.TwoSlopeNorm(vmin=0.0, vcenter=50.0, vmax=100.0),
+            shading="auto",
+            rasterized=True,
+        )
     contour_levels = np.arange(contour_step, 100.0, contour_step, dtype=np.float32)
-    contours = ax.contour(
-        longitudes,
-        latitudes,
-        score_subset,
-        levels=contour_levels,
-        colors="#1b1b1b",
-        linewidths=[0.75, 0.75, 1.25, 0.75, 0.75],
-        alpha=0.82,
-    )
-    ax.clabel(contours, inline=True, fmt="%g", fontsize=8)
+    if min_contour_vertices > 0 or min_contour_length_deg > 0.0:
+        kept_contours, dropped_contours = draw_filtered_contours(
+            ax=ax,
+            score_subset=score_subset,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            contour_levels=contour_levels,
+            min_vertices=max(min_contour_vertices, 0),
+            min_length_deg=max(min_contour_length_deg, 0.0),
+        )
+    else:
+        contours = ax.contour(
+            longitudes,
+            latitudes,
+            score_subset,
+            levels=contour_levels,
+            colors="#1b1b1b",
+            linewidths=[0.75, 0.75, 1.25, 0.75, 0.75],
+            alpha=0.82,
+        )
+        ax.clabel(contours, inline=True, fmt="%g", fontsize=8)
+        kept_contours = len(contours.get_paths())
+        dropped_contours = 0
     lon_min = float(np.min(longitudes))
     lon_max = float(np.max(longitudes))
     lat_min = float(np.min(latitudes))
@@ -147,14 +271,20 @@ def plot_heatmap(
     ax.set_ylim(float(np.min(latitudes)), float(np.max(latitudes)))
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    ax.set_title(
-        f"{level_hpa:g} hPa thermal-displacement score heatmap "
-        "with score contours"
-    )
-    colorbar = fig.colorbar(mesh, ax=ax, pad=0.01)
-    colorbar.set_label("Thermal-displacement score")
+    if contours_only:
+        ax.set_title(
+            f"{level_hpa:g} hPa thermal-displacement score contours"
+        )
+    else:
+        ax.set_title(
+            f"{level_hpa:g} hPa thermal-displacement score heatmap "
+            "with score contours"
+        )
+        colorbar = fig.colorbar(mesh, ax=ax, pad=0.01)
+        colorbar.set_label("Thermal-displacement score")
     fig.savefig(output_path, dpi=dpi)
     plt.close(fig)
+    return kept_contours, dropped_contours
 
 
 def plot_waterfall(
@@ -266,16 +396,24 @@ def main() -> None:
         score_smoothed = smooth_wrapped_lon(score_unsmoothed, args.smooth_sigma_cells)
         score_subset = score_smoothed[np.ix_(lat_indices, lon_indices)]
 
-        plot_heatmap(
-        score_subset=score_subset,
+        kept_contours, dropped_contours = plot_heatmap(
+            score_subset=score_subset,
             latitudes=selected_lats,
             longitudes=selected_lons,
             border_segments=border_segments,
             level_hpa=level_hpa,
-        contour_step=args.contour_step,
-        output_path=heatmap_dir / f"heatmap_{slug}.png",
-        dpi=args.dpi,
-    )
+            contour_step=args.contour_step,
+            output_path=heatmap_dir / f"heatmap_{slug}.png",
+            dpi=args.dpi,
+            contours_only=args.contours_only,
+            min_contour_vertices=args.min_contour_vertices,
+            min_contour_length_deg=args.min_contour_length_deg,
+        )
+        if dropped_contours:
+            print(
+                f"  kept {kept_contours} contour segments; "
+                f"dropped {dropped_contours} tiny segments"
+            )
         if not args.heatmaps_only:
             plot_waterfall(
                 score_subset=score_subset,

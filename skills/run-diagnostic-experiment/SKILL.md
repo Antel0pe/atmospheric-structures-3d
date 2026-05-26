@@ -23,12 +23,13 @@ Create one experiment folder under `tmp/`:
 
 ```text
 tmp/<experiment-slug>/
-  findings/
-    <experiment-slug>.md
   <subexperiment-or-variant-slug>/
     <plot-name>_<level>hpa.png
   <another-subexperiment-or-variant-slug>/
     <plot-name>_<level>hpa.png
+-------
+findings/
+  <experiment-slug>.md
 ```
 
 Rules:
@@ -37,7 +38,7 @@ Rules:
 - If there is only one method, use a clear subfolder like `base/`, `plots/`, or the method name.
 - Use one PNG per requested pressure level unless the user explicitly asks for an overview, panel, GIF, or combined figure.
 - Do not make per-level subfolders unless the user asks; put level-specific PNGs directly in the relevant subexperiment folder.
-- Always create a brief experiment-specific Markdown note in `tmp/<experiment-slug>/findings/`.
+- Always create a brief experiment-specific Markdown note in `findings/<experiment-slug>`.
 - Keep names repo-relative and portable. Never write full local filesystem paths into generated files, notes, reports, or scripts intended to be shared.
 
 ## Artifact Rules
@@ -46,7 +47,7 @@ By default, generate only:
 
 - scripts needed to run the experiment, usually in `tmp/<experiment-slug>/`
 - PNG plots, one per requested level
-- a brief Markdown findings note in `tmp/<experiment-slug>/findings/`
+- a brief Markdown findings note in `findings/<experiment-slug>`
 - a small README or JSON manifest only when it materially helps reproduce the run
 
 Do **not** generate `.npy` or `.csv` files unless the user explicitly requests them.
@@ -58,7 +59,7 @@ If intermediate arrays are needed, keep them in memory or recompute them. If per
 After running an experiment, create or update:
 
 ```text
-tmp/<experiment-slug>/findings/<experiment-slug>.md
+findings/<experiment-slug>.md
 ```
 
 Keep this note quick and dirty. It should preserve the user's thoughts and the experiment lineage, not become a polished report.
@@ -143,5 +144,5 @@ Before finishing:
 - Did each requested level get its own plot?
 - Are land/coast/country borders included on maps unless the user said otherwise?
 - Were `.npy` and `.csv` files avoided unless explicitly requested?
-- Does `tmp/<experiment-slug>/findings/` contain a brief Markdown note for the experiment?
+- Does `findings/<experiment-slug>/` contain a brief Markdown note for the experiment?
 - Are all paths in generated artifacts repo-relative?

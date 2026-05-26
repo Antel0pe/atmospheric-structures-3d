@@ -148,3 +148,7 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 - look at frontogensis and temperature gradient again
 - different levels typically look at different things?
 - ask what would a meteorologist do/think/look at to find cold vs hot boundaries
+
+
+25/05/26
+- do with multiple hours at pressure levels and see how it changes
