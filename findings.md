@@ -152,3 +152,17 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 
 25/05/26
 - do with multiple hours at pressure levels and see how it changes
+
+26/05/26
+- many different things work to identify hot/cold like 2 clustering, lowest bucket count but no reason to choose between any of them really. no methodology to choose between them
+- downside of clustering is that every boundary is strict, none are diffuse or slow
+- simple metrics best because they simplify data without adding additional complexity - also makes it hard to trust
+- we care about defining 3 things: hot, cold, transition air
+    - any method has to either identify hot/cold and by exclusion identifying transition air or identifying transition air and then hotter is hot air and vice versa
+- experiments like tmp/fuzzy-local-thermal-interface find a point of transition instead of transition air. this is fine because we can extend out from the point of transition air so not the biggest deal
+    - a problem with this experiment is that it doesnt identify at least 2 cuts per longitude around the globe. there should be at least 1 transition per hemisphere (potentially more) but it often doesnt identify one
+    - generally transition air should wrap around globe or self connect as there's always a boundary right?
+- atmosphere is continuous fluid meaning while we may not see "exact number matches" they probably exist on sub grid scale. this could be root cause of broken lines and contours
+- what does transition even mean? we're defining it as hot vs cold air but what about hot vs hotter air? it can't simply be biggest percentile difference because what about mountains and deserts at surface level?
+
+- tmmr can sample different longitudes and make line plots of their thermal displacement and/or temperature values. can try to interpolate and make it more continuous before plotting to see any difference. the goal is to find noticeably different regimes the line goes to

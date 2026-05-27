@@ -1,0 +1,72 @@
+{
+  "process": "canonical Thermal Displacement scores clustered into two non-spatial value clusters per time and pressure level",
+  "dataset": ".worktree-shared/data/era5_temperature_2021-11-08t15_to_2021-11-10t00_3hourly_250-1000hpa.nc",
+  "climatology": ".worktree-shared/data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "valid_times": [
+    "2021-11-08T15:00:00",
+    "2021-11-08T18:00:00",
+    "2021-11-08T21:00:00",
+    "2021-11-09T00:00:00",
+    "2021-11-09T03:00:00",
+    "2021-11-09T06:00:00",
+    "2021-11-09T09:00:00",
+    "2021-11-09T12:00:00",
+    "2021-11-09T15:00:00",
+    "2021-11-09T18:00:00",
+    "2021-11-09T21:00:00",
+    "2021-11-10T00:00:00"
+  ],
+  "pressure_levels_hpa": [
+    250.0,
+    300.0,
+    350.0,
+    400.0,
+    450.0,
+    500.0,
+    550.0,
+    600.0,
+    650.0,
+    700.0,
+    750.0,
+    775.0,
+    800.0,
+    825.0,
+    850.0,
+    875.0,
+    900.0,
+    925.0,
+    950.0,
+    975.0,
+    1000.0
+  ],
+  "pressure_level_gifs_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "score_smooth_sigma_cells": 1.0,
+  "clustering_method": "For each time and pressure level, run 1D k-means with k=2 on Thermal Displacement score values. Cluster membership is only by score value; cells do not need to touch spatially.",
+  "gif_frame_duration_seconds": 0.5,
+  "time_gifs": [
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211108t1500-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211108t1800-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211108t2100-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t0000-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t0300-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t0600-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t0900-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t1200-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t1500-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t1800-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211109t2100-levels-250-to-1000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-20211110t0000-levels-250-to-1000-0p5s.gif"
+  ],
+  "pressure_gifs": [
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-0250hpa-20211108t1500-to-20211110t0000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-0500hpa-20211108t1500-to-20211110t0000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-0850hpa-20211108t1500-to-20211110t0000-0p5s.gif",
+    "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/gifs/thermal-displacement-score-two-clusters-1000hpa-20211108t1500-to-20211110t0000-0p5s.gif"
+  ],
+  "stats_csv": "experiments/thermal-displacement-score-two-clusters/time-series-2021-11-08t15-to-2021-11-10t00/cluster_stats_by_time_level.csv"
+}

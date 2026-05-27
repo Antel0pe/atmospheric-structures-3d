@@ -55,6 +55,14 @@ Treat the notes as an active tool. Before major brainstorming, planning, or impl
 
 In git worktrees, `notes/` may be a symlink to shared local state created by `worktree-scripts/setup-worktree.sh`. Re-read the specific note immediately before editing it, keep updates append-oriented, and use `worktree-scripts/with-shared-notes-lock.sh -- <command>` for scripted or bulk notes edits.
 
+# Experiment Findings
+
+Use the repo-local `findings/` directory as the place to look for previous experiment findings, observations, and quick conclusions before rerunning or revisiting an old diagnostic idea.
+
+For new experiments, follow `skills/run-diagnostic-experiment/`: create or update a brief Markdown note at `findings/<experiment-slug>.md` with the experiment title, date, purpose, levels/domain/variants, repo-relative output paths, user feedback, and requested iterations. Do not put new findings notes under `tmp/<experiment-slug>/findings/`.
+
+Keep findings notes quick and practical. Append later analysis, correlations, interpretations, and iteration requests to the relevant experiment note unless the user says otherwise. Do not polish these into formal reports, and never include full local filesystem paths.
+
 # Local Skills
 
 This repo includes two local-only meteorological diagnostic skills under `skills/`:

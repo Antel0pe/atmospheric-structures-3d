@@ -144,5 +144,5 @@ Before finishing:
 - Did each requested level get its own plot?
 - Are land/coast/country borders included on maps unless the user said otherwise?
 - Were `.npy` and `.csv` files avoided unless explicitly requested?
-- Does `findings/<experiment-slug>/` contain a brief Markdown note for the experiment?
+- Does `findings/<experiment-slug>.md` contain a brief Markdown note for the experiment?
 - Are all paths in generated artifacts repo-relative?
