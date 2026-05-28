@@ -9,6 +9,13 @@ description: Run repo-local atmospheric diagnostic experiments when the user ask
 
 Conduct the experiment in the repo's `tmp/` folder, keep outputs easy to compare, and avoid surprise data dumps.
 
+Hard defaults:
+
+- Experiment outputs go under repo-relative `tmp/<experiment-slug>/`.
+- When the user says "tmp folder", assume repo-relative `tmp/`, not `/tmp`.
+- Do not put experiment outputs in `/tmp` or an `experiments/` folder unless the user explicitly asks.
+- Findings notes go in repo-relative `findings/<experiment-slug>.md`, not under `tmp/<experiment-slug>/findings/`, unless the user explicitly asks.
+
 Default pressure levels are:
 
 ```text
@@ -27,9 +34,9 @@ tmp/<experiment-slug>/
     <plot-name>_<level>hpa.png
   <another-subexperiment-or-variant-slug>/
     <plot-name>_<level>hpa.png
--------
-findings/
-  <experiment-slug>.md
+  summary.json
+
+findings/<experiment-slug>.md
 ```
 
 Rules:
@@ -38,7 +45,7 @@ Rules:
 - If there is only one method, use a clear subfolder like `base/`, `plots/`, or the method name.
 - Use one PNG per requested pressure level unless the user explicitly asks for an overview, panel, GIF, or combined figure.
 - Do not make per-level subfolders unless the user asks; put level-specific PNGs directly in the relevant subexperiment folder.
-- Always create a brief experiment-specific Markdown note in `findings/<experiment-slug>`.
+- Always create a brief experiment-specific Markdown note in `findings/<experiment-slug>.md`.
 - Keep names repo-relative and portable. Never write full local filesystem paths into generated files, notes, reports, or scripts intended to be shared.
 
 ## Artifact Rules
@@ -47,12 +54,14 @@ By default, generate only:
 
 - scripts needed to run the experiment, usually in `tmp/<experiment-slug>/`
 - PNG plots, one per requested level
-- a brief Markdown findings note in `findings/<experiment-slug>`
-- a small README or JSON manifest only when it materially helps reproduce the run
+- a brief Markdown findings note in `findings/<experiment-slug>.md`
+- a concise `summary.json` when it materially helps reproduce the run
 
-Do **not** generate `.npy` or `.csv` files unless the user explicitly requests them.
+Do **not** generate intermediate `.npy` or `.csv` files unless the user explicitly requests them.
 
 If intermediate arrays are needed, keep them in memory or recompute them. If persistence is unavoidable, ask before writing binary/tabular intermediates.
+
+Keep `summary.json` minimal. Include only the fields needed to reproduce or inspect the experiment, such as script path, input data paths, levels, domain/window, variants, key parameters, output paths, and run date. Do not turn it into a verbose report or duplicate the findings note.
 
 ## Findings Note
 
@@ -113,7 +122,7 @@ For pressure-level plots:
    - `notes/index.md`
    - relevant current notes if the experiment touches product direction or known technical pitfalls
    - `thermal_displacement.md` and `scripts/thermal_displacement.py` when the request involves thermal displacement, equivalent-latitude matching, or polar-like/equator-like temperature score
-3. Create `tmp/<experiment-slug>/` and subfolders for each method/variant.
+3. Create repo-relative `tmp/<experiment-slug>/` and subfolders for each method/variant.
 4. Write a small, reproducible script under the experiment folder when needed.
 5. Run Python with the conda environment named `atmospheric-structures-3d`.
 6. Set writable plotting caches before matplotlib/cartopy work when needed:
@@ -123,6 +132,8 @@ MPLCONFIGDIR=/tmp/atmospheric-structures-3d-cache/matplotlib \
 XDG_CACHE_HOME=/tmp/atmospheric-structures-3d-cache \
 conda run -n atmospheric-structures-3d python tmp/<experiment-slug>/<script>.py
 ```
+
+The `/tmp` paths in this command are only for disposable process caches, not experiment outputs.
 
 7. Verify the expected PNG count and dimensions after the run.
 8. Create or update the Markdown findings note.
@@ -141,8 +152,10 @@ conda run -n atmospheric-structures-3d python tmp/<experiment-slug>/<script>.py
 Before finishing:
 
 - Are all outputs under `tmp/<experiment-slug>/`?
+- Did the run avoid `/tmp` and `experiments/` for experiment outputs unless explicitly requested?
 - Did each requested level get its own plot?
 - Are land/coast/country borders included on maps unless the user said otherwise?
-- Were `.npy` and `.csv` files avoided unless explicitly requested?
+- Were intermediate `.npy` and `.csv` files avoided unless explicitly requested?
+- If `summary.json` exists, is it concise and limited to reproducibility essentials?
 - Does `findings/<experiment-slug>.md` contain a brief Markdown note for the experiment?
 - Are all paths in generated artifacts repo-relative?

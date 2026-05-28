@@ -1,0 +1,55 @@
+{
+  "experiment": "thermal-displacement-longitude-hemisphere-lines",
+  "method": "canonical same-longitude same-hemisphere Thermal Displacement",
+  "dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp": "2021-11-08T12:00",
+  "levels_hpa": [
+    250,
+    500,
+    850,
+    1000
+  ],
+  "score_smooth_sigma_cells": 1.0,
+  "longitude_sample_count": 10,
+  "sampled_longitudes_degrees": [
+    -180.0,
+    -144.0,
+    -108.0,
+    -72.0,
+    -36.0,
+    0.0,
+    36.0,
+    72.0,
+    108.0,
+    144.0
+  ],
+  "x_axis": "absolute latitude, ordered from pole to equator separately for each hemisphere",
+  "line_encoding": "color is longitude; solid is Northern Hemisphere; dashed is Southern Hemisphere",
+  "plots": [
+    {
+      "pressure_level_hpa": 250,
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots/thermal_displacement_longitude_hemisphere_lines_0250hpa.png",
+      "score_min": 0.0,
+      "score_max": 100.0
+    },
+    {
+      "pressure_level_hpa": 500,
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots/thermal_displacement_longitude_hemisphere_lines_0500hpa.png",
+      "score_min": 0.0,
+      "score_max": 100.0
+    },
+    {
+      "pressure_level_hpa": 850,
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots/thermal_displacement_longitude_hemisphere_lines_0850hpa.png",
+      "score_min": 0.0,
+      "score_max": 100.0
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots/thermal_displacement_longitude_hemisphere_lines_1000hpa.png",
+      "score_min": 0.0,
+      "score_max": 100.0
+    }
+  ]
+}

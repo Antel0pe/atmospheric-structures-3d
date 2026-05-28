@@ -156,7 +156,7 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 26/05/26
 - many different things work to identify hot/cold like 2 clustering, lowest bucket count but no reason to choose between any of them really. no methodology to choose between them
 - downside of clustering is that every boundary is strict, none are diffuse or slow
-- simple metrics best because they simplify data without adding additional complexity - also makes it hard to trust
+- simple metrics best because they simplify data without adding additional complexity - also makes it easier to trust
 - we care about defining 3 things: hot, cold, transition air
     - any method has to either identify hot/cold and by exclusion identifying transition air or identifying transition air and then hotter is hot air and vice versa
 - experiments like tmp/fuzzy-local-thermal-interface find a point of transition instead of transition air. this is fine because we can extend out from the point of transition air so not the biggest deal
@@ -166,3 +166,11 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 - what does transition even mean? we're defining it as hot vs cold air but what about hot vs hotter air? it can't simply be biggest percentile difference because what about mountains and deserts at surface level?
 
 - tmmr can sample different longitudes and make line plots of their thermal displacement and/or temperature values. can try to interpolate and make it more continuous before plotting to see any difference. the goal is to find noticeably different regimes the line goes to
+- range based method? for a given point find a range of what normal is say middle 80% then based on that range define hot and cold?
+    - likely ends up similar to anomaly based method. sure this is locally cold/warm metric but i care about global level
+    - what does global level even mean though? in my head im thinking in terms of mid latitude but then what is mid latitude? it's possible the conflict extends further out? i mean to be fair i might not know what mid latitudes is but i know for a fact that the equator isnt it. so maybe defining a super broad surely the mid latitude transition zone has to exist within this range. then looking for max transition along there?
+
+
+27-05-26
+- the line plots might be better to run them on raw temperature and the plots with raw temperature too since thermal displacement might be too jagged compared to raw. 
+- analyze them more - looking for just the biggest jump might not be the best since that would highlight sharp gradients rather than extended gradual transition air?

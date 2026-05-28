@@ -1,0 +1,51 @@
+{
+  "title": "North America 850 hPa longitude window",
+  "family": "regional_850hpa",
+  "hemisphere": "south",
+  "pressure_level_hpa": 850,
+  "timestamp": "2021-11-08T12:00",
+  "profile_and_thermal_displacement_map": "tmp/thermal-displacement-longitude-hemisphere-lines/organized-profile-map-pairs/regional_850hpa/north_america/south/profile_and_thermal_displacement_map.png",
+  "matching_plot_folder_output": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_north_america_longitude_window_south.png",
+  "source_summary": "tmp/thermal-displacement-longitude-hemisphere-lines/regional_windows_850hpa_summary.json",
+  "requested_longitudes_degrees": [
+    -130.0,
+    -120.0,
+    -110.0,
+    -100.0,
+    -90.0
+  ],
+  "matched_grid_longitudes_degrees": [
+    -130.0,
+    -120.0,
+    -110.0,
+    -100.0,
+    -90.0
+  ],
+  "matched_grid_longitude_labels": [
+    "130\u00b0W",
+    "120\u00b0W",
+    "110\u00b0W",
+    "100\u00b0W",
+    "90\u00b0W"
+  ],
+  "latitude_marker_degrees": [
+    -90.0,
+    -75.0,
+    -60.0,
+    -45.0,
+    -30.0,
+    -15.0,
+    -0.0
+  ],
+  "map_extent": [
+    -142.0,
+    -68.0,
+    -78.0,
+    -5.0
+  ],
+  "window": [
+    -130.0,
+    -80.0
+  ],
+  "map_field": "thermal_displacement_score"
+}

@@ -1,0 +1,48 @@
+{
+  "title": "Random 850 hPa set 3",
+  "family": "random_850hpa",
+  "hemisphere": "north",
+  "pressure_level_hpa": 850,
+  "timestamp": "2021-11-08T12:00",
+  "profile_and_thermal_displacement_map": "tmp/thermal-displacement-longitude-hemisphere-lines/organized-profile-map-pairs/random_850hpa/set_03/north/profile_and_thermal_displacement_map.png",
+  "matching_plot_folder_output": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-random-sets-850hpa/thermal_displacement_850hpa_random_longitude_set_03_north.png",
+  "source_summary": "tmp/thermal-displacement-longitude-hemisphere-lines/random_850hpa_summary.json",
+  "requested_longitudes_degrees": [
+    -72.5,
+    70.75,
+    96.5,
+    128.25,
+    169.75
+  ],
+  "matched_grid_longitudes_degrees": [
+    -72.5,
+    70.75,
+    96.5,
+    128.25,
+    169.75
+  ],
+  "matched_grid_longitude_labels": [
+    "72.5\u00b0W",
+    "70.75\u00b0E",
+    "96.5\u00b0E",
+    "128.25\u00b0E",
+    "169.75\u00b0E"
+  ],
+  "latitude_marker_degrees": [
+    90.0,
+    75.0,
+    60.0,
+    45.0,
+    30.0,
+    15.0,
+    0.0
+  ],
+  "map_extent": [
+    -180.0,
+    180.0,
+    0.0,
+    90.0
+  ],
+  "window": null,
+  "map_field": "thermal_displacement_score"
+}

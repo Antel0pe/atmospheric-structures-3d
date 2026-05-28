@@ -1,0 +1,255 @@
+{
+  "experiment": "thermal-displacement-longitude-hemisphere-lines",
+  "iteration": "regional 850 hPa longitude windows split by hemisphere with Thermal Displacement maps",
+  "method": "canonical same-longitude same-hemisphere Thermal Displacement",
+  "dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "climatology": "data/era5_temperature-climatology_1990-2020_11-08_12.nc",
+  "timestamp": "2021-11-08T12:00",
+  "pressure_level_hpa": 850,
+  "score_smooth_sigma_cells": 1.0,
+  "window_width_degrees": 50.0,
+  "longitude_increment_degrees": 10.0,
+  "longitudes_per_region": 5,
+  "plots_per_region": 2,
+  "line_count_per_plot": 5,
+  "x_axis": "absolute latitude, ordered from pole to equator for the selected hemisphere",
+  "line_encoding": "color is longitude",
+  "map_field": "thermal_displacement_score",
+  "map_encoding": "black vertical lines are 50-degree window boundaries; colored vertical lines are sampled longitudes; dot markers are plotted every 15 latitude degrees",
+  "plots": [
+    {
+      "region": "North America",
+      "hemisphere": "north",
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_north_america_longitude_window_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "map_field": "thermal_displacement_score",
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ]
+    },
+    {
+      "region": "North America",
+      "hemisphere": "south",
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_north_america_longitude_window_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "map_field": "thermal_displacement_score",
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ]
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_europe_longitude_window_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "map_field": "thermal_displacement_score",
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ]
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_europe_longitude_window_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "map_field": "thermal_displacement_score",
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ]
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_russia_longitude_window_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "map_field": "thermal_displacement_score",
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ]
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "plot": "tmp/thermal-displacement-longitude-hemisphere-lines/plots-regional-windows-850hpa/thermal_displacement_850hpa_russia_longitude_window_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "map_field": "thermal_displacement_score",
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ]
+    }
+  ]
+}
