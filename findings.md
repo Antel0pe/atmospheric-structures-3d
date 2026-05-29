@@ -174,3 +174,8 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 27-05-26
 - the line plots might be better to run them on raw temperature and the plots with raw temperature too since thermal displacement might be too jagged compared to raw. 
 - analyze them more - looking for just the biggest jump might not be the best since that would highlight sharp gradients rather than extended gradual transition air?
+
+28-05-26
+- wait raw temperature climatology at 250hpa has a warm bump into the atlantic ocean off the southern tip of greenland
+- the line plot based approach can help see where white colored areas arent necessarily transitions
+- some way to judge line based on climatology lines? not in terms of higher or lower than line but in terms of slope of line relative to segments?

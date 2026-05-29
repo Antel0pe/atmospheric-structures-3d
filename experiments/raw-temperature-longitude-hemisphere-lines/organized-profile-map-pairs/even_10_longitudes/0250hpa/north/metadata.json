@@ -1,0 +1,68 @@
+{
+  "title": "Even 10 longitudes, 250 hPa",
+  "family": "even_10_longitudes",
+  "hemisphere": "north",
+  "pressure_level_hpa": 250,
+  "timestamp": "2021-11-08T12:00",
+  "profile_and_raw_temperature_map": "tmp/raw-temperature-longitude-hemisphere-lines/organized-profile-map-pairs/even_10_longitudes/0250hpa/north/profile_and_raw_temperature_map.png",
+  "matching_plot_folder_output": "tmp/raw-temperature-longitude-hemisphere-lines/plots/raw_temperature_longitude_lines_0250hpa_north.png",
+  "source_summary": "tmp/raw-temperature-longitude-hemisphere-lines/summary.json",
+  "requested_longitudes_degrees": [
+    -180.0,
+    -144.0,
+    -108.0,
+    -72.0,
+    -36.0,
+    0.0,
+    36.0,
+    72.0,
+    108.0,
+    144.0
+  ],
+  "matched_grid_longitudes_degrees": [
+    -180.0,
+    -144.0,
+    -108.0,
+    -72.0,
+    -36.0,
+    0.0,
+    36.0,
+    72.0,
+    108.0,
+    144.0
+  ],
+  "matched_grid_longitude_labels": [
+    "180\u00b0E",
+    "144\u00b0W",
+    "108\u00b0W",
+    "72\u00b0W",
+    "36\u00b0W",
+    "0\u00b0E",
+    "36\u00b0E",
+    "72\u00b0E",
+    "108\u00b0E",
+    "144\u00b0E"
+  ],
+  "latitude_marker_degrees": [
+    90.0,
+    75.0,
+    60.0,
+    45.0,
+    30.0,
+    15.0,
+    0.0
+  ],
+  "map_extent": [
+    -180.0,
+    180.0,
+    0.0,
+    90.0
+  ],
+  "window": null,
+  "map_field": "raw_temperature_k",
+  "temperature_unit": "K",
+  "color_scale": "per pressure level raw temperature min/max",
+  "temperature_min_k": 200.88088989257812,
+  "temperature_max_k": 235.70901489257812,
+  "temperature_mean_k": 221.3592529296875
+}

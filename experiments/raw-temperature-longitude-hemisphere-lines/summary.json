@@ -1,0 +1,61 @@
+{
+  "experiment": "raw-temperature-longitude-hemisphere-lines",
+  "method": "raw ERA5 pressure-level temperature",
+  "dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "timestamp": "2021-11-08T12:00",
+  "levels_hpa": [
+    250,
+    500,
+    850,
+    1000
+  ],
+  "temperature_unit": "K",
+  "longitude_sample_count": 10,
+  "sampled_longitudes_degrees": [
+    -180.0,
+    -144.0,
+    -108.0,
+    -72.0,
+    -36.0,
+    0.0,
+    36.0,
+    72.0,
+    108.0,
+    144.0
+  ],
+  "x_axis": "absolute latitude, ordered from pole to equator separately for each hemisphere",
+  "line_encoding": "color is longitude; solid is Northern Hemisphere; dashed is Southern Hemisphere in the one-panel summary plots",
+  "plots": [
+    {
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots/raw_temperature_longitude_lines_0250hpa.png",
+      "temperature_min_k": 200.88088989257812,
+      "temperature_max_k": 235.70901489257812,
+      "temperature_mean_k": 221.3592529296875
+    },
+    {
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots/raw_temperature_longitude_lines_0500hpa.png",
+      "temperature_min_k": 228.2738037109375,
+      "temperature_max_k": 271.8646240234375,
+      "temperature_mean_k": 252.4130401611328
+    },
+    {
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots/raw_temperature_longitude_lines_0850hpa.png",
+      "temperature_min_k": 243.51126098632812,
+      "temperature_max_k": 305.0552062988281,
+      "temperature_mean_k": 274.374755859375
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots/raw_temperature_longitude_lines_1000hpa.png",
+      "temperature_min_k": 247.7929229736328,
+      "temperature_max_k": 314.83782958984375,
+      "temperature_mean_k": 281.4176025390625
+    }
+  ],
+  "plot_dirs": [
+    "tmp/raw-temperature-longitude-hemisphere-lines/plots"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "title": "North America 850 hPa longitude window",
+  "family": "regional_850hpa",
+  "hemisphere": "north",
+  "pressure_level_hpa": 850,
+  "timestamp": "2021-11-08T12:00",
+  "profile_and_raw_temperature_map": "tmp/raw-temperature-longitude-hemisphere-lines/organized-profile-map-pairs/regional_850hpa/north_america/north/profile_and_raw_temperature_map.png",
+  "matching_plot_folder_output": "tmp/raw-temperature-longitude-hemisphere-lines/plots-regional-windows-850hpa/raw_temperature_850hpa_north_america_longitude_window_north.png",
+  "source_summary": "tmp/raw-temperature-longitude-hemisphere-lines/regional_windows_850hpa_summary.json",
+  "requested_longitudes_degrees": [
+    -130.0,
+    -120.0,
+    -110.0,
+    -100.0,
+    -90.0
+  ],
+  "matched_grid_longitudes_degrees": [
+    -130.0,
+    -120.0,
+    -110.0,
+    -100.0,
+    -90.0
+  ],
+  "matched_grid_longitude_labels": [
+    "130\u00b0W",
+    "120\u00b0W",
+    "110\u00b0W",
+    "100\u00b0W",
+    "90\u00b0W"
+  ],
+  "latitude_marker_degrees": [
+    90.0,
+    75.0,
+    60.0,
+    45.0,
+    30.0,
+    15.0,
+    0.0
+  ],
+  "map_extent": [
+    -142.0,
+    -68.0,
+    5.0,
+    78.0
+  ],
+  "window": [
+    -130.0,
+    -80.0
+  ],
+  "map_field": "raw_temperature_k",
+  "temperature_unit": "K",
+  "color_scale": "per pressure level raw temperature min/max",
+  "temperature_min_k": 243.51126098632812,
+  "temperature_max_k": 305.0552062988281,
+  "temperature_mean_k": 274.374755859375
+}

@@ -1,0 +1,52 @@
+{
+  "experiment": "raw-temperature-climatology-maps",
+  "date": "2026-05-28",
+  "source_dataset": "data/global-pressure-level-temperature-stack-for-nov-8-12z-dry-theta-climatology_1990-to-2020_p1-to-1000.nc",
+  "variable": "t",
+  "method": "mean raw pressure-level temperature across valid_time entries",
+  "valid_time_count": 31,
+  "levels_hpa": [
+    250,
+    500,
+    850,
+    1000
+  ],
+  "domain": "global latitude/longitude",
+  "unit": "K",
+  "script": "tmp/raw-temperature-climatology-maps/plot_raw_temperature_climatology_maps.py",
+  "plots_dir": "tmp/raw-temperature-climatology-maps/plots",
+  "levels": [
+    {
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-0250hpa.png",
+      "min_k": 206.97415161132812,
+      "mean_k": 221.95864868164062,
+      "max_k": 233.5242919921875,
+      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+    },
+    {
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-0500hpa.png",
+      "min_k": 231.65103149414062,
+      "mean_k": 252.50953674316406,
+      "max_k": 269.0226135253906,
+      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+    },
+    {
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-0850hpa.png",
+      "min_k": 246.6554412841797,
+      "mean_k": 274.1219482421875,
+      "max_k": 302.02734375,
+      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-1000hpa.png",
+      "min_k": 248.24530029296875,
+      "mean_k": 280.78216552734375,
+      "max_k": 311.9124755859375,
+      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+    }
+  ]
+}

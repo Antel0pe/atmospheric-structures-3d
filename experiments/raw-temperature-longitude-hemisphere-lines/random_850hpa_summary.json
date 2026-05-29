@@ -1,0 +1,77 @@
+{
+  "experiment": "raw-temperature-longitude-hemisphere-lines",
+  "iteration": "random non-overlapping 850 hPa longitude sets",
+  "method": "raw ERA5 pressure-level temperature",
+  "dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "timestamp": "2021-11-08T12:00",
+  "pressure_level_hpa": 850,
+  "temperature_unit": "K",
+  "random_seed": 20260528,
+  "plot_count": 3,
+  "longitudes_per_plot": 5,
+  "line_count_per_plot": 10,
+  "x_axis": "absolute latitude, ordered from pole to equator separately for each hemisphere",
+  "line_encoding": "color is longitude; solid is Northern Hemisphere; dashed is Southern Hemisphere in the one-panel summary plots",
+  "plots": [
+    {
+      "group_number": 1,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots-random-sets-850hpa/raw_temperature_850hpa_random_longitude_set_01.png",
+      "sampled_longitudes_degrees": [
+        -115.75,
+        -102.0,
+        12.0,
+        27.0,
+        159.5
+      ],
+      "sampled_longitude_labels": [
+        "115.75\u00b0W",
+        "102\u00b0W",
+        "12\u00b0E",
+        "27\u00b0E",
+        "159.5\u00b0E"
+      ]
+    },
+    {
+      "group_number": 2,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots-random-sets-850hpa/raw_temperature_850hpa_random_longitude_set_02.png",
+      "sampled_longitudes_degrees": [
+        -125.25,
+        -113.0,
+        -56.0,
+        -42.25,
+        -38.5
+      ],
+      "sampled_longitude_labels": [
+        "125.25\u00b0W",
+        "113\u00b0W",
+        "56\u00b0W",
+        "42.25\u00b0W",
+        "38.5\u00b0W"
+      ]
+    },
+    {
+      "group_number": 3,
+      "plot": "tmp/raw-temperature-longitude-hemisphere-lines/plots-random-sets-850hpa/raw_temperature_850hpa_random_longitude_set_03.png",
+      "sampled_longitudes_degrees": [
+        -72.5,
+        70.75,
+        96.5,
+        128.25,
+        169.75
+      ],
+      "sampled_longitude_labels": [
+        "72.5\u00b0W",
+        "70.75\u00b0E",
+        "96.5\u00b0E",
+        "128.25\u00b0E",
+        "169.75\u00b0E"
+      ]
+    }
+  ],
+  "plot_dirs": [
+    "tmp/raw-temperature-longitude-hemisphere-lines/plots-random-sets-850hpa"
+  ],
+  "temperature_min_k": 243.51126098632812,
+  "temperature_max_k": 305.0552062988281,
+  "temperature_mean_k": 274.374755859375
+}
