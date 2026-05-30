@@ -1,6 +1,7 @@
 {
   "experiment": "raw-temperature-climatology-maps",
-  "date": "2026-05-28",
+  "date": "2026-05-29",
+  "iteration": "regional longitude-window profile-map plots using raw temperature climatology",
   "source_dataset": "data/global-pressure-level-temperature-stack-for-nov-8-12z-dry-theta-climatology_1990-to-2020_p1-to-1000.nc",
   "variable": "t",
   "method": "mean raw pressure-level temperature across valid_time entries",
@@ -11,42 +12,1130 @@
     850,
     1000
   ],
-  "domain": "global latitude/longitude",
-  "unit": "K",
-  "script": "tmp/raw-temperature-climatology-maps/plot_raw_temperature_climatology_maps.py",
-  "plots_dir": "tmp/raw-temperature-climatology-maps/plots",
-  "levels": [
+  "regions": [
+    "North America",
+    "Europe",
+    "Russia"
+  ],
+  "hemispheres": [
+    "north",
+    "south"
+  ],
+  "window_width_degrees": 50.0,
+  "longitude_increment_degrees": 10.0,
+  "longitudes_per_region": 5,
+  "line_count_per_plot": 5,
+  "x_axis": "absolute latitude, ordered from pole to equator for the selected hemisphere",
+  "line_encoding": "color is longitude",
+  "map_field": "raw_temperature_climatology_k",
+  "map_encoding": "black vertical lines are 50-degree window boundaries; colored vertical lines are sampled longitudes; dot markers are plotted every 15 latitude degrees",
+  "color_scale": "per pressure level climatology min/max",
+  "temperature_unit": "K",
+  "script": "experiments/raw-temperature-climatology-maps/plot_raw_temperature_climatology_maps.py",
+  "plots_dir": "experiments/raw-temperature-climatology-maps/plots-regional-windows",
+  "plot_count": 24,
+  "level_ranges": {
+    "250": {
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    "500": {
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    "850": {
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    "1000": {
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    }
+  },
+  "plots": [
     {
+      "region": "North America",
+      "hemisphere": "north",
       "pressure_level_hpa": 250,
-      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-0250hpa.png",
-      "min_k": 206.97415161132812,
-      "mean_k": 221.95864868164062,
-      "max_k": 233.5242919921875,
-      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0250hpa_north_america_longitude_window_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
     },
     {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 250,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0250hpa_north_america_longitude_window_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 250,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0250hpa_europe_longitude_window_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 250,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0250hpa_europe_longitude_window_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 250,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0250hpa_russia_longitude_window_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 250,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0250hpa_russia_longitude_window_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    {
+      "region": "North America",
+      "hemisphere": "north",
       "pressure_level_hpa": 500,
-      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-0500hpa.png",
-      "min_k": 231.65103149414062,
-      "mean_k": 252.50953674316406,
-      "max_k": 269.0226135253906,
-      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0500hpa_north_america_longitude_window_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
     },
     {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 500,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0500hpa_north_america_longitude_window_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 500,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0500hpa_europe_longitude_window_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 500,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0500hpa_europe_longitude_window_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 500,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0500hpa_russia_longitude_window_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 500,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0500hpa_russia_longitude_window_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    {
+      "region": "North America",
+      "hemisphere": "north",
       "pressure_level_hpa": 850,
-      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-0850hpa.png",
-      "min_k": 246.6554412841797,
-      "mean_k": 274.1219482421875,
-      "max_k": 302.02734375,
-      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0850hpa_north_america_longitude_window_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
     },
     {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 850,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0850hpa_north_america_longitude_window_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 850,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0850hpa_europe_longitude_window_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 850,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0850hpa_europe_longitude_window_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 850,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0850hpa_russia_longitude_window_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 850,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_0850hpa_russia_longitude_window_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    {
+      "region": "North America",
+      "hemisphere": "north",
       "pressure_level_hpa": 1000,
-      "plot": "tmp/raw-temperature-climatology-maps/plots/raw-temperature-climatology-map-1000hpa.png",
-      "min_k": 248.24530029296875,
-      "mean_k": 280.78216552734375,
-      "max_k": 311.9124755859375,
-      "color_scale": "per pressure level min/max; blue low, white midpoint, red high"
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_1000hpa_north_america_longitude_window_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    },
+    {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 1000,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_1000hpa_north_america_longitude_window_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "sampled_longitudes_degrees": [
+        -130.0,
+        -120.0,
+        -110.0,
+        -100.0,
+        -90.0
+      ],
+      "sampled_longitude_labels": [
+        "130\u00b0W",
+        "120\u00b0W",
+        "110\u00b0W",
+        "100\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 1000,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_1000hpa_europe_longitude_window_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 1000,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_1000hpa_europe_longitude_window_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "sampled_longitudes_degrees": [
+        -10.0,
+        0.0,
+        10.0,
+        20.0,
+        30.0
+      ],
+      "sampled_longitude_labels": [
+        "10\u00b0W",
+        "0\u00b0E",
+        "10\u00b0E",
+        "20\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 1000,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_1000hpa_russia_longitude_window_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 1000,
+      "plot": "experiments/raw-temperature-climatology-maps/plots-regional-windows/raw_temperature_climatology_1000hpa_russia_longitude_window_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "sampled_longitudes_degrees": [
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+        100.0
+      ],
+      "sampled_longitude_labels": [
+        "60\u00b0E",
+        "70\u00b0E",
+        "80\u00b0E",
+        "90\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "color_scale": "per pressure level climatology min/max",
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
     }
   ]
 }

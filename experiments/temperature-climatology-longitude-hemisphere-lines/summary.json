@@ -1,0 +1,160 @@
+{
+  "experiment": "temperature-climatology-longitude-hemisphere-lines",
+  "method": "raw temperature climatology latitude profiles at evenly sampled global longitudes, computed as mean(t) over valid_time",
+  "input": "data/global-pressure-level-temperature-stack-for-nov-8-12z-dry-theta-climatology_1990-to-2020_p1-to-1000.nc",
+  "variable": "t",
+  "aggregation": "mean over valid_time",
+  "valid_time_count": 31,
+  "first_valid_time": "1990-11-08T12:00:00",
+  "last_valid_time": "2020-11-08T12:00:00",
+  "levels_hpa": [
+    250,
+    500,
+    850,
+    1000
+  ],
+  "longitude_sample_count": 5,
+  "sampled_longitudes_degrees": [
+    -180.0,
+    -108.0,
+    -36.0,
+    36.0,
+    108.0
+  ],
+  "variant": "even-5-longitudes",
+  "x_axis": "actual latitude in degrees, split by hemisphere",
+  "y_axis": "mean raw t over valid_time in Kelvin",
+  "line_only_plots": [
+    {
+      "pressure_level_hpa": 250,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_0250hpa_north.png",
+      "temperature_min_k": 213.03964233398438,
+      "temperature_max_k": 233.22744750976562
+    },
+    {
+      "pressure_level_hpa": 250,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_0250hpa_south.png",
+      "temperature_min_k": 207.08827209472656,
+      "temperature_max_k": 233.01205444335938
+    },
+    {
+      "pressure_level_hpa": 500,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_0500hpa_north.png",
+      "temperature_min_k": 234.39756774902344,
+      "temperature_max_k": 268.8005065917969
+    },
+    {
+      "pressure_level_hpa": 500,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_0500hpa_south.png",
+      "temperature_min_k": 232.33409118652344,
+      "temperature_max_k": 268.9068603515625
+    },
+    {
+      "pressure_level_hpa": 850,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_0850hpa_north.png",
+      "temperature_min_k": 251.27638244628906,
+      "temperature_max_k": 299.2098083496094
+    },
+    {
+      "pressure_level_hpa": 850,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_0850hpa_south.png",
+      "temperature_min_k": 247.31689453125,
+      "temperature_max_k": 298.3525085449219
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_1000hpa_north.png",
+      "temperature_min_k": 251.43722534179688,
+      "temperature_max_k": 311.6080017089844
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes/temperature_climatology_longitude_lines_1000hpa_south.png",
+      "temperature_min_k": 255.09158325195312,
+      "temperature_max_k": 308.43572998046875
+    }
+  ],
+  "paired_profile_raw_temperature_map_plots": [
+    {
+      "pressure_level_hpa": 250,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_0250hpa_north.png",
+      "temperature_min_k": 213.03964233398438,
+      "temperature_max_k": 233.22744750976562,
+      "map_color_min_k": 204.8501403808594,
+      "map_color_max_k": 235.64830322265624
+    },
+    {
+      "pressure_level_hpa": 250,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_0250hpa_south.png",
+      "temperature_min_k": 207.08827209472656,
+      "temperature_max_k": 233.01205444335938,
+      "map_color_min_k": 204.8501403808594,
+      "map_color_max_k": 235.64830322265624
+    },
+    {
+      "pressure_level_hpa": 500,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_0500hpa_north.png",
+      "temperature_min_k": 234.39756774902344,
+      "temperature_max_k": 268.8005065917969,
+      "map_color_min_k": 228.66130493164061,
+      "map_color_max_k": 272.0123400878906
+    },
+    {
+      "pressure_level_hpa": 500,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_0500hpa_south.png",
+      "temperature_min_k": 232.33409118652344,
+      "temperature_max_k": 268.9068603515625,
+      "map_color_min_k": 228.66130493164061,
+      "map_color_max_k": 272.0123400878906
+    },
+    {
+      "pressure_level_hpa": 850,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_0850hpa_north.png",
+      "temperature_min_k": 251.27638244628906,
+      "temperature_max_k": 299.2098083496094,
+      "map_color_min_k": 242.22568908691406,
+      "map_color_max_k": 306.4570959472656
+    },
+    {
+      "pressure_level_hpa": 850,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_0850hpa_south.png",
+      "temperature_min_k": 247.31689453125,
+      "temperature_max_k": 298.3525085449219,
+      "map_color_min_k": 242.22568908691406,
+      "map_color_max_k": 306.4570959472656
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "hemisphere": "north",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_1000hpa_north.png",
+      "temperature_min_k": 251.43722534179688,
+      "temperature_max_k": 311.6080017089844,
+      "map_color_min_k": 243.15192626953126,
+      "map_color_max_k": 317.005849609375
+    },
+    {
+      "pressure_level_hpa": 1000,
+      "hemisphere": "south",
+      "plot": "tmp/temperature-climatology-longitude-hemisphere-lines/even-5-longitudes-profile-raw-temperature-map/temperature_climatology_profile_raw_temperature_map_1000hpa_south.png",
+      "temperature_min_k": 255.09158325195312,
+      "temperature_max_k": 308.43572998046875,
+      "map_color_min_k": 243.15192626953126,
+      "map_color_max_k": 317.005849609375
+    }
+  ],
+  "map_encoding": "raw temperature climatology with coastlines, borders, extracted longitude meridians, and 15-degree latitude markers"
+}

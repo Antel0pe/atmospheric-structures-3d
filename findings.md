@@ -179,3 +179,10 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 - wait raw temperature climatology at 250hpa has a warm bump into the atlantic ocean off the southern tip of greenland
 - the line plot based approach can help see where white colored areas arent necessarily transitions
 - some way to judge line based on climatology lines? not in terms of higher or lower than line but in terms of slope of line relative to segments?
+
+29-05-26
+- what im trying to use the lines to do is identify big changes in general slope along line segments. so if a line segment is generally following slightly increasing slope, then has HUGE jump, then has another slightly increasing stage. the huge jump could be transition air. of course it might not always be huge jump transition air.  
+- piecewise line segments seems to be a good way of doing this
+    - the tmp/raw-temperature-climatology-longitude-derivative/1000hpa/piecewise-segments/raw_temperature_climatology_1000hpa_russia_longitude_window_north_piecewise_segments.png is pretty good, it's not perfect for example doesn't catch things coming down between dots which i would do but generally high level the piecewise line segments are exactly what i would identify too
+
+- interesting idea to explore further tmp/piecewise-transition-air-search/slope-regime-heatmaps/slope_regimes_0250hpa_south.png - this sort of view might be very helpful

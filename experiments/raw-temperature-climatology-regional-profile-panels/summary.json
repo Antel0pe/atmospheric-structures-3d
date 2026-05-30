@@ -1,0 +1,1210 @@
+{
+  "experiment": "raw-temperature-climatology-regional-profile-panels",
+  "date": "2026-05-29",
+  "method": "regional longitude-window profile-map panels combining raw ERA5 temperature with valid_time-mean raw temperature climatology",
+  "raw_dataset": "data/era5_temperature_2021-11_08-12.nc",
+  "raw_timestamp": "2021-11-08T12:00",
+  "climatology_dataset": "data/global-pressure-level-temperature-stack-for-nov-8-12z-dry-theta-climatology_1990-to-2020_p1-to-1000.nc",
+  "climatology_method": "mean across valid_time",
+  "climatology_valid_time_count": 31,
+  "variable": "t",
+  "levels_hpa": [
+    250,
+    500,
+    850,
+    1000
+  ],
+  "regions": [
+    "North America",
+    "Europe",
+    "Russia"
+  ],
+  "hemispheres": [
+    "north",
+    "south"
+  ],
+  "window_width_degrees": 50.0,
+  "longitudes_per_region": 3,
+  "profile_line_count_per_plot": 6,
+  "x_axis": "absolute latitude, ordered from pole to equator for the selected hemisphere",
+  "line_encoding": "color is longitude; solid is raw temperature; dashed is climatology",
+  "map_encoding": "black vertical lines are 50-degree window boundaries; colored vertical lines are sampled longitudes; dot markers are plotted every 15 latitude degrees",
+  "temperature_unit": "K",
+  "script": "tmp/raw-temperature-climatology-regional-profile-panels/plot_regional_profile_panels.py",
+  "plots_dir": "tmp/raw-temperature-climatology-regional-profile-panels/plots",
+  "plot_count": 24,
+  "raw_level_ranges": {
+    "250": {
+      "temperature_min_k": 200.88088989257812,
+      "temperature_max_k": 235.70901489257812,
+      "temperature_mean_k": 221.3592529296875
+    },
+    "500": {
+      "temperature_min_k": 228.2738037109375,
+      "temperature_max_k": 271.8646240234375,
+      "temperature_mean_k": 252.4130401611328
+    },
+    "850": {
+      "temperature_min_k": 243.51126098632812,
+      "temperature_max_k": 305.0552062988281,
+      "temperature_mean_k": 274.374755859375
+    },
+    "1000": {
+      "temperature_min_k": 247.7929229736328,
+      "temperature_max_k": 314.83782958984375,
+      "temperature_mean_k": 281.4176025390625
+    }
+  },
+  "climatology_level_ranges": {
+    "250": {
+      "temperature_min_k": 206.97415161132812,
+      "temperature_max_k": 233.5242919921875,
+      "temperature_mean_k": 221.95864868164062
+    },
+    "500": {
+      "temperature_min_k": 231.65103149414062,
+      "temperature_max_k": 269.0226135253906,
+      "temperature_mean_k": 252.50953674316406
+    },
+    "850": {
+      "temperature_min_k": 246.6554412841797,
+      "temperature_max_k": 302.02734375,
+      "temperature_mean_k": 274.1219482421875
+    },
+    "1000": {
+      "temperature_min_k": 248.24530029296875,
+      "temperature_max_k": 311.9124755859375,
+      "temperature_mean_k": 280.78216552734375
+    }
+  },
+  "plots": [
+    {
+      "region": "North America",
+      "hemisphere": "north",
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0250hpa_north_america_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0250hpa_north_america_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0250hpa_europe_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0250hpa_europe_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0250hpa_russia_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 250,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0250hpa_russia_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "north",
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0500hpa_north_america_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0500hpa_north_america_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0500hpa_europe_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0500hpa_europe_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0500hpa_russia_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 500,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0500hpa_russia_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "north",
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0850hpa_north_america_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0850hpa_north_america_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0850hpa_europe_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0850hpa_europe_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0850hpa_russia_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 850,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_0850hpa_russia_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "north",
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_1000hpa_north_america_north.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        5.0,
+        78.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "North America",
+      "hemisphere": "south",
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_1000hpa_north_america_south.png",
+      "window_degrees": [
+        -130.0,
+        -80.0
+      ],
+      "requested_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -130.0,
+        -110.0,
+        -90.0
+      ],
+      "matched_grid_longitude_labels": [
+        "130\u00b0W",
+        "110\u00b0W",
+        "90\u00b0W"
+      ],
+      "map_extent": [
+        -142.0,
+        -68.0,
+        -78.0,
+        -5.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "north",
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_1000hpa_europe_north.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        25.0,
+        75.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Europe",
+      "hemisphere": "south",
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_1000hpa_europe_south.png",
+      "window_degrees": [
+        -10.0,
+        40.0
+      ],
+      "requested_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        -10.0,
+        10.0,
+        30.0
+      ],
+      "matched_grid_longitude_labels": [
+        "10\u00b0W",
+        "10\u00b0E",
+        "30\u00b0E"
+      ],
+      "map_extent": [
+        -22.0,
+        52.0,
+        -75.0,
+        -25.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "north",
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_1000hpa_russia_north.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        35.0,
+        82.0
+      ],
+      "latitude_marker_degrees": [
+        90.0,
+        75.0,
+        60.0,
+        45.0,
+        30.0,
+        15.0,
+        0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    },
+    {
+      "region": "Russia",
+      "hemisphere": "south",
+      "pressure_level_hpa": 1000,
+      "plot": "tmp/raw-temperature-climatology-regional-profile-panels/plots/raw_temperature_climatology_regional_profile_panel_1000hpa_russia_south.png",
+      "window_degrees": [
+        60.0,
+        110.0
+      ],
+      "requested_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitudes_degrees": [
+        60.0,
+        80.0,
+        100.0
+      ],
+      "matched_grid_longitude_labels": [
+        "60\u00b0E",
+        "80\u00b0E",
+        "100\u00b0E"
+      ],
+      "map_extent": [
+        48.0,
+        122.0,
+        -82.0,
+        -35.0
+      ],
+      "latitude_marker_degrees": [
+        -90.0,
+        -75.0,
+        -60.0,
+        -45.0,
+        -30.0,
+        -15.0,
+        -0.0
+      ],
+      "profile_line_count": 6,
+      "profile_line_encoding": "same color per longitude; solid is raw temperature; dashed is climatology",
+      "raw_map_field": "raw_temperature_k",
+      "climatology_map_field": "raw_temperature_climatology_k",
+      "temperature_unit": "K",
+      "raw_color_scale": "per pressure level raw temperature min/max",
+      "climatology_color_scale": "per pressure level climatology min/max"
+    }
+  ]
+}
