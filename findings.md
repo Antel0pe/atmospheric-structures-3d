@@ -186,3 +186,9 @@ maybe make some sort of plot viewer that makes it easy to compare plots
     - the tmp/raw-temperature-climatology-longitude-derivative/1000hpa/piecewise-segments/raw_temperature_climatology_1000hpa_russia_longitude_window_north_piecewise_segments.png is pretty good, it's not perfect for example doesn't catch things coming down between dots which i would do but generally high level the piecewise line segments are exactly what i would identify too
 
 - interesting idea to explore further tmp/piecewise-transition-air-search/slope-regime-heatmaps/slope_regimes_0250hpa_south.png - this sort of view might be very helpful
+
+30-05-26
+- potentially using climatology to find sharper boundaries of transition air masses
+- is the climatology boundaries representative of sharp or gradual transition air? what does the average represent?
+- honestly looking for cold/hot air isnt exciting really, the so what isnt really there for me anymore
+- looking for cold vs hot air does mean big gradient just that the 2 air masses have to be specific temperatures. looking for a specific kind of big gradient. can maybe apply the piecewise line segment thing to air too. then at higher levels i should clearly see the jetstream and then use that as a seed at lower levels to find other gradients?
