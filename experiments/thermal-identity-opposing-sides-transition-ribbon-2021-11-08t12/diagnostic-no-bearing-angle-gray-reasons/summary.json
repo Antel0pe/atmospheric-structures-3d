@@ -1,0 +1,126 @@
+{
+  "diagnostic": "global-no-bearing-angle-gray-reasons",
+  "date_run": "2026-05-31",
+  "timestamp": "2021-11-08T12:00 UTC",
+  "levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "rendered_absolute_latitude_band_degrees": [
+    20.0,
+    70.0
+  ],
+  "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+  "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+  "search_radius_degrees": 12.0,
+  "bearing_angle_gate_applied": false,
+  "gray_reason_rule": "An unresolved gray intermediate cell has nearest warm core farther than 12 degrees, nearest cold core farther than 12 degrees, or both. Distances are spherical great-circle angular distances. No bearing-angle condition is applied.",
+  "levels": [
+    {
+      "pressure_level_hpa": 250.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-no-bearing-angle-gray-reasons/no_bearing_angle_gray_reasons_0250hpa.png",
+      "stats": {
+        "rendered_band_cell_count": 578880,
+        "intermediate_cell_fraction_of_rendered_band": 0.2757324488667772,
+        "yellow_cell_fraction_of_rendered_band": 0.23362182144831398,
+        "unresolved_gray_cell_fraction_of_rendered_band": 0.04211062741846324,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.15272278468323977,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.6977068548221684,
+          "cold_core_too_far": 0.30134963285063787,
+          "both_cores_too_far": 0.0
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 13.875310897827148,
+            "p90": 20.89388084411621
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 3.0,
+            "p90": 16.064797210693364
+          }
+        }
+      }
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-no-bearing-angle-gray-reasons/no_bearing_angle_gray_reasons_0500hpa.png",
+      "stats": {
+        "rendered_band_cell_count": 578880,
+        "intermediate_cell_fraction_of_rendered_band": 0.38871441404090656,
+        "yellow_cell_fraction_of_rendered_band": 0.17936359867330018,
+        "unresolved_gray_cell_fraction_of_rendered_band": 0.2093508153676064,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.5385722983392514,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.47392090041175355,
+          "cold_core_too_far": 0.5091221150434445,
+          "both_cores_too_far": 0.015050870953634405
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 10.860837936401367,
+            "p90": 20.053336334228515
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 12.315839767456055,
+            "p90": 20.616357040405273
+          }
+        }
+      }
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-no-bearing-angle-gray-reasons/no_bearing_angle_gray_reasons_0850hpa.png",
+      "stats": {
+        "rendered_band_cell_count": 578880,
+        "intermediate_cell_fraction_of_rendered_band": 0.3577753593145384,
+        "yellow_cell_fraction_of_rendered_band": 0.2181868435599779,
+        "unresolved_gray_cell_fraction_of_rendered_band": 0.13958851575456052,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.3901568739166333,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.46953777612771486,
+          "cold_core_too_far": 0.5282593898892395,
+          "both_cores_too_far": 0.0005816471752985582
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 8.500202178955078,
+            "p90": 20.08625602722168
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 12.313302040100098,
+            "p90": 20.261746597290042
+          }
+        }
+      }
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-no-bearing-angle-gray-reasons/no_bearing_angle_gray_reasons_1000hpa.png",
+      "stats": {
+        "rendered_band_cell_count": 578880,
+        "intermediate_cell_fraction_of_rendered_band": 0.4188052791597568,
+        "yellow_cell_fraction_of_rendered_band": 0.19016203703703705,
+        "unresolved_gray_cell_fraction_of_rendered_band": 0.22864324212271975,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.5459416428117704,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.5210680205807022,
+          "cold_core_too_far": 0.46771232348874636,
+          "both_cores_too_far": 0.009821921016644378
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 12.371930122375488,
+            "p90": 20.416876983642585
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 9.08085823059082,
+            "p90": 19.0
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,618 @@
+{
+  "experiment": "thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12",
+  "date_run": "2026-05-31",
+  "timestamp": "2021-11-08T12:00 UTC",
+  "inputs": {
+    "raw_temperature": "data/era5_temperature_2021-11_08-12.nc",
+    "temperature_climatology": "data/era5_temperature-climatology_1990-2020_11-08_12.nc"
+  },
+  "identity_field": "Canonical same-longitude, same-pressure, same-hemisphere Thermal Displacement converted back to absolute matched climatological latitude.",
+  "rule": "Warm cores resemble a conservative low-latitude climatological source band. Cold cores resemble a conservative high-latitude climatological source band. A validated transition cell has intermediate identity, a nearby nearest warm core, a nearby nearest cold core, and substantially opposing bearings toward those cores. The test does not assume that warm air is equatorward or cold air is poleward. One sensitivity variant removes the bearing-angle gate and requires nearby cores only.",
+  "levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "rendered_absolute_latitude_band_degrees": [
+    20.0,
+    70.0
+  ],
+  "intermediate_arrays_written": false,
+  "variants": [
+    {
+      "slug": "primary-nearby-opposing-cores",
+      "title": "Primary nearby opposing-core test",
+      "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+      "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+      "search_radius_degrees": 12.0,
+      "minimum_opposition_angle_degrees": 120.0,
+      "levels": [
+        {
+          "pressure_level_hpa": 250.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/primary-nearby-opposing-cores/opposing_sides_transition_ribbon_0250hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.15068062465450524,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 2.4287123680114746,
+              "nearest_cold_core_distance_degrees": 2.364318370819092,
+              "warm_cold_bearing_opposition_angle_degrees": 154.8876953125
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9993055555555556,
+              "median_ribbon_width_deg_when_present": 9.5,
+              "p90_ribbon_width_deg_when_present": 16.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9965277777777778,
+              "median_ribbon_width_deg_when_present": 4.5,
+              "p90_ribbon_width_deg_when_present": 10.25
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 500.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/primary-nearby-opposing-cores/opposing_sides_transition_ribbon_0500hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.14557248479823107,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.112836837768555,
+              "nearest_cold_core_distance_degrees": 6.198892593383789,
+              "warm_cold_bearing_opposition_angle_degrees": 157.7779998779297
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9354166666666667,
+              "median_ribbon_width_deg_when_present": 8.75,
+              "p90_ribbon_width_deg_when_present": 12.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.8875,
+              "median_ribbon_width_deg_when_present": 8.0,
+              "p90_ribbon_width_deg_when_present": 12.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 850.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/primary-nearby-opposing-cores/opposing_sides_transition_ribbon_0850hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.15297125483692647,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 4.831137657165527,
+              "nearest_cold_core_distance_degrees": 4.850905895233154,
+              "warm_cold_bearing_opposition_angle_degrees": 154.885986328125
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9270833333333334,
+              "median_ribbon_width_deg_when_present": 9.25,
+              "p90_ribbon_width_deg_when_present": 13.75
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9958333333333333,
+              "median_ribbon_width_deg_when_present": 7.5,
+              "p90_ribbon_width_deg_when_present": 12.25
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 1000.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/primary-nearby-opposing-cores/opposing_sides_transition_ribbon_1000hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.13841901603095633,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.88577938079834,
+              "nearest_cold_core_distance_degrees": 6.726794719696045,
+              "warm_cold_bearing_opposition_angle_degrees": 154.24777221679688
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.8951388888888889,
+              "median_ribbon_width_deg_when_present": 8.5,
+              "p90_ribbon_width_deg_when_present": 12.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9805555555555555,
+              "median_ribbon_width_deg_when_present": 6.75,
+              "p90_ribbon_width_deg_when_present": 11.5
+            }
+          }
+        }
+      ],
+      "all_level_overlay": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/primary-nearby-opposing-cores/opposing_sides_transition_ribbon_all_level_overlay.png"
+    },
+    {
+      "slug": "sensitivity-broader-search-radius",
+      "title": "Sensitivity: broader search radius",
+      "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+      "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+      "search_radius_degrees": 18.0,
+      "minimum_opposition_angle_degrees": 120.0,
+      "levels": [
+        {
+          "pressure_level_hpa": 250.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-broader-search-radius/opposing_sides_transition_ribbon_0250hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.1728579325594251,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 2.7436251640319824,
+              "nearest_cold_core_distance_degrees": 2.5,
+              "warm_cold_bearing_opposition_angle_degrees": 154.7462615966797
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 9.5,
+              "p90_ribbon_width_deg_when_present": 16.25
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 5.25,
+              "p90_ribbon_width_deg_when_present": 15.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 500.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-broader-search-radius/opposing_sides_transition_ribbon_0500hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.2368832918739635,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.918537616729736,
+              "nearest_cold_core_distance_degrees": 6.919956684112549,
+              "warm_cold_bearing_opposition_angle_degrees": 155.60154724121094
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 11.75,
+              "p90_ribbon_width_deg_when_present": 18.524999618530273
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9951388888888889,
+              "median_ribbon_width_deg_when_present": 12.25,
+              "p90_ribbon_width_deg_when_present": 17.25
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 850.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-broader-search-radius/opposing_sides_transition_ribbon_0850hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.2037088861249309,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 5.061185359954834,
+              "nearest_cold_core_distance_degrees": 5.403740882873535,
+              "warm_cold_bearing_opposition_angle_degrees": 154.32028198242188
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9798611111111111,
+              "median_ribbon_width_deg_when_present": 11.25,
+              "p90_ribbon_width_deg_when_present": 16.5
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 9.25,
+              "p90_ribbon_width_deg_when_present": 16.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 1000.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-broader-search-radius/opposing_sides_transition_ribbon_1000hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.24342523493642895,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 7.15791130065918,
+              "nearest_cold_core_distance_degrees": 7.364725589752197,
+              "warm_cold_bearing_opposition_angle_degrees": 154.12240600585938
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9854166666666667,
+              "median_ribbon_width_deg_when_present": 11.5,
+              "p90_ribbon_width_deg_when_present": 17.25
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 13.625,
+              "p90_ribbon_width_deg_when_present": 18.0
+            }
+          }
+        }
+      ],
+      "all_level_overlay": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-broader-search-radius/opposing_sides_transition_ribbon_all_level_overlay.png"
+    },
+    {
+      "slug": "sensitivity-stricter-opposition-angle",
+      "title": "Sensitivity: stricter opposing-side angle",
+      "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+      "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+      "search_radius_degrees": 12.0,
+      "minimum_opposition_angle_degrees": 150.0,
+      "levels": [
+        {
+          "pressure_level_hpa": 250.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-stricter-opposition-angle/opposing_sides_transition_ribbon_0250hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.0877038419016031,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 2.2803425788879395,
+              "nearest_cold_core_distance_degrees": 2.395310878753662,
+              "warm_cold_bearing_opposition_angle_degrees": 166.46438598632812
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.975,
+              "median_ribbon_width_deg_when_present": 5.5,
+              "p90_ribbon_width_deg_when_present": 9.75
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9583333333333334,
+              "median_ribbon_width_deg_when_present": 2.625,
+              "p90_ribbon_width_deg_when_present": 7.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 500.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-stricter-opposition-angle/opposing_sides_transition_ribbon_0500hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.09407303758982863,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.0,
+              "nearest_cold_core_distance_degrees": 6.001788139343262,
+              "warm_cold_bearing_opposition_angle_degrees": 166.2462921142578
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.8173611111111111,
+              "median_ribbon_width_deg_when_present": 6.0,
+              "p90_ribbon_width_deg_when_present": 10.75
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.7083333333333334,
+              "median_ribbon_width_deg_when_present": 6.5,
+              "p90_ribbon_width_deg_when_present": 11.25
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 850.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-stricter-opposition-angle/opposing_sides_transition_ribbon_0850hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.09001865671641791,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 4.674000263214111,
+              "nearest_cold_core_distance_degrees": 4.726000785827637,
+              "warm_cold_bearing_opposition_angle_degrees": 165.0263671875
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.8305555555555556,
+              "median_ribbon_width_deg_when_present": 5.125,
+              "p90_ribbon_width_deg_when_present": 11.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9090277777777778,
+              "median_ribbon_width_deg_when_present": 4.75,
+              "p90_ribbon_width_deg_when_present": 8.300000190734863
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 1000.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-stricter-opposition-angle/opposing_sides_transition_ribbon_1000hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.07938778330569375,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.870294570922852,
+              "nearest_cold_core_distance_degrees": 6.657666206359863,
+              "warm_cold_bearing_opposition_angle_degrees": 165.4864501953125
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.7319444444444444,
+              "median_ribbon_width_deg_when_present": 5.25,
+              "p90_ribbon_width_deg_when_present": 9.5
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.7541666666666667,
+              "median_ribbon_width_deg_when_present": 5.0,
+              "p90_ribbon_width_deg_when_present": 10.5
+            }
+          }
+        }
+      ],
+      "all_level_overlay": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-stricter-opposition-angle/opposing_sides_transition_ribbon_all_level_overlay.png"
+    },
+    {
+      "slug": "sensitivity-no-bearing-angle",
+      "title": "Sensitivity: nearby cores only, no bearing-angle gate",
+      "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+      "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+      "search_radius_degrees": 12.0,
+      "minimum_opposition_angle_degrees": null,
+      "levels": [
+        {
+          "pressure_level_hpa": 250.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle/opposing_sides_transition_ribbon_0250hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.23362182144831398,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 2.7891488075256348,
+              "nearest_cold_core_distance_degrees": 2.5,
+              "warm_cold_bearing_opposition_angle_degrees": 137.61940002441406
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 15.0,
+              "p90_ribbon_width_deg_when_present": 22.75
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 7.25,
+              "p90_ribbon_width_deg_when_present": 14.25
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 500.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle/opposing_sides_transition_ribbon_0500hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.17936359867330018,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.25,
+              "nearest_cold_core_distance_degrees": 6.387689590454102,
+              "warm_cold_bearing_opposition_angle_degrees": 151.7801055908203
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9597222222222223,
+              "median_ribbon_width_deg_when_present": 10.75,
+              "p90_ribbon_width_deg_when_present": 13.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9236111111111112,
+              "median_ribbon_width_deg_when_present": 9.5,
+              "p90_ribbon_width_deg_when_present": 12.75
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 850.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle/opposing_sides_transition_ribbon_0850hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.2181868435599779,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 4.986764907836914,
+              "nearest_cold_core_distance_degrees": 5.094856262207031,
+              "warm_cold_bearing_opposition_angle_degrees": 142.44723510742188
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9888888888888889,
+              "median_ribbon_width_deg_when_present": 12.0,
+              "p90_ribbon_width_deg_when_present": 15.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 11.25,
+              "p90_ribbon_width_deg_when_present": 15.25
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 1000.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle/opposing_sides_transition_ribbon_1000hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.19016203703703705,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.870930194854736,
+              "nearest_cold_core_distance_degrees": 6.75,
+              "warm_cold_bearing_opposition_angle_degrees": 143.2422332763672
+            },
+            "north": {
+              "longitude_coverage_fraction": 0.9416666666666667,
+              "median_ribbon_width_deg_when_present": 12.0,
+              "p90_ribbon_width_deg_when_present": 14.5
+            },
+            "south": {
+              "longitude_coverage_fraction": 0.9951388888888889,
+              "median_ribbon_width_deg_when_present": 8.75,
+              "p90_ribbon_width_deg_when_present": 13.0
+            }
+          }
+        }
+      ],
+      "all_level_overlay": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle/opposing_sides_transition_ribbon_all_level_overlay.png"
+    },
+    {
+      "slug": "sensitivity-no-bearing-angle-radius15",
+      "title": "Sensitivity: nearby cores only, 15 deg radius",
+      "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+      "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+      "search_radius_degrees": 15.0,
+      "minimum_opposition_angle_degrees": null,
+      "levels": [
+        {
+          "pressure_level_hpa": 250.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius15/opposing_sides_transition_ribbon_0250hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.2537607103372029,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 3.0019333362579346,
+              "nearest_cold_core_distance_degrees": 2.6188583374023438,
+              "warm_cold_bearing_opposition_angle_degrees": 137.86769104003906
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 15.75,
+              "p90_ribbon_width_deg_when_present": 24.75
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 8.125,
+              "p90_ribbon_width_deg_when_present": 18.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 500.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius15/opposing_sides_transition_ribbon_0500hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.25614807904919845,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 6.79886531829834,
+              "nearest_cold_core_distance_degrees": 7.027216911315918,
+              "warm_cold_bearing_opposition_angle_degrees": 148.45111083984375
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 14.25,
+              "p90_ribbon_width_deg_when_present": 17.5
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 12.5,
+              "p90_ribbon_width_deg_when_present": 15.75
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 850.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius15/opposing_sides_transition_ribbon_0850hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.27593456329463795,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 5.231775283813477,
+              "nearest_cold_core_distance_degrees": 5.52531099319458,
+              "warm_cold_bearing_opposition_angle_degrees": 140.37954711914062
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 15.25,
+              "p90_ribbon_width_deg_when_present": 20.0
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 13.5,
+              "p90_ribbon_width_deg_when_present": 18.524999618530273
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 1000.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius15/opposing_sides_transition_ribbon_1000hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.28238840519624103,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 7.2831926345825195,
+              "nearest_cold_core_distance_degrees": 7.187754154205322,
+              "warm_cold_bearing_opposition_angle_degrees": 142.31976318359375
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 15.25,
+              "p90_ribbon_width_deg_when_present": 19.5
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 13.75,
+              "p90_ribbon_width_deg_when_present": 18.0
+            }
+          }
+        }
+      ],
+      "all_level_overlay": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius15/opposing_sides_transition_ribbon_all_level_overlay.png"
+    },
+    {
+      "slug": "sensitivity-no-bearing-angle-radius20",
+      "title": "Sensitivity: nearby cores only, 20 deg radius",
+      "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+      "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+      "search_radius_degrees": 20.0,
+      "minimum_opposition_angle_degrees": null,
+      "levels": [
+        {
+          "pressure_level_hpa": 250.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius20/opposing_sides_transition_ribbon_0250hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.2694047125483693,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 3.1252007484436035,
+              "nearest_cold_core_distance_degrees": 2.5582358837127686,
+              "warm_cold_bearing_opposition_angle_degrees": 138.03529357910156
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 16.0,
+              "p90_ribbon_width_deg_when_present": 24.75
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 8.25,
+              "p90_ribbon_width_deg_when_present": 22.5
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 500.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius20/opposing_sides_transition_ribbon_0500hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.3427186981757877,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 7.11259126663208,
+              "nearest_cold_core_distance_degrees": 7.464412689208984,
+              "warm_cold_bearing_opposition_angle_degrees": 144.93930053710938
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 19.0,
+              "p90_ribbon_width_deg_when_present": 24.5
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 17.5,
+              "p90_ribbon_width_deg_when_present": 23.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 850.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius20/opposing_sides_transition_ribbon_0850hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.3283357517965727,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 5.3310346603393555,
+              "nearest_cold_core_distance_degrees": 5.75260066986084,
+              "warm_cold_bearing_opposition_angle_degrees": 137.7389373779297
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 17.25,
+              "p90_ribbon_width_deg_when_present": 26.774999618530273
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 15.75,
+              "p90_ribbon_width_deg_when_present": 23.0
+            }
+          }
+        },
+        {
+          "pressure_level_hpa": 1000.0,
+          "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius20/opposing_sides_transition_ribbon_1000hpa.png",
+          "ribbon_stats": {
+            "rendered_band_cell_fraction": 0.3761280403537866,
+            "validated_cell_medians": {
+              "nearest_warm_core_distance_degrees": 7.566800117492676,
+              "nearest_cold_core_distance_degrees": 7.338776588439941,
+              "warm_cold_bearing_opposition_angle_degrees": 140.78707885742188
+            },
+            "north": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 19.25,
+              "p90_ribbon_width_deg_when_present": 26.25
+            },
+            "south": {
+              "longitude_coverage_fraction": 1.0,
+              "median_ribbon_width_deg_when_present": 19.25,
+              "p90_ribbon_width_deg_when_present": 23.274999618530273
+            }
+          }
+        }
+      ],
+      "all_level_overlay": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/sensitivity-no-bearing-angle-radius20/opposing_sides_transition_ribbon_all_level_overlay.png"
+    }
+  ]
+}

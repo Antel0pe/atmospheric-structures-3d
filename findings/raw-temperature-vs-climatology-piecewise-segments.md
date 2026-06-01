@@ -34,3 +34,9 @@ Verification:
 - All PNGs are `2624 x 2080`.
 - `summary.json` validates with `python -m json.tool`.
 - The output tree contains no `original/` or `smoothed-derivative/` directories.
+
+## Rerun 2026-05-31
+
+- Regenerated the requested four-panel piecewise-segment plots in place.
+- Kept the existing pressure-level and regional-window layout.
+- Confirmed that no `original/` or `smoothed-derivative/` output folders were created.

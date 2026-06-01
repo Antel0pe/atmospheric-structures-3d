@@ -1,0 +1,258 @@
+{
+  "variant": "preferred-no-bearing-angle-radius20-full-globe-pressure-stack",
+  "date_run": "2026-06-01",
+  "timestamp": "2021-11-08T12:00 UTC",
+  "inputs": {
+    "raw_temperature": "data/era5_temperature_2021-11_08-12.nc",
+    "temperature_climatology": "data/era5_temperature-climatology_1990-2020_11-08_12.nc"
+  },
+  "domain": "Full globe: all available latitude and longitude cells.",
+  "levels_hpa": [
+    250.0,
+    300.0,
+    350.0,
+    400.0,
+    450.0,
+    500.0,
+    550.0,
+    600.0,
+    650.0,
+    700.0,
+    750.0,
+    775.0,
+    800.0,
+    825.0,
+    850.0,
+    875.0,
+    900.0,
+    925.0,
+    950.0,
+    975.0,
+    1000.0
+  ],
+  "method": "Canonical same-longitude, same-pressure, same-hemisphere Thermal Displacement converted to absolute matched climatological latitude. Warm core is <=35 degrees; cold core is >=55 degrees; yellow is intermediate identity with nearest warm and cold cores each within 20 great-circle degrees. No bearing-angle gate.",
+  "gif": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/full_globe_nearby_core_pressure_stack_0250_to_1000hpa.gif",
+  "gif_settings": {
+    "source_level_frame_count": 21,
+    "interpolated_transition_frame_count": 80,
+    "total_frame_count": 101,
+    "source_level_hold_ms": 500,
+    "transition_frame_count_between_source_levels": 4,
+    "transition_frame_duration_ms": 100,
+    "animation_duration_seconds": 18.5,
+    "interpolation": "Visual crossfade between independently computed source-level maps. Blended frames are presentation interpolation, not inferred atmospheric levels."
+  },
+  "source_maps": [
+    {
+      "pressure_level_hpa": 250.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0250hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4273200093501636,
+        "nearby_core_transition_cell_fraction": 0.17391304347826086,
+        "unresolved_intermediate_cell_fraction": 0.003567671809256662,
+        "cold_core_cell_fraction": 0.39519927536231886
+      }
+    },
+    {
+      "pressure_level_hpa": 300.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0300hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4000340891382266,
+        "nearby_core_transition_cell_fraction": 0.19774329904940002,
+        "unresolved_intermediate_cell_fraction": 0.020804114071996258,
+        "cold_core_cell_fraction": 0.3814184977403771
+      }
+    },
+    {
+      "pressure_level_hpa": 350.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0350hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.40385596852111577,
+        "nearby_core_transition_cell_fraction": 0.18895804114071996,
+        "unresolved_intermediate_cell_fraction": 0.02840306997039115,
+        "cold_core_cell_fraction": 0.3787829203677731
+      }
+    },
+    {
+      "pressure_level_hpa": 400.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0400hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.40609805984104724,
+        "nearby_core_transition_cell_fraction": 0.1837190275829827,
+        "unresolved_intermediate_cell_fraction": 0.03401706404862085,
+        "cold_core_cell_fraction": 0.37616584852734924
+      }
+    },
+    {
+      "pressure_level_hpa": 450.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0450hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.40742948418263986,
+        "nearby_core_transition_cell_fraction": 0.19385226741467976,
+        "unresolved_intermediate_cell_fraction": 0.025078892005610098,
+        "cold_core_cell_fraction": 0.3736393563970703
+      }
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0500hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.40767882187938287,
+        "nearby_core_transition_cell_fraction": 0.19326301231104878,
+        "unresolved_intermediate_cell_fraction": 0.026477520648278012,
+        "cold_core_cell_fraction": 0.3725806451612903
+      }
+    },
+    {
+      "pressure_level_hpa": 550.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0550hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4069678198535141,
+        "nearby_core_transition_cell_fraction": 0.19617032881408758,
+        "unresolved_intermediate_cell_fraction": 0.025368162692847127,
+        "cold_core_cell_fraction": 0.3714936886395512
+      }
+    },
+    {
+      "pressure_level_hpa": 600.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0600hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4067632850241546,
+        "nearby_core_transition_cell_fraction": 0.1989705080255571,
+        "unresolved_intermediate_cell_fraction": 0.02428802399875331,
+        "cold_core_cell_fraction": 0.369978182951535
+      }
+    },
+    {
+      "pressure_level_hpa": 650.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0650hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4089946626149291,
+        "nearby_core_transition_cell_fraction": 0.19802575190899174,
+        "unresolved_intermediate_cell_fraction": 0.023474754558204768,
+        "cold_core_cell_fraction": 0.3695048309178744
+      }
+    },
+    {
+      "pressure_level_hpa": 700.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0700hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4107439223936419,
+        "nearby_core_transition_cell_fraction": 0.19890817360137136,
+        "unresolved_intermediate_cell_fraction": 0.018940899174068878,
+        "cold_core_cell_fraction": 0.3714070048309179
+      }
+    },
+    {
+      "pressure_level_hpa": 750.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0750hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4142599735078697,
+        "nearby_core_transition_cell_fraction": 0.19553237494156148,
+        "unresolved_intermediate_cell_fraction": 0.015538803179055634,
+        "cold_core_cell_fraction": 0.37466884837151315
+      }
+    },
+    {
+      "pressure_level_hpa": 775.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0775hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.41616117344553527,
+        "nearby_core_transition_cell_fraction": 0.19341884837151316,
+        "unresolved_intermediate_cell_fraction": 0.01546185912420134,
+        "cold_core_cell_fraction": 0.3749581190587502
+      }
+    },
+    {
+      "pressure_level_hpa": 800.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0800hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4177068723702665,
+        "nearby_core_transition_cell_fraction": 0.19046185912420133,
+        "unresolved_intermediate_cell_fraction": 0.016132928159576124,
+        "cold_core_cell_fraction": 0.37569834034595606
+      }
+    },
+    {
+      "pressure_level_hpa": 825.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0825hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.41889901823281905,
+        "nearby_core_transition_cell_fraction": 0.18770940470624903,
+        "unresolved_intermediate_cell_fraction": 0.01757635966962755,
+        "cold_core_cell_fraction": 0.37581521739130436
+      }
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0850hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.4195369721053452,
+        "nearby_core_transition_cell_fraction": 0.18512057815178432,
+        "unresolved_intermediate_cell_fraction": 0.018572736481221756,
+        "cold_core_cell_fraction": 0.37676971326164876
+      }
+    },
+    {
+      "pressure_level_hpa": 875.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0875hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.41651375253233597,
+        "nearby_core_transition_cell_fraction": 0.19071801464858967,
+        "unresolved_intermediate_cell_fraction": 0.018074061087735703,
+        "cold_core_cell_fraction": 0.3746941717313386
+      }
+    },
+    {
+      "pressure_level_hpa": 900.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0900hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.41144421069035375,
+        "nearby_core_transition_cell_fraction": 0.19601546672900108,
+        "unresolved_intermediate_cell_fraction": 0.01983598254636123,
+        "cold_core_cell_fraction": 0.37270434003428393
+      }
+    },
+    {
+      "pressure_level_hpa": 925.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0925hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.40791452392083527,
+        "nearby_core_transition_cell_fraction": 0.1999162381175004,
+        "unresolved_intermediate_cell_fraction": 0.024058165809568335,
+        "cold_core_cell_fraction": 0.368111072152096
+      }
+    },
+    {
+      "pressure_level_hpa": 950.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0950hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.40530621785881255,
+        "nearby_core_transition_cell_fraction": 0.20523609163160356,
+        "unresolved_intermediate_cell_fraction": 0.026037283777466107,
+        "cold_core_cell_fraction": 0.3634204067321178
+      }
+    },
+    {
+      "pressure_level_hpa": 975.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_0975hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.403823827333645,
+        "nearby_core_transition_cell_fraction": 0.2086352657004831,
+        "unresolved_intermediate_cell_fraction": 0.025869760012466884,
+        "cold_core_cell_fraction": 0.361671146953405
+      }
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/preferred-no-bearing-angle-radius20-full-globe-pressure-stack/source-level-maps/full_globe_nearby_core_1000hpa.png",
+      "stats": {
+        "warm_core_cell_fraction": 0.403264765466729,
+        "nearby_core_transition_cell_fraction": 0.21206658095683342,
+        "unresolved_intermediate_cell_fraction": 0.02561360448807854,
+        "cold_core_cell_fraction": 0.35905504908835906
+      }
+    }
+  ],
+  "intermediate_arrays_written": false
+}

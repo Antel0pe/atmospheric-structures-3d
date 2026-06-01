@@ -1,0 +1,481 @@
+{
+  "diagnostic": "russia-sector-gray-failure-reasons",
+  "date_run": "2026-05-31",
+  "timestamp": "2021-11-08T12:00 UTC",
+  "sector": {
+    "longitude_degrees_east": [
+      30.0,
+      180.0
+    ],
+    "latitude_degrees_north": [
+      45.0,
+      70.0
+    ]
+  },
+  "sector_note": "A simple Eurasia/Russia-sector bounding box, not a country-border mask.",
+  "identity_field": "Canonical Thermal Displacement converted to absolute matched climatological latitude.",
+  "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+  "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+  "primary_search_radius_degrees": 12.0,
+  "primary_minimum_opposition_angle_degrees": 120.0,
+  "gray_reason_rule": "Exclusive unresolved-gray reasons are assigned after the warm-core, cold-core, and validated-yellow masks: warm core too far, cold core too far, both too far, or both nearby but bearing separation below the opposition-angle threshold.",
+  "threshold_sensitivity_plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-russia-gray-reasons/gray_threshold_sensitivity.png",
+  "levels": [
+    {
+      "pressure_level_hpa": 250.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-russia-gray-reasons/gray_failure_reasons_0250hpa.png",
+      "global_primary_rule_stats": {
+        "sector_cell_count": 1026720,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.0849559763129188,
+          "warm_core": 0.20391343306841203,
+          "cold_core": 0.20443937977247936
+        },
+        "intermediate_cell_fraction_of_sector": 0.15546205391927692,
+        "unresolved_gray_cell_fraction_of_sector": 0.07050607760635812,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.4535259623095429,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.23494957867108718,
+          "cold_core_too_far": 0.10147810471059539,
+          "both_cores_too_far": 0.0,
+          "nearby_but_not_opposed": 0.6634894322420224
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 4.845184803009033,
+            "p90": 15.987852764129638
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 2.8093953132629395,
+            "p90": 12.059496688842772
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 95.63643264770508,
+            "p90": 154.48426208496093
+          }
+        }
+      },
+      "primary_rule_sector_stats": {
+        "sector_cell_count": 60600,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.16443894389438943,
+          "warm_core": 0.07744224422442245,
+          "cold_core": 0.4888778877887789
+        },
+        "intermediate_cell_fraction_of_sector": 0.4336798679867987,
+        "unresolved_gray_cell_fraction_of_sector": 0.26924092409240924,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.620828735588448,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.4601005148320667,
+          "cold_core_too_far": 0.0,
+          "both_cores_too_far": 0.0,
+          "nearby_but_not_opposed": 0.5398994851679333
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 10.997869491577148,
+            "p90": 22.151416778564453
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 2.6078017950057983,
+            "p90": 5.830673694610596
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 85.38568496704102,
+            "p90": 139.6367950439453
+          }
+        }
+      },
+      "radius_sweep": [
+        {
+          "radius_degrees": 8.0,
+          "unresolved_fraction_of_intermediate": 0.6809101632357977
+        },
+        {
+          "radius_degrees": 10.0,
+          "unresolved_fraction_of_intermediate": 0.6427076595258933
+        },
+        {
+          "radius_degrees": 12.0,
+          "unresolved_fraction_of_intermediate": 0.620828735588448
+        },
+        {
+          "radius_degrees": 14.0,
+          "unresolved_fraction_of_intermediate": 0.6008142764734979
+        },
+        {
+          "radius_degrees": 16.0,
+          "unresolved_fraction_of_intermediate": 0.5712491914310719
+        },
+        {
+          "radius_degrees": 18.0,
+          "unresolved_fraction_of_intermediate": 0.5577793843461055
+        }
+      ],
+      "angle_sweep": [
+        {
+          "angle_degrees": 90.0,
+          "unresolved_fraction_of_intermediate": 0.456413378486359
+        },
+        {
+          "angle_degrees": 105.0,
+          "unresolved_fraction_of_intermediate": 0.5422548609261444
+        },
+        {
+          "angle_degrees": 120.0,
+          "unresolved_fraction_of_intermediate": 0.620828735588448
+        },
+        {
+          "angle_degrees": 135.0,
+          "unresolved_fraction_of_intermediate": 0.7158403409307104
+        },
+        {
+          "angle_degrees": 150.0,
+          "unresolved_fraction_of_intermediate": 0.8036604391004909
+        }
+      ]
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-russia-gray-reasons/gray_failure_reasons_0500hpa.png",
+      "global_primary_rule_stats": {
+        "sector_cell_count": 1026720,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.08207593112046127,
+          "warm_core": 0.1847602072619604,
+          "cold_core": 0.15989169393797725
+        },
+        "intermediate_cell_fraction_of_sector": 0.21916296556023063,
+        "unresolved_gray_cell_fraction_of_sector": 0.13708703443976936,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.6255027353245726,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.40805683836589696,
+          "cold_core_too_far": 0.4383658969804618,
+          "both_cores_too_far": 0.012959147424511545,
+          "nearby_but_not_opposed": 0.1392682060390764
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 8.772819995880127,
+            "p90": 19.506361961364746
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 10.067019939422607,
+            "p90": 20.02815055847168
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 127.45135879516602,
+            "p90": 169.62588958740236
+          }
+        }
+      },
+      "primary_rule_sector_stats": {
+        "sector_cell_count": 60600,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.12965346534653466,
+          "warm_core": 0.0008250825082508251,
+          "cold_core": 0.4191089108910891
+        },
+        "intermediate_cell_fraction_of_sector": 0.5800660066006601,
+        "unresolved_gray_cell_fraction_of_sector": 0.4504125412541254,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.7764849795175239,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.7753068327532515,
+          "cold_core_too_far": 0.09543872504121634,
+          "both_cores_too_far": 0.027697380472614032,
+          "nearby_but_not_opposed": 0.10144715149294743
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 15.004437446594238,
+            "p90": 20.714025497436523
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 4.398807525634766,
+            "p90": 12.579668045043949
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 129.31033325195312,
+            "p90": 167.09844665527345
+          }
+        }
+      },
+      "radius_sweep": [
+        {
+          "radius_degrees": 8.0,
+          "unresolved_fraction_of_intermediate": 0.9662039144287665
+        },
+        {
+          "radius_degrees": 10.0,
+          "unresolved_fraction_of_intermediate": 0.8812585343650432
+        },
+        {
+          "radius_degrees": 12.0,
+          "unresolved_fraction_of_intermediate": 0.7764849795175239
+        },
+        {
+          "radius_degrees": 14.0,
+          "unresolved_fraction_of_intermediate": 0.6466488393263541
+        },
+        {
+          "radius_degrees": 16.0,
+          "unresolved_fraction_of_intermediate": 0.5375512061902594
+        },
+        {
+          "radius_degrees": 18.0,
+          "unresolved_fraction_of_intermediate": 0.43735776058261266
+        }
+      ],
+      "angle_sweep": [
+        {
+          "angle_degrees": 90.0,
+          "unresolved_fraction_of_intermediate": 0.7361458807464725
+        },
+        {
+          "angle_degrees": 105.0,
+          "unresolved_fraction_of_intermediate": 0.7516215293582158
+        },
+        {
+          "angle_degrees": 120.0,
+          "unresolved_fraction_of_intermediate": 0.7764849795175239
+        },
+        {
+          "angle_degrees": 135.0,
+          "unresolved_fraction_of_intermediate": 0.8181611288120164
+        },
+        {
+          "angle_degrees": 150.0,
+          "unresolved_fraction_of_intermediate": 0.8636777423759673
+        }
+      ]
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-russia-gray-reasons/gray_failure_reasons_0850hpa.png",
+      "global_primary_rule_stats": {
+        "sector_cell_count": 1026720,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.08624746766401746,
+          "warm_core": 0.19653556958080098,
+          "cold_core": 0.1655602306373695
+        },
+        "intermediate_cell_fraction_of_sector": 0.2017190665419978,
+        "unresolved_gray_cell_fraction_of_sector": 0.11547159887798036,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.5724377018864463,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.32002327994129404,
+          "cold_core_too_far": 0.3600462224921346,
+          "both_cores_too_far": 0.0003964337829061127,
+          "nearby_but_not_opposed": 0.31863154432045343
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 6.314326763153076,
+            "p90": 18.47526435852052
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 7.490845203399658,
+            "p90": 18.76406707763672
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 108.84803009033203,
+            "p90": 164.12641906738284
+          }
+        }
+      },
+      "primary_rule_sector_stats": {
+        "sector_cell_count": 60600,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.10717821782178218,
+          "warm_core": 0.005016501650165017,
+          "cold_core": 0.42234323432343235
+        },
+        "intermediate_cell_fraction_of_sector": 0.5726402640264027,
+        "unresolved_gray_cell_fraction_of_sector": 0.46546204620462045,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.8128349951011469,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.7619739780905449,
+          "cold_core_too_far": 0.012550076222214344,
+          "both_cores_too_far": 0.0003190697344630765,
+          "nearby_but_not_opposed": 0.22458964086928776
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 15.568197250366211,
+            "p90": 23.01212043762207
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 2.892845392227173,
+            "p90": 8.554847145080567
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 107.05862426757812,
+            "p90": 164.95358276367188
+          }
+        }
+      },
+      "radius_sweep": [
+        {
+          "radius_degrees": 8.0,
+          "unresolved_fraction_of_intermediate": 0.8990836263039594
+        },
+        {
+          "radius_degrees": 10.0,
+          "unresolved_fraction_of_intermediate": 0.857962077113711
+        },
+        {
+          "radius_degrees": 12.0,
+          "unresolved_fraction_of_intermediate": 0.8128349951011469
+        },
+        {
+          "radius_degrees": 14.0,
+          "unresolved_fraction_of_intermediate": 0.7492651720361939
+        },
+        {
+          "radius_degrees": 16.0,
+          "unresolved_fraction_of_intermediate": 0.6869632874185926
+        },
+        {
+          "radius_degrees": 18.0,
+          "unresolved_fraction_of_intermediate": 0.6313757132153767
+        }
+      ],
+      "angle_sweep": [
+        {
+          "angle_degrees": 90.0,
+          "unresolved_fraction_of_intermediate": 0.7250014408391448
+        },
+        {
+          "angle_degrees": 105.0,
+          "unresolved_fraction_of_intermediate": 0.7675926459570054
+        },
+        {
+          "angle_degrees": 120.0,
+          "unresolved_fraction_of_intermediate": 0.8128349951011469
+        },
+        {
+          "angle_degrees": 135.0,
+          "unresolved_fraction_of_intermediate": 0.8493458590282981
+        },
+        {
+          "angle_degrees": 150.0,
+          "unresolved_fraction_of_intermediate": 0.8943576739092848
+        }
+      ]
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-russia-gray-reasons/gray_failure_reasons_1000hpa.png",
+      "global_primary_rule_stats": {
+        "sector_cell_count": 1026720,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.07804269908056724,
+          "warm_core": 0.18026920679445224,
+          "cold_core": 0.1474170172978027
+        },
+        "intermediate_cell_fraction_of_sector": 0.23612864266791336,
+        "unresolved_gray_cell_fraction_of_sector": 0.15808594358734612,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.6694907563995743,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.4249091245148173,
+          "cold_core_too_far": 0.38139979052430534,
+          "both_cores_too_far": 0.008009364795761198,
+          "nearby_but_not_opposed": 0.18488078368554
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 9.260565280914307,
+            "p90": 19.543896293640138
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 7.777071714401245,
+            "p90": 18.226021194458006
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 124.02809524536133,
+            "p90": 170.41528778076173
+          }
+        }
+      },
+      "primary_rule_sector_stats": {
+        "sector_cell_count": 60600,
+        "core_and_transition_cell_fraction_of_sector": {
+          "validated_transition": 0.08927392739273927,
+          "warm_core": 0.0,
+          "cold_core": 0.3257095709570957
+        },
+        "intermediate_cell_fraction_of_sector": 0.6742904290429043,
+        "unresolved_gray_cell_fraction_of_sector": 0.585016501650165,
+        "unresolved_gray_cell_fraction_of_intermediate": 0.8676031520728305,
+        "exclusive_gray_failure_fraction_of_unresolved_gray": {
+          "warm_core_too_far": 0.8191075256685095,
+          "cold_core_too_far": 0.033735755387566284,
+          "both_cores_too_far": 0.03023806837413968,
+          "nearby_but_not_opposed": 0.11669299334311181
+        },
+        "unresolved_gray_metrics": {
+          "nearest_warm_core_distance_degrees": {
+            "median": 17.175491333007812,
+            "p90": 26.5
+          },
+          "nearest_cold_core_distance_degrees": {
+            "median": 3.942555785179138,
+            "p90": 10.527571201324465
+          },
+          "warm_cold_bearing_opposition_angle_degrees": {
+            "median": 116.43238067626953,
+            "p90": 166.62954711914062
+          }
+        }
+      },
+      "radius_sweep": [
+        {
+          "radius_degrees": 8.0,
+          "unresolved_fraction_of_intermediate": 0.9635847486662424
+        },
+        {
+          "radius_degrees": 10.0,
+          "unresolved_fraction_of_intermediate": 0.9237188585972297
+        },
+        {
+          "radius_degrees": 12.0,
+          "unresolved_fraction_of_intermediate": 0.8676031520728305
+        },
+        {
+          "radius_degrees": 14.0,
+          "unresolved_fraction_of_intermediate": 0.8056629631442416
+        },
+        {
+          "radius_degrees": 16.0,
+          "unresolved_fraction_of_intermediate": 0.7512358670647545
+        },
+        {
+          "radius_degrees": 18.0,
+          "unresolved_fraction_of_intermediate": 0.703147178307474
+        }
+      ],
+      "angle_sweep": [
+        {
+          "angle_degrees": 90.0,
+          "unresolved_fraction_of_intermediate": 0.8024081053301356
+        },
+        {
+          "angle_degrees": 105.0,
+          "unresolved_fraction_of_intermediate": 0.8298908521364593
+        },
+        {
+          "angle_degrees": 120.0,
+          "unresolved_fraction_of_intermediate": 0.8676031520728305
+        },
+        {
+          "angle_degrees": 135.0,
+          "unresolved_fraction_of_intermediate": 0.915765258675542
+        },
+        {
+          "angle_degrees": 150.0,
+          "unresolved_fraction_of_intermediate": 0.9543341001419412
+        }
+      ]
+    }
+  ]
+}

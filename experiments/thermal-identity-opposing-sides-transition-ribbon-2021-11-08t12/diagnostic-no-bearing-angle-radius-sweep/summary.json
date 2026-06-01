@@ -1,0 +1,988 @@
+{
+  "diagnostic": "global-no-bearing-angle-radius-sweep",
+  "date_run": "2026-05-31",
+  "timestamp": "2021-11-08T12:00 UTC",
+  "levels_hpa": [
+    250.0,
+    500.0,
+    850.0,
+    1000.0
+  ],
+  "rendered_absolute_latitude_band_degrees": [
+    20.0,
+    70.0
+  ],
+  "warm_core_max_abs_equivalent_latitude_degrees": 35.0,
+  "cold_core_min_abs_equivalent_latitude_degrees": 55.0,
+  "bearing_angle_gate_applied": false,
+  "current_search_radius_degrees": 12.0,
+  "radius_sweep_degrees": [
+    0.0,
+    1.0,
+    2.0,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0,
+    10.0,
+    11.0,
+    12.0,
+    13.0,
+    14.0,
+    15.0,
+    16.0,
+    17.0,
+    18.0,
+    19.0,
+    20.0,
+    21.0,
+    22.0,
+    23.0,
+    24.0,
+    25.0,
+    26.0,
+    27.0,
+    28.0,
+    29.0,
+    30.0
+  ],
+  "elbow_note": "Elbow candidates use maximum normalized distance from the straight line joining the first and last sweep points. They identify curve-shape bends, not meteorologically proven optimal radii.",
+  "plot": "tmp/thermal-identity-opposing-sides-transition-ribbon-2021-11-08t12/diagnostic-no-bearing-angle-radius-sweep/remaining_gray_by_search_radius.png",
+  "levels": [
+    {
+      "pressure_level_hpa": 250.0,
+      "intermediate_cell_fraction_of_rendered_band": 0.2757324488667772,
+      "radius_sweep": [
+        {
+          "radius_degrees": 0.0,
+          "radius_approx_km": 0.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2757324488667772,
+          "remaining_gray_cell_fraction_of_intermediate_air": 1.0,
+          "yellow_cell_fraction_of_rendered_band": 0.0
+        },
+        {
+          "radius_degrees": 1.0,
+          "radius_approx_km": 111.19999694824219,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2689745715865119,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.97549117882919,
+          "yellow_cell_fraction_of_rendered_band": 0.00675787728026534
+        },
+        {
+          "radius_degrees": 2.0,
+          "radius_approx_km": 222.39999389648438,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.24483830845771146,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.887956094627105,
+          "yellow_cell_fraction_of_rendered_band": 0.030894140409065782
+        },
+        {
+          "radius_degrees": 3.0,
+          "radius_approx_km": 333.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.21211477335544499,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.7692775160384924,
+          "yellow_cell_fraction_of_rendered_band": 0.06361767551133223
+        },
+        {
+          "radius_degrees": 4.0,
+          "radius_approx_km": 444.79998779296875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.17879353233830847,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.6484312349639134,
+          "yellow_cell_fraction_of_rendered_band": 0.09693891652846877
+        },
+        {
+          "radius_degrees": 5.0,
+          "radius_approx_km": 556.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.14995681315644002,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.5438489875701684,
+          "yellow_cell_fraction_of_rendered_band": 0.1257756357103372
+        },
+        {
+          "radius_degrees": 6.0,
+          "radius_approx_km": 667.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.12602957435046988,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.45707197273456296,
+          "yellow_cell_fraction_of_rendered_band": 0.14970287451630734
+        },
+        {
+          "radius_degrees": 7.0,
+          "radius_approx_km": 778.3999633789062,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.10570584577114428,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.3833638231756215,
+          "yellow_cell_fraction_of_rendered_band": 0.17002660309563294
+        },
+        {
+          "radius_degrees": 8.0,
+          "radius_approx_km": 889.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.08874723604201216,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.32185996391339217,
+          "yellow_cell_fraction_of_rendered_band": 0.18698521282476507
+        },
+        {
+          "radius_degrees": 9.0,
+          "radius_approx_km": 1000.7999877929688,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.07429346323935876,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.2694404069767442,
+          "yellow_cell_fraction_of_rendered_band": 0.20143898562741847
+        },
+        {
+          "radius_degrees": 10.0,
+          "radius_approx_km": 1112.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.061257946379215035,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.22216444466720128,
+          "yellow_cell_fraction_of_rendered_band": 0.2144745024875622
+        },
+        {
+          "radius_degrees": 11.0,
+          "radius_approx_km": 1223.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.050559701492537315,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.18336507618283882,
+          "yellow_cell_fraction_of_rendered_band": 0.22517274737423992
+        },
+        {
+          "radius_degrees": 12.0,
+          "radius_approx_km": 1334.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.04207089552238806,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.1525786888532478,
+          "yellow_cell_fraction_of_rendered_band": 0.23366155334438918
+        },
+        {
+          "radius_degrees": 13.0,
+          "radius_approx_km": 1445.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.03490706191265893,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.126597584202085,
+          "yellow_cell_fraction_of_rendered_band": 0.2408253869541183
+        },
+        {
+          "radius_degrees": 14.0,
+          "radius_approx_km": 1556.7999267578125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.028071448313985628,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.10180683640737771,
+          "yellow_cell_fraction_of_rendered_band": 0.2476610005527916
+        },
+        {
+          "radius_degrees": 15.0,
+          "radius_approx_km": 1668.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.021907822001105585,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.07945318765036087,
+          "yellow_cell_fraction_of_rendered_band": 0.25382462686567164
+        },
+        {
+          "radius_degrees": 16.0,
+          "radius_approx_km": 1779.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.01673403814262023,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.06068940457097033,
+          "yellow_cell_fraction_of_rendered_band": 0.25899841072415697
+        },
+        {
+          "radius_degrees": 17.0,
+          "radius_approx_km": 1890.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.012981965174129353,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.04708174619085806,
+          "yellow_cell_fraction_of_rendered_band": 0.26275048369264786
+        },
+        {
+          "radius_degrees": 18.0,
+          "radius_approx_km": 2001.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.010516860143725815,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.03814153969526864,
+          "yellow_cell_fraction_of_rendered_band": 0.2652155887230514
+        },
+        {
+          "radius_degrees": 19.0,
+          "radius_approx_km": 2112.800048828125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.008236594803758983,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.02987169206094627,
+          "yellow_cell_fraction_of_rendered_band": 0.26749585406301823
+        },
+        {
+          "radius_degrees": 20.0,
+          "radius_approx_km": 2224.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.00632773631840796,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.02294882718524459,
+          "yellow_cell_fraction_of_rendered_band": 0.2694047125483693
+        },
+        {
+          "radius_degrees": 21.0,
+          "radius_approx_km": 2335.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.004633084577114428,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.016802826784282278,
+          "yellow_cell_fraction_of_rendered_band": 0.2710993642896628
+        },
+        {
+          "radius_degrees": 22.0,
+          "radius_approx_km": 2446.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.003169914317302377,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.011496341218925421,
+          "yellow_cell_fraction_of_rendered_band": 0.2725625345494748
+        },
+        {
+          "radius_degrees": 23.0,
+          "radius_approx_km": 2557.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0018432144831398562,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.006684793504410585,
+          "yellow_cell_fraction_of_rendered_band": 0.2738892343836374
+        },
+        {
+          "radius_degrees": 24.0,
+          "radius_approx_km": 2668.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.00070308181315644,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0025498696872493986,
+          "yellow_cell_fraction_of_rendered_band": 0.2750293670536208
+        },
+        {
+          "radius_degrees": 25.0,
+          "radius_approx_km": 2780.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 4.318684355997789e-05,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.00015662590216519647,
+          "yellow_cell_fraction_of_rendered_band": 0.27568926202321725
+        },
+        {
+          "radius_degrees": 26.0,
+          "radius_approx_km": 2891.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0,
+          "yellow_cell_fraction_of_rendered_band": 0.2757324488667772
+        },
+        {
+          "radius_degrees": 27.0,
+          "radius_approx_km": 3002.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0,
+          "yellow_cell_fraction_of_rendered_band": 0.2757324488667772
+        },
+        {
+          "radius_degrees": 28.0,
+          "radius_approx_km": 3113.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0,
+          "yellow_cell_fraction_of_rendered_band": 0.2757324488667772
+        },
+        {
+          "radius_degrees": 29.0,
+          "radius_approx_km": 3224.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0,
+          "yellow_cell_fraction_of_rendered_band": 0.2757324488667772
+        },
+        {
+          "radius_degrees": 30.0,
+          "radius_approx_km": 3336.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0,
+          "yellow_cell_fraction_of_rendered_band": 0.2757324488667772
+        }
+      ],
+      "elbow_candidate_from_gray_share_of_intermediate_air": {
+        "radius_degrees": 11.0,
+        "radius_approx_km": 1223.2,
+        "normalized_distance_from_endpoint_line": 0.4499682571504945
+      },
+      "elbow_candidate_from_gray_share_of_rendered_band": {
+        "radius_degrees": 11.0,
+        "radius_approx_km": 1223.2,
+        "normalized_distance_from_endpoint_line": 0.4499682571504945
+      }
+    },
+    {
+      "pressure_level_hpa": 500.0,
+      "intermediate_cell_fraction_of_rendered_band": 0.38871441404090656,
+      "radius_sweep": [
+        {
+          "radius_degrees": 0.0,
+          "radius_approx_km": 0.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.38871441404090656,
+          "remaining_gray_cell_fraction_of_intermediate_air": 1.0,
+          "yellow_cell_fraction_of_rendered_band": 0.0
+        },
+        {
+          "radius_degrees": 1.0,
+          "radius_approx_km": 111.19999694824219,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.38870059425096737,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.99996444744666,
+          "yellow_cell_fraction_of_rendered_band": 1.3819789939192925e-05
+        },
+        {
+          "radius_degrees": 2.0,
+          "radius_approx_km": 222.39999389648438,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3880406992813709,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9982668130246779,
+          "yellow_cell_fraction_of_rendered_band": 0.000673714759535655
+        },
+        {
+          "radius_degrees": 3.0,
+          "radius_approx_km": 333.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.38604373963515753,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9931294690670566,
+          "yellow_cell_fraction_of_rendered_band": 0.0026706744057490325
+        },
+        {
+          "radius_degrees": 4.0,
+          "radius_approx_km": 444.79998779296875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.38057283029297956,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9790551020136078,
+          "yellow_cell_fraction_of_rendered_band": 0.008141583747927032
+        },
+        {
+          "radius_degrees": 5.0,
+          "radius_approx_km": 556.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.37142240187949144,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9555148676333999,
+          "yellow_cell_fraction_of_rendered_band": 0.017292012161415148
+        },
+        {
+          "radius_degrees": 6.0,
+          "radius_approx_km": 667.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.35693926202321724,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9182557917331425,
+          "yellow_cell_fraction_of_rendered_band": 0.03177515201768933
+        },
+        {
+          "radius_degrees": 7.0,
+          "radius_approx_km": 778.3999633789062,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.33948832227750136,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.8733618050031331,
+          "yellow_cell_fraction_of_rendered_band": 0.04922609176340519
+        },
+        {
+          "radius_degrees": 8.0,
+          "radius_approx_km": 889.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3177877971254837,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.817535408121092,
+          "yellow_cell_fraction_of_rendered_band": 0.07092661691542289
+        },
+        {
+          "radius_degrees": 9.0,
+          "radius_approx_km": 1000.7999877929688,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.292191818684356,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.7516876352663553,
+          "yellow_cell_fraction_of_rendered_band": 0.09652259535655058
+        },
+        {
+          "radius_degrees": 10.0,
+          "radius_approx_km": 1112.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2648165422885572,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.6812624711691013,
+          "yellow_cell_fraction_of_rendered_band": 0.12389787175234937
+        },
+        {
+          "radius_degrees": 11.0,
+          "radius_approx_km": 1223.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.23679346323935876,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.6091707811340376,
+          "yellow_cell_fraction_of_rendered_band": 0.15192095080154783
+        },
+        {
+          "radius_degrees": 12.0,
+          "radius_approx_km": 1334.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2089517689331122,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.5375457183615606,
+          "yellow_cell_fraction_of_rendered_band": 0.17976264510779436
+        },
+        {
+          "radius_degrees": 13.0,
+          "radius_approx_km": 1445.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.18208609729132116,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.4684315546687169,
+          "yellow_cell_fraction_of_rendered_band": 0.2066283167495854
+        },
+        {
+          "radius_degrees": 14.0,
+          "radius_approx_km": 1556.7999267578125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.1562430901050304,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.40194827992302873,
+          "yellow_cell_fraction_of_rendered_band": 0.23247132393587616
+        },
+        {
+          "radius_degrees": 15.0,
+          "radius_approx_km": 1668.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.13230894140409066,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.3403757016074198,
+          "yellow_cell_fraction_of_rendered_band": 0.2564054726368159
+        },
+        {
+          "radius_degrees": 16.0,
+          "radius_approx_km": 1779.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.11097118573797678,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.28548255925055216,
+          "yellow_cell_fraction_of_rendered_band": 0.2777432283029298
+        },
+        {
+          "radius_degrees": 17.0,
+          "radius_approx_km": 1890.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.09143000276395799,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.23521124882787675,
+          "yellow_cell_fraction_of_rendered_band": 0.2972844112769486
+        },
+        {
+          "radius_degrees": 18.0,
+          "radius_approx_km": 2001.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.07406716417910447,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.1905439096254094,
+          "yellow_cell_fraction_of_rendered_band": 0.3146472498618021
+        },
+        {
+          "radius_degrees": 19.0,
+          "radius_approx_km": 2112.800048828125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.058939676616915425,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.1516271959256774,
+          "yellow_cell_fraction_of_rendered_band": 0.32977473742399116
+        },
+        {
+          "radius_degrees": 20.0,
+          "radius_approx_km": 2224.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.04588515754560531,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.1180433652269364,
+          "yellow_cell_fraction_of_rendered_band": 0.34282925649530127
+        },
+        {
+          "radius_degrees": 21.0,
+          "radius_approx_km": 2335.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.03488805970149254,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.089752420906679,
+          "yellow_cell_fraction_of_rendered_band": 0.35382635433941406
+        },
+        {
+          "radius_degrees": 22.0,
+          "radius_approx_km": 2446.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.02546814538419016,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.06551891173634226,
+          "yellow_cell_fraction_of_rendered_band": 0.36324626865671644
+        },
+        {
+          "radius_degrees": 23.0,
+          "radius_approx_km": 2557.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.017727335544499723,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.045605037796808266,
+          "yellow_cell_fraction_of_rendered_band": 0.37098707849640683
+        },
+        {
+          "radius_degrees": 24.0,
+          "radius_approx_km": 2668.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.011662175234936428,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.03000191094974202,
+          "yellow_cell_fraction_of_rendered_band": 0.37705223880597016
+        },
+        {
+          "radius_degrees": 25.0,
+          "radius_approx_km": 2780.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.007454049198452183,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.019176158457730238,
+          "yellow_cell_fraction_of_rendered_band": 0.3812603648424544
+        },
+        {
+          "radius_degrees": 26.0,
+          "radius_approx_km": 2891.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.00433595909342178,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.011154613610406233,
+          "yellow_cell_fraction_of_rendered_band": 0.3843784549474848
+        },
+        {
+          "radius_degrees": 27.0,
+          "radius_approx_km": 3002.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.002171434494195688,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.005586194943538101,
+          "yellow_cell_fraction_of_rendered_band": 0.3865429795467109
+        },
+        {
+          "radius_degrees": 28.0,
+          "radius_approx_km": 3113.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.00109349087893864,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.002813095783022767,
+          "yellow_cell_fraction_of_rendered_band": 0.38762092316196795
+        },
+        {
+          "radius_degrees": 29.0,
+          "radius_approx_km": 3224.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0005614289662797126,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0014443224794350698,
+          "yellow_cell_fraction_of_rendered_band": 0.38815298507462687
+        },
+        {
+          "radius_degrees": 30.0,
+          "radius_approx_km": 3336.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.000433595909342178,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0011154613610406233,
+          "yellow_cell_fraction_of_rendered_band": 0.3882808181315644
+        }
+      ],
+      "elbow_candidate_from_gray_share_of_intermediate_air": {
+        "radius_degrees": 20.0,
+        "radius_approx_km": 2224.0,
+        "normalized_distance_from_endpoint_line": 0.21627485525816253
+      },
+      "elbow_candidate_from_gray_share_of_rendered_band": {
+        "radius_degrees": 20.0,
+        "radius_approx_km": 2224.0,
+        "normalized_distance_from_endpoint_line": 0.21627485525816253
+      }
+    },
+    {
+      "pressure_level_hpa": 850.0,
+      "intermediate_cell_fraction_of_rendered_band": 0.3577753593145384,
+      "radius_sweep": [
+        {
+          "radius_degrees": 0.0,
+          "radius_approx_km": 0.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3577753593145384,
+          "remaining_gray_cell_fraction_of_intermediate_air": 1.0,
+          "yellow_cell_fraction_of_rendered_band": 0.0
+        },
+        {
+          "radius_degrees": 1.0,
+          "radius_approx_km": 111.19999694824219,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.35770971531232726,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9998165217349319,
+          "yellow_cell_fraction_of_rendered_band": 6.564400221116639e-05
+        },
+        {
+          "radius_degrees": 2.0,
+          "radius_approx_km": 222.39999389648438,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.35553137092316195,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9937279403599071,
+          "yellow_cell_fraction_of_rendered_band": 0.002243988391376451
+        },
+        {
+          "radius_degrees": 3.0,
+          "radius_approx_km": 333.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.34905852681039246,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9756360177491079,
+          "yellow_cell_fraction_of_rendered_band": 0.008716832504145938
+        },
+        {
+          "radius_degrees": 4.0,
+          "radius_approx_km": 444.79998779296875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3375034549474848,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9433390147217166,
+          "yellow_cell_fraction_of_rendered_band": 0.02027190436705362
+        },
+        {
+          "radius_degrees": 5.0,
+          "radius_approx_km": 556.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3206070342730791,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.8961126749682534,
+          "yellow_cell_fraction_of_rendered_band": 0.03716832504145937
+        },
+        {
+          "radius_degrees": 6.0,
+          "radius_approx_km": 667.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2986162935323383,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.8346474561704224,
+          "yellow_cell_fraction_of_rendered_band": 0.059159065782200114
+        },
+        {
+          "radius_degrees": 7.0,
+          "radius_approx_km": 778.3999633789062,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.27210820895522386,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.7605560357106644,
+          "yellow_cell_fraction_of_rendered_band": 0.08566715035931453
+        },
+        {
+          "radius_degrees": 8.0,
+          "radius_approx_km": 889.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.24360489220563847,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.680887841667914,
+          "yellow_cell_fraction_of_rendered_band": 0.11417046710889994
+        },
+        {
+          "radius_degrees": 9.0,
+          "radius_approx_km": 1000.7999877929688,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.21573210337202875,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.6029820046448972,
+          "yellow_cell_fraction_of_rendered_band": 0.14204325594250966
+        },
+        {
+          "radius_degrees": 10.0,
+          "radius_approx_km": 1112.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.1892654781647319,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.529006465194656,
+          "yellow_cell_fraction_of_rendered_band": 0.16850988114980653
+        },
+        {
+          "radius_degrees": 11.0,
+          "radius_approx_km": 1223.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.16373168877833058,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.4576382484585412,
+          "yellow_cell_fraction_of_rendered_band": 0.19404367053620786
+        },
+        {
+          "radius_degrees": 12.0,
+          "radius_approx_km": 1334.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.13936221669430623,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.38952435673968777,
+          "yellow_cell_fraction_of_rendered_band": 0.21841314262023218
+        },
+        {
+          "radius_degrees": 13.0,
+          "radius_approx_km": 1445.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.11676513266998341,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.32636437817767455,
+          "yellow_cell_fraction_of_rendered_band": 0.24101022664455501
+        },
+        {
+          "radius_degrees": 14.0,
+          "radius_approx_km": 1556.7999267578125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.09768691265892758,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.2730398002983936,
+          "yellow_cell_fraction_of_rendered_band": 0.2600884466556108
+        },
+        {
+          "radius_degrees": 15.0,
+          "radius_approx_km": 1668.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.08170605306799336,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.22837249950509153,
+          "yellow_cell_fraction_of_rendered_band": 0.2760693062465451
+        },
+        {
+          "radius_degrees": 16.0,
+          "radius_approx_km": 1779.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.06829912935323383,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.19089947805261964,
+          "yellow_cell_fraction_of_rendered_band": 0.28947622996130457
+        },
+        {
+          "radius_degrees": 17.0,
+          "radius_approx_km": 1890.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.056754422332780545,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.15863144527760745,
+          "yellow_cell_fraction_of_rendered_band": 0.30102093698175786
+        },
+        {
+          "radius_degrees": 18.0,
+          "radius_approx_km": 2001.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.046722982310668876,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.13059306934995582,
+          "yellow_cell_fraction_of_rendered_band": 0.31105237700386956
+        },
+        {
+          "radius_degrees": 19.0,
+          "radius_approx_km": 2112.800048828125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0376934770591487,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.10535515115229178,
+          "yellow_cell_fraction_of_rendered_band": 0.3200818822553897
+        },
+        {
+          "radius_degrees": 20.0,
+          "radius_approx_km": 2224.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.029386055831951353,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.08213549387037744,
+          "yellow_cell_fraction_of_rendered_band": 0.32838930348258705
+        },
+        {
+          "radius_degrees": 21.0,
+          "radius_approx_km": 2335.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.02212548369264787,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.06184183207876046,
+          "yellow_cell_fraction_of_rendered_band": 0.3356498756218905
+        },
+        {
+          "radius_degrees": 22.0,
+          "radius_approx_km": 2446.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.01618988391376451,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.045251534216282245,
+          "yellow_cell_fraction_of_rendered_band": 0.3415854754007739
+        },
+        {
+          "radius_degrees": 23.0,
+          "radius_approx_km": 2557.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.01136850469872858,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.031775538484566095,
+          "yellow_cell_fraction_of_rendered_band": 0.34640685461580983
+        },
+        {
+          "radius_degrees": 24.0,
+          "radius_approx_km": 2668.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.007606066887783306,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.021259336870923042,
+          "yellow_cell_fraction_of_rendered_band": 0.3501692924267551
+        },
+        {
+          "radius_degrees": 25.0,
+          "radius_approx_km": 2780.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.004752280265339967,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.013282860715854937,
+          "yellow_cell_fraction_of_rendered_band": 0.35302307904919844
+        },
+        {
+          "radius_degrees": 26.0,
+          "radius_approx_km": 2891.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0026240326147042563,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.00733430222732957,
+          "yellow_cell_fraction_of_rendered_band": 0.3551513266998342
+        },
+        {
+          "radius_degrees": 27.0,
+          "radius_approx_km": 3002.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0011764096185737977,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0032881236450371543,
+          "yellow_cell_fraction_of_rendered_band": 0.3565989496959646
+        },
+        {
+          "radius_degrees": 28.0,
+          "radius_approx_km": 3113.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.000492330016583748,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.001376086988011144,
+          "yellow_cell_fraction_of_rendered_band": 0.3572830292979547
+        },
+        {
+          "radius_degrees": 29.0,
+          "radius_approx_km": 3224.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0001779297954671089,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0004973226658426239,
+          "yellow_cell_fraction_of_rendered_band": 0.3575974295190713
+        },
+        {
+          "radius_degrees": 30.0,
+          "radius_approx_km": 3336.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.0,
+          "yellow_cell_fraction_of_rendered_band": 0.3577753593145384
+        }
+      ],
+      "elbow_candidate_from_gray_share_of_intermediate_air": {
+        "radius_degrees": 16.0,
+        "radius_approx_km": 1779.2,
+        "normalized_distance_from_endpoint_line": 0.27576718861404703
+      },
+      "elbow_candidate_from_gray_share_of_rendered_band": {
+        "radius_degrees": 16.0,
+        "radius_approx_km": 1779.2,
+        "normalized_distance_from_endpoint_line": 0.27576718861404703
+      }
+    },
+    {
+      "pressure_level_hpa": 1000.0,
+      "intermediate_cell_fraction_of_rendered_band": 0.4188052791597568,
+      "radius_sweep": [
+        {
+          "radius_degrees": 0.0,
+          "radius_approx_km": 0.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.4188052791597568,
+          "remaining_gray_cell_fraction_of_intermediate_air": 1.0,
+          "yellow_cell_fraction_of_rendered_band": 0.0
+        },
+        {
+          "radius_degrees": 1.0,
+          "radius_approx_km": 111.19999694824219,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.4188052791597568,
+          "remaining_gray_cell_fraction_of_intermediate_air": 1.0,
+          "yellow_cell_fraction_of_rendered_band": 0.0
+        },
+        {
+          "radius_degrees": 2.0,
+          "radius_approx_km": 222.39999389648438,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.41879491431730237,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9999752514044828,
+          "yellow_cell_fraction_of_rendered_band": 1.0364842454394693e-05
+        },
+        {
+          "radius_degrees": 3.0,
+          "radius_approx_km": 333.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.4181522940851299,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9984408384824162,
+          "yellow_cell_fraction_of_rendered_band": 0.0006529850746268657
+        },
+        {
+          "radius_degrees": 4.0,
+          "radius_approx_km": 444.79998779296875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.4146524322830293,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.99008406272944,
+          "yellow_cell_fraction_of_rendered_band": 0.004152846876727474
+        },
+        {
+          "radius_degrees": 5.0,
+          "radius_approx_km": 556.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.4082210475400774,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9747275592110147,
+          "yellow_cell_fraction_of_rendered_band": 0.01058423161967938
+        },
+        {
+          "radius_degrees": 6.0,
+          "radius_approx_km": 667.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.39813260088446656,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9506389262409358,
+          "yellow_cell_fraction_of_rendered_band": 0.020672678275290214
+        },
+        {
+          "radius_degrees": 7.0,
+          "radius_approx_km": 778.3999633789062,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3814953012714207,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.9109133056699033,
+          "yellow_cell_fraction_of_rendered_band": 0.0373099778883361
+        },
+        {
+          "radius_degrees": 8.0,
+          "radius_approx_km": 889.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3591711580983969,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.8576089556917645,
+          "yellow_cell_fraction_of_rendered_band": 0.05963412106135987
+        },
+        {
+          "radius_degrees": 9.0,
+          "radius_approx_km": 1000.7999877929688,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.3310288833609729,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.790412394096635,
+          "yellow_cell_fraction_of_rendered_band": 0.08777639579878385
+        },
+        {
+          "radius_degrees": 10.0,
+          "radius_approx_km": 1112.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2994385710337203,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.7149827997261156,
+          "yellow_cell_fraction_of_rendered_band": 0.11936670812603649
+        },
+        {
+          "radius_degrees": 11.0,
+          "radius_approx_km": 1223.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2641894693200663,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.6308169511380229,
+          "yellow_cell_fraction_of_rendered_band": 0.15461580983969045
+        },
+        {
+          "radius_degrees": 12.0,
+          "radius_approx_km": 1334.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.2283236594803759,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.5451785611166566,
+          "yellow_cell_fraction_of_rendered_band": 0.19048161967938088
+        },
+        {
+          "radius_degrees": 13.0,
+          "radius_approx_km": 1445.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.19483830845771144,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.46522409853240826,
+          "yellow_cell_fraction_of_rendered_band": 0.22396697070204533
+        },
+        {
+          "radius_degrees": 14.0,
+          "radius_approx_km": 1556.7999267578125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.16413073521282476,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.3919022595467707,
+          "yellow_cell_fraction_of_rendered_band": 0.254674543946932
+        },
+        {
+          "radius_degrees": 15.0,
+          "radius_approx_km": 1668.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.13619402985074627,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.3251965450960658,
+          "yellow_cell_fraction_of_rendered_band": 0.2826112493090105
+        },
+        {
+          "radius_degrees": 16.0,
+          "radius_approx_km": 1779.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.11087962962962963,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.26475222531121356,
+          "yellow_cell_fraction_of_rendered_band": 0.30792564953012713
+        },
+        {
+          "radius_degrees": 17.0,
+          "radius_approx_km": 1890.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.08880769762299613,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.21205009115732681,
+          "yellow_cell_fraction_of_rendered_band": 0.3299975815367606
+        },
+        {
+          "radius_degrees": 18.0,
+          "radius_approx_km": 2001.5999755859375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.07035482310668878,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.16798934160486392,
+          "yellow_cell_fraction_of_rendered_band": 0.348450456053068
+        },
+        {
+          "radius_degrees": 19.0,
+          "radius_approx_km": 2112.800048828125,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.05499412658927584,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.131311923048367,
+          "yellow_cell_fraction_of_rendered_band": 0.3638111525704809
+        },
+        {
+          "radius_degrees": 20.0,
+          "radius_approx_km": 2224.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.042623687119955775,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.10177447429858355,
+          "yellow_cell_fraction_of_rendered_band": 0.376181592039801
+        },
+        {
+          "radius_degrees": 21.0,
+          "radius_approx_km": 2335.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.03346980375898286,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.07991733969097253,
+          "yellow_cell_fraction_of_rendered_band": 0.3853354754007739
+        },
+        {
+          "radius_degrees": 22.0,
+          "radius_approx_km": 2446.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.026663557213930347,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.06366576196800831,
+          "yellow_cell_fraction_of_rendered_band": 0.3921417219458264
+        },
+        {
+          "radius_degrees": 23.0,
+          "radius_approx_km": 2557.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.021294568822553896,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.05084598949009644,
+          "yellow_cell_fraction_of_rendered_band": 0.39751071033720287
+        },
+        {
+          "radius_degrees": 24.0,
+          "radius_approx_km": 2668.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.017136539524599224,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.04091767792177794,
+          "yellow_cell_fraction_of_rendered_band": 0.40166873963515753
+        },
+        {
+          "radius_degrees": 25.0,
+          "radius_approx_km": 2780.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.013374101713653953,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.03193393774903274,
+          "yellow_cell_fraction_of_rendered_band": 0.4054311774461028
+        },
+        {
+          "radius_degrees": 26.0,
+          "radius_approx_km": 2891.199951171875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.009836235489220564,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.023486417145826975,
+          "yellow_cell_fraction_of_rendered_band": 0.4089690436705362
+        },
+        {
+          "radius_degrees": 27.0,
+          "radius_approx_km": 3002.39990234375,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.006773424543946932,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.016173207170493073,
+          "yellow_cell_fraction_of_rendered_band": 0.4120318546158098
+        },
+        {
+          "radius_degrees": 28.0,
+          "radius_approx_km": 3113.599853515625,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.004246130458817026,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.010138674630214735,
+          "yellow_cell_fraction_of_rendered_band": 0.41455914870093974
+        },
+        {
+          "radius_degrees": 29.0,
+          "radius_approx_km": 3224.7998046875,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0023372719734660033,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.005580808289129592,
+          "yellow_cell_fraction_of_rendered_band": 0.4164680071862908
+        },
+        {
+          "radius_degrees": 30.0,
+          "radius_approx_km": 3336.0,
+          "remaining_gray_cell_fraction_of_rendered_band": 0.0012489635157545604,
+          "remaining_gray_cell_fraction_of_intermediate_air": 0.00298220575982313,
+          "yellow_cell_fraction_of_rendered_band": 0.4175563156440022
+        }
+      ],
+      "elbow_candidate_from_gray_share_of_intermediate_air": {
+        "radius_degrees": 19.0,
+        "radius_approx_km": 2112.8,
+        "normalized_distance_from_endpoint_line": 0.23795309903536538
+      },
+      "elbow_candidate_from_gray_share_of_rendered_band": {
+        "radius_degrees": 19.0,
+        "radius_approx_km": 2112.8,
+        "normalized_distance_from_endpoint_line": 0.2379530990353654
+      }
+    }
+  ]
+}

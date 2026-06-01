@@ -192,3 +192,6 @@ maybe make some sort of plot viewer that makes it easy to compare plots
 - is the climatology boundaries representative of sharp or gradual transition air? what does the average represent?
 - honestly looking for cold/hot air isnt exciting really, the so what isnt really there for me anymore
 - looking for cold vs hot air does mean big gradient just that the 2 air masses have to be specific temperatures. looking for a specific kind of big gradient. can maybe apply the piecewise line segment thing to air too. then at higher levels i should clearly see the jetstream and then use that as a seed at lower levels to find other gradients?
+
+31-05-26
+- some of the yellow show maybe be classified as hot/cold? i dont know seems really broad and more diffuse than gph might suggest
